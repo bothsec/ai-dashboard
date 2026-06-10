@@ -96,7 +96,7 @@ export const ChatInput: React.FC = () => {
           {/* File previews */}
           {selectedFiles.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
-              {selectedFiles.map((file, index) => (
+              {selectedFiles.map((file) => (
                 <div key={file.name} className="flex items-center bg-gray-800/50 rounded-xl px-3 py-1.5 text-sm">
                   <span className="truncate max-w-[150px]">{file.name}</span>
                   <button
