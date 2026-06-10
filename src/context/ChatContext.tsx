@@ -20,6 +20,17 @@ interface ChatContextType extends ChatState {
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
+const generateId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { settings } = useSettings();
   
@@ -71,7 +82,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const createNewChat = useCallback(() => {
     const newChat: Chat = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       title: 'New Chat',
       messages: [],
       createdAt: Date.now(),
@@ -107,7 +118,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Create chat if none exists
     if (!currentChatId) {
       const newChat: Chat = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         title: content.slice(0, 40) + (content.length > 40 ? '...' : ''),
         messages: [],
         createdAt: Date.now(),
@@ -122,13 +133,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const userMessage: Message = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       role: 'user',
       content,
       timestamp: Date.now(),
     };
 
-    const assistantMessageId = crypto.randomUUID();
+    const assistantMessageId = generateId();
     const assistantMessage: Message = {
       id: assistantMessageId,
       role: 'assistant',
