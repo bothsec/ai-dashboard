@@ -71,3 +71,34 @@ export default defineConfig([
   },
 ])
 ```
+
+## Debugging
+
+### Vite Server Debug Logs
+To see detailed logs about the Vite development server (HMR, dependency resolution, etc.), use the `--debug` flag:
+
+```bash
+npm run dev -- --debug
+```
+
+Or using the `DEBUG` environment variable:
+
+```bash
+# PowerShell
+$env:DEBUG = "vite:*"; npm run dev
+
+# Bash
+DEBUG=vite:* npm run dev
+```
+
+### Browser Debug Logs
+Most frontend debugging occurs in the **Browser Developer Tools** (F12):
+- **Console Tab:** View application errors and logs.
+- **Network Tab:** Inspect API calls to `/api/*`. For AI streaming, check the **EventStream** or **Response** tab of the specific request to see raw SSE chunks.
+
+### Benchmark Tool
+To run the agentic model benchmark script:
+```bash
+node benchmark_agentic.cjs
+```
+

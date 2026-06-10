@@ -11,9 +11,12 @@ interface MessageItemProps {
   msg: Message;
   isStreaming: boolean;
   isLast: boolean;
+  streamingContent?: string;
 }
 
-const MessageItem = memo(({ msg, isStreaming, isLast }: MessageItemProps) => {
+const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent }: MessageItemProps) => {
+  const displayContent = (isLast && streamingContent) || msg.content;
+
   return (
     <div
       className={`flex gap-4 md:gap-6 group animate-in fade-in duration-300 ${
@@ -31,7 +34,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast }: MessageItemProps) => {
       <div className={`flex flex-col space-y-2 max-w-[85%] md:max-w-[80%] ${
         msg.role === 'user' ? 'items-end' : ''
       }`}>
-        {msg.role === 'assistant' && !msg.content && isStreaming && isLast && (
+        {msg.role === 'assistant' && !displayContent && isStreaming && isLast && (
           <div className="flex items-center gap-2 px-4 py-2 bg-indigo-500/5 border border-indigo-500/10 rounded-xl animate-in fade-in slide-in-from-left-2 duration-500">
             <div className="flex gap-1">
               <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
@@ -44,7 +47,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast }: MessageItemProps) => {
           </div>
         )}
         
-        {msg.content && (
+        {displayContent && (
           <div className={`prose prose-invert prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-800 max-w-none px-5 py-3.5 rounded-2xl ${
             msg.role === 'user' 
               ? 'bg-indigo-600/10 border border-indigo-500/20 text-indigo-50' 
@@ -54,7 +57,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast }: MessageItemProps) => {
               remarkPlugins={[remarkGfm]} 
               rehypePlugins={[rehypeHighlight]}
             >
-              {msg.content}
+              {displayContent}
             </ReactMarkdown>
           </div>
         )}
@@ -67,7 +70,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast }: MessageItemProps) => {
 });
 
 export const ChatWindow: React.FC = () => {
-  const { chats, activeChatId, isStreaming, error } = useChat();
+  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent } = useChat();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const activeChat = useMemo(() => 
@@ -77,11 +80,12 @@ export const ChatWindow: React.FC = () => {
 
   const messages = activeChat?.messages || [];
 
+  // Scroll to bottom on message updates OR streaming content updates
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, streamingContent]);
 
   return (
     <div className="flex-1 flex flex-col h-full bg-gray-950 overflow-hidden relative">
@@ -102,14 +106,20 @@ export const ChatWindow: React.FC = () => {
             </div>
           )}
 
-          {messages.map((msg, index) => (
-            <MessageItem 
-              key={msg.id} 
-              msg={msg} 
-              isStreaming={isStreaming} 
-              isLast={index === messages.length - 1} 
-            />
-          ))}
+          {messages.map((msg, index) => {
+            const isLast = index === messages.length - 1;
+            const isStreamingThisMessage = isLast && msg.id === streamingMessageId;
+            
+            return (
+              <MessageItem 
+                key={msg.id} 
+                msg={msg} 
+                isStreaming={isStreaming} 
+                isLast={isLast} 
+                streamingContent={isStreamingThisMessage ? streamingContent : undefined}
+              />
+            );
+          })}
 
           {error && (
             <div className="flex items-center gap-3 p-4 bg-red-950/20 border border-red-900/50 rounded-2xl text-red-400 animate-in slide-in-from-top-2">
@@ -122,3 +132,4 @@ export const ChatWindow: React.FC = () => {
     </div>
   );
 };
+

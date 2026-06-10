@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useChat } from '../context/ChatContext';
 import { Cpu, Menu, X, Plus, MessageSquare, Trash } from 'lucide-react';
 
-export const Sidebar: React.FC = () => {
+export const Sidebar: React.FC = memo(() => {
   const { settings } = useSettings();
   const { chats, activeChatId, createNewChat, switchChat, deleteChat } = useChat();
   const [isOpen, setIsOpen] = useState(false);
@@ -99,4 +99,5 @@ export const Sidebar: React.FC = () => {
       )}
     </>
   );
-};
+});
+

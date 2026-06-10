@@ -1,7 +1,13 @@
 const fs = require('fs');
 const http = require('https');
 
-const apiKey = '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';
+const apiKey = process.env.NVIDIA_API_KEY;
+
+if (!apiKey) {
+  console.error('Error: NVIDIA_API_KEY environment variable is not set.');
+  process.exit(1);
+}
+
 const agenticModels = [
   'nvidia/llama-3.1-nemotron-70b-instruct',
   'nvidia/nemotron-3-super-120b-a12b',

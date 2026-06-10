@@ -71,8 +71,12 @@ export async function parseSSEStream(
     if (buffer.trim()) {
       processLines([buffer]);
     }
-  } finally {
+    
+    // Call onComplete only after successful stream exhaustion
     callbacks.onComplete(fullContent);
+  } catch (error) {
+    // Error is handled by the caller, but we don't call onComplete here
+    throw error;
   }
 }
 
@@ -134,7 +138,9 @@ export async function parseNDJSONStream(
     if (!completed && buffer.trim()) {
       processLines([buffer]);
     }
-  } finally {
+
     callbacks.onComplete(fullContent);
+  } catch (error) {
+    throw error;
   }
 }

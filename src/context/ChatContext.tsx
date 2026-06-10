@@ -8,6 +8,8 @@ import { NvidiaService } from '../services/nvidiaService';
 import type { AIService } from '../services/aiService';
 
 interface ChatContextType extends ChatState {
+  streamingMessageId: string | null;
+  streamingContent: string;
   sendMessage: (content: string) => Promise<void>;
   createNewChat: () => void;
   switchChat: (chatId: string) => void;
@@ -17,18 +19,6 @@ interface ChatContextType extends ChatState {
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
-
-// Fallback for crypto.randomUUID() in non-secure contexts
-const generateId = () => {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-};
 
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { settings } = useSettings();
@@ -56,9 +46,15 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   });
 
-  // Persist chats to localStorage
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  const [streamingContent, setStreamingContent] = useState<string>('');
+
+  // Persist chats to localStorage with debounce
   useEffect(() => {
-    localStorage.setItem('ai-dashboard-chats', JSON.stringify(state.chats));
+    const timer = setTimeout(() => {
+      localStorage.setItem('ai-dashboard-chats', JSON.stringify(state.chats));
+    }, 1000);
+    return () => clearTimeout(timer);
   }, [state.chats]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -75,7 +71,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const createNewChat = useCallback(() => {
     const newChat: Chat = {
-      id: generateId(),
+      id: crypto.randomUUID(),
       title: 'New Chat',
       messages: [],
       createdAt: Date.now(),
@@ -111,7 +107,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Create chat if none exists
     if (!currentChatId) {
       const newChat: Chat = {
-        id: generateId(),
+        id: crypto.randomUUID(),
         title: content.slice(0, 40) + (content.length > 40 ? '...' : ''),
         messages: [],
         createdAt: Date.now(),
@@ -126,13 +122,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const userMessage: Message = {
-      id: generateId(),
+      id: crypto.randomUUID(),
       role: 'user',
       content,
       timestamp: Date.now(),
     };
 
-    const assistantMessageId = generateId();
+    const assistantMessageId = crypto.randomUUID();
     const assistantMessage: Message = {
       id: assistantMessageId,
       role: 'assistant',
@@ -157,10 +153,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }),
     }));
 
+    setStreamingMessageId(assistantMessageId);
+    setStreamingContent('');
+
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
     try {
+      // Find the latest history including the new user message
       const activeChat = state.chats.find(c => c.id === currentChatId);
       const history = activeChat ? activeChat.messages : [];
 
@@ -169,15 +169,19 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         settings,
         {
           onChunk: (chunk) => {
+            setStreamingContent(prev => prev + chunk);
+          },
+          onComplete: (fullContent) => {
             setState(prev => ({
               ...prev,
+              isStreaming: false,
               chats: prev.chats.map(chat => {
                 if (chat.id === currentChatId) {
                   return {
                     ...chat,
                     messages: chat.messages.map(msg =>
                       msg.id === assistantMessageId
-                        ? { ...msg, content: msg.content + chunk }
+                        ? { ...msg, content: fullContent }
                         : msg
                     ),
                   };
@@ -185,9 +189,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 return chat;
               }),
             }));
+            setStreamingMessageId(null);
+            setStreamingContent('');
           },
-          onComplete: () => setState(prev => ({ ...prev, isStreaming: false })),
-          onError: (err) => setState(prev => ({ ...prev, isStreaming: false, error: err.message })),
+          onError: (err) => {
+            setState(prev => ({ ...prev, isStreaming: false, error: err.message }));
+            setStreamingMessageId(null);
+          },
         },
         controller.signal
       );
@@ -197,6 +205,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isStreaming: false,
         error: error instanceof Error ? error.message : 'Failed to send message',
       }));
+      setStreamingMessageId(null);
     }
   }, [state.activeChatId, state.chats, service, settings]);
 
@@ -204,6 +213,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     setState(prev => ({ ...prev, isStreaming: false }));
+    setStreamingMessageId(null);
   }, []);
 
   const clearMessages = useCallback(() => {
@@ -217,12 +227,25 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [state.activeChatId]);
 
+  const contextValue = useMemo(() => ({
+    ...state,
+    streamingMessageId,
+    streamingContent,
+    sendMessage,
+    createNewChat,
+    switchChat,
+    deleteChat,
+    clearMessages,
+    cancelStream
+  }), [state, streamingMessageId, streamingContent, sendMessage, createNewChat, switchChat, deleteChat, clearMessages, cancelStream]);
+
   return (
-    <ChatContext.Provider value={{ ...state, sendMessage, createNewChat, switchChat, deleteChat, clearMessages, cancelStream }}>
+    <ChatContext.Provider value={contextValue}>
       {children}
     </ChatContext.Provider>
   );
 };
+
 
 export const useChat = () => {
   const context = useContext(ChatContext);
