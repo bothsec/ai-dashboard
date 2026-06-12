@@ -32,22 +32,17 @@ export async function parseSSEStream(
 
       if (trimmedLine.startsWith('data: ')) {
         const jsonStr = trimmedLine.slice(6);
-        try {
-          const data = JSON.parse(jsonStr);
-          const content = extractContent(data);
-          if (content) {
-            fullContent += content;
-            callbacks.onChunk(content);
-          }
-        } catch {
-          // Silently skip unparseable chunks.
+        const data = JSON.parse(jsonStr);
+        const content = extractContent(data);
+        if (content) {
+          fullContent += content;
+          callbacks.onChunk(content);
         }
       }
     }
   };
 
-  try {
-    while (true) {
+  while (true) {
       if (signal?.aborted) {
         reader.cancel();
         break;
@@ -69,8 +64,4 @@ export async function parseSSEStream(
     
     // Call onComplete only after successful stream exhaustion
     callbacks.onComplete(fullContent);
-  } catch (error) {
-    // Error is handled by the caller, but we don't call onComplete here
-    throw error;
   }
-}

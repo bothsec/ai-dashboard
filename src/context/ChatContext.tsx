@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, useMemo, useRef, useEffect } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { Message, ChatState, Chat } from '../types/chat';
 import { useSettings } from './SettingsContext';
 import { OpenAIService } from '../services/openaiService';

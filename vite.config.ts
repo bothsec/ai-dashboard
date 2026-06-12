@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -16,7 +17,7 @@ export default defineConfig(({ mode }) => {
         name: 'inject-safe-env',
         transformIndexHtml(html) {
           const safeEnv: Record<string, string> = {}
-          const safeKeys = ['NVIDIA_MODEL', 'OPENAI_MODEL', 'ANTHROPIC_MODEL', 'OLLAMA_MODEL', 'PORT']
+          const safeKeys = ['NVIDIA_MODEL', 'OPENAI_MODEL', 'ANTHROPIC_MODEL', 'PORT']
           for (const key of safeKeys) {
             if (env[key]) safeEnv[key] = env[key]
           }
@@ -59,11 +60,24 @@ export default defineConfig(({ mode }) => {
           configure: (proxy: any) => {
             proxy.on('proxyReq', (proxyReq: any, req: any) => {
               const key = req.headers['x-api-key']
-              if (key) proxyReq.setHeader('x-api-key', key)
+              if (key) proxyReq.setHeader('x-api-key', key as string)
             })
           },
         },
       },
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: (id) => {
+            if (id.includes('node_modules')) {
+              if (id.includes('react')) return 'vendor'
+              if (id.includes('react-markdown') || id.includes('remark') || id.includes('rehype')) return 'markdown'
+            }
+          },
+        },
+      },
+      chunkSizeWarningLimit: 300,
     },
   }
 })

@@ -95,7 +95,7 @@ function createProxyWithRetry(
     return null;
   }
 
-  return async (req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  return async (req: express.Request, res: express.Response) => {
     // Extract real client IP (handles X-Forwarded-For behind proxies)
     let clientIp = req.ip || req.socket.remoteAddress || 'unknown';
     // If behind a trusted proxy, use the leftmost untrusted IP from X-Forwarded-For

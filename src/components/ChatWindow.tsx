@@ -79,7 +79,7 @@ export const ChatWindow: React.FC = () => {
     [chats, activeChatId]
   );
 
-  const messages = activeChat?.messages || [];
+  const messages = useMemo(() => activeChat?.messages || [], [activeChat]);
 
   // Scroll to bottom on message updates OR streaming content updates
   useEffect(() => {
