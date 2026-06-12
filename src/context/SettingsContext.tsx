@@ -11,16 +11,16 @@ interface SettingsContextType {
 const DEFAULT_SETTINGS: Settings = {
   activeProvider: 'nvidia',
   apiKeys: {
-    openai: import.meta.env.VITE_OPENAI_API_KEY || '',
-    anthropic: import.meta.env.VITE_ANTHROPIC_API_KEY || '',
-    nvidia: import.meta.env.VITE_NVIDIA_API_KEY || '',
-    ollamaBaseUrl: import.meta.env.VITE_OLLAMA_BASE_URL || 'http://localhost:11434',
+    // API keys are NOT exposed to browser for security.
+    // All requests go through server-side proxies that inject keys.
+    openai: '',
+    anthropic: '',
+    nvidia: '',
   },
   model: {
-    openai: import.meta.env.VITE_OPENAI_MODEL || 'gpt-4o',
-    anthropic: import.meta.env.VITE_ANTHROPIC_MODEL || 'claude-3-5-sonnet-20240620',
-    nvidia: import.meta.env.VITE_NVIDIA_MODEL || 'nvidia/llama-3.1-405b-instruct',
-    ollama: import.meta.env.VITE_OLLAMA_MODEL || 'llama3',
+    openai: (import.meta.env.VITE_OPENAI_MODEL || '') || (typeof window !== 'undefined' ? (window as any).__ENV?.OPENAI_MODEL || '' : '') || 'gpt-4o',
+    anthropic: (import.meta.env.VITE_ANTHROPIC_MODEL || '') || (typeof window !== 'undefined' ? (window as any).__ENV?.ANTHROPIC_MODEL || '' : '') || 'claude-3-5-sonnet-20240620',
+    nvidia: (import.meta.env.VITE_NVIDIA_MODEL || '') || (typeof window !== 'undefined' ? (window as any).__ENV?.NVIDIA_MODEL || '' : '') || 'minimaxai/minimax-m2.7',
   },
 };
 
@@ -61,12 +61,10 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const updateApiKey = (provider: AIProvider, key: string) => {
-    setSettings((prev) => {
-      if (provider === 'ollama') {
-        return { ...prev, apiKeys: { ...prev.apiKeys, ollamaBaseUrl: key } };
-      }
-      return { ...prev, apiKeys: { ...prev.apiKeys, [provider]: key } };
-    });
+    setSettings((prev) => ({
+      ...prev,
+      apiKeys: { ...prev.apiKeys, [provider]: key },
+    }));
   };
 
   const updateModel = (provider: AIProvider, model: string) => {
