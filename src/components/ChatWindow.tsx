@@ -3,6 +3,7 @@ import { useChat } from '../context/ChatContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
+import rehypeSanitize from 'rehype-sanitize';
 import 'highlight.js/styles/github-dark.css';
 import { User, Bot, AlertCircle } from 'lucide-react';
 import type { Message } from '../types/chat';
@@ -53,9 +54,9 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent }: Messag
               ? 'bg-indigo-600/10 border border-indigo-500/20 text-indigo-50' 
               : 'bg-gray-900/50 border border-gray-800 text-gray-200 shadow-sm'
           }`}>
-            <ReactMarkdown 
-              remarkPlugins={[remarkGfm]} 
-              rehypePlugins={[rehypeHighlight]}
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeSanitize, rehypeHighlight]}
             >
               {displayContent}
             </ReactMarkdown>
@@ -78,7 +79,7 @@ export const ChatWindow: React.FC = () => {
     [chats, activeChatId]
   );
 
-  const messages = activeChat?.messages || [];
+  const messages = useMemo(() => activeChat?.messages || [], [activeChat]);
 
   // Scroll to bottom on message updates OR streaming content updates
   useEffect(() => {

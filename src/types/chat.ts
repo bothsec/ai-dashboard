@@ -1,4 +1,4 @@
-export type AIProvider = 'openai' | 'anthropic' | 'ollama' | 'nvidia';
+export type AIProvider = 'openai' | 'anthropic' | 'nvidia';
 
 export interface Message {
   id: string;
@@ -21,13 +21,11 @@ export interface Settings {
     openai: string;
     anthropic: string;
     nvidia: string;
-    ollamaBaseUrl: string;
   };
   model: {
     openai: string;
     anthropic: string;
     nvidia: string;
-    ollama: string;
   };
 }
 

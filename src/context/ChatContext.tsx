@@ -1,9 +1,9 @@
-import React, { createContext, useContext, useState, useCallback, useMemo, useRef, useEffect } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { Message, ChatState, Chat } from '../types/chat';
 import { useSettings } from './SettingsContext';
 import { OpenAIService } from '../services/openaiService';
 import { AnthropicService } from '../services/anthropicService';
-import { OllamaService } from '../services/ollamaService';
 import { NvidiaService } from '../services/nvidiaService';
 import type { AIService } from '../services/aiService';
 
@@ -74,7 +74,6 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     switch (settings.activeProvider) {
       case 'openai': return new OpenAIService();
       case 'anthropic': return new AnthropicService();
-      case 'ollama': return new OllamaService();
       case 'nvidia': return new NvidiaService();
       default: throw new Error(`Unsupported provider: ${settings.activeProvider}`);
     }
