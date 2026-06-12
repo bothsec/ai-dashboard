@@ -1,6 +1,24 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { Settings, AIProvider } from '../types/chat';
 
+/** Type-safe window.__ENV for server-injected environment variables */
+interface WindowEnv {
+  OPENAI_MODEL?: string;
+  ANTHROPIC_MODEL?: string;
+  NVIDIA_MODEL?: string;
+}
+
+declare global {
+  interface Window {
+    __ENV: WindowEnv;
+    __ENV_SERVER?: WindowEnv;
+  }
+}
+
+/** Get model from VITE env, server injection, or fallback */
+const getModel = (envKey: string, windowKey: keyof WindowEnv, fallback: string): string =>
+  import.meta.env[envKey] || (typeof window !== 'undefined' ? window.__ENV?.[windowKey] : '') || fallback;
+
 interface SettingsContextType {
   settings: Settings;
   updateSettings: (newSettings: Partial<Settings>) => void;
@@ -18,9 +36,9 @@ const DEFAULT_SETTINGS: Settings = {
     nvidia: '',
   },
   model: {
-    openai: (import.meta.env.VITE_OPENAI_MODEL || '') || (typeof window !== 'undefined' ? (window as any).__ENV?.OPENAI_MODEL || '' : '') || 'gpt-4o',
-    anthropic: (import.meta.env.VITE_ANTHROPIC_MODEL || '') || (typeof window !== 'undefined' ? (window as any).__ENV?.ANTHROPIC_MODEL || '' : '') || 'claude-3-5-sonnet-20240620',
-    nvidia: (import.meta.env.VITE_NVIDIA_MODEL || '') || (typeof window !== 'undefined' ? (window as any).__ENV?.NVIDIA_MODEL || '' : '') || 'minimaxai/minimax-m2.7',
+    openai: getModel('VITE_OPENAI_MODEL', 'OPENAI_MODEL', 'gpt-4o'),
+    anthropic: getModel('VITE_ANTHROPIC_MODEL', 'ANTHROPIC_MODEL', 'claude-3-5-sonnet-20240620'),
+    nvidia: getModel('VITE_NVIDIA_MODEL', 'NVIDIA_MODEL', 'minimaxai/minimax-m2.7'),
   },
 };
 

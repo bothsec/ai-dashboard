@@ -24,3 +24,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# PM2 ecosystem
+ecosystem.config.cjs
+
+# Dev output
+nohup.out

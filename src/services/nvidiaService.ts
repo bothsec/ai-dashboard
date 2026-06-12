@@ -14,7 +14,7 @@ export class NvidiaService implements AIService {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream',
-          'Authorization': `Bearer ${settings.apiKeys.nvidia}`,
+          // Auth is injected by the Vite dev proxy (server-side) — never sent from browser
         },
         body: JSON.stringify({
           model: settings.model.nvidia,
