@@ -62,11 +62,12 @@ describe('withRetry', () => {
   })
 
   it('should throw after max retries', async () => {
-    const fn = vi.fn().mockRejectedValue(new Error('always fails'))
+    vi.useRealTimers()
+    const fn = vi.fn().mockImplementation(async () => {
+      throw new Error('always fails')
+    })
 
-    const promise = withRetry(fn, { maxRetries: 2, baseDelay: 100 })
-    await vi.runAllTimersAsync()
-    await expect(promise).rejects.toThrow('always fails')
+    await expect(withRetry(fn, { maxRetries: 2, baseDelay: 10 })).rejects.toThrow('always fails')
     expect(fn).toHaveBeenCalledTimes(3) // initial + 2 retries
   })
 

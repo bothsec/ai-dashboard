@@ -9,6 +9,7 @@ interface SSEParseOptions {
 
 /**
  * Shared SSE stream parser for OpenAI, Anthropic, and NVIDIA services.
+ * Handles SSE protocol with JSON data frames, [DONE] markers, and event lines.
  */
 export async function parseSSEStream(
   response: Response,
@@ -16,7 +17,10 @@ export async function parseSSEStream(
   options: SSEParseOptions
 ): Promise<void> {
   const reader = response.body?.getReader();
-  if (!reader) throw new Error('ReadableStream not supported');
+  if (!reader) {
+    callbacks.onError?.(new Error('ReadableStream not supported'));
+    return;
+  }
 
   const { extractContent, signal } = options;
   let fullContent = '';
@@ -26,9 +30,8 @@ export async function parseSSEStream(
   const processLines = (lines: string[]) => {
     for (const line of lines) {
       const trimmedLine = line.trim();
-      if (!trimmedLine || trimmedLine === 'data: [DONE]' || trimmedLine.startsWith('event:')) {
-        continue;
-      }
+      if (!trimmedLine || trimmedLine === 'data: [DONE]') continue;
+      if (trimmedLine.startsWith('event:')) continue;
 
       if (trimmedLine.startsWith('data: ')) {
         const jsonStr = trimmedLine.slice(6);
@@ -37,7 +40,6 @@ export async function parseSSEStream(
           data = JSON.parse(jsonStr);
         } catch {
           // Skip malformed JSON — don't crash the stream
-          console.warn('[sseParser] Skipping malformed JSON:', jsonStr.slice(0, 80));
           continue;
         }
         const content = extractContent(data);
@@ -49,14 +51,10 @@ export async function parseSSEStream(
     }
   };
 
-  while (true) {
-      if (signal?.aborted) {
-        reader.cancel();
-        break;
-      }
+  try {
+    while (true) {
+      if (signal?.aborted) break;
 
-      // Browser's ReadableStreamDefaultReader.read() accepts { signal } for cancellation
-      // but TypeScript's lib definitions don't include this overload
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { done, value } = await (reader.read as unknown as (options?: { signal?: AbortSignal }) => Promise<{ done: boolean; value?: Uint8Array }>)({ signal });
       if (done) break;
@@ -71,7 +69,12 @@ export async function parseSSEStream(
     if (buffer.trim()) {
       processLines([buffer]);
     }
-    
-    // Call onComplete only after successful stream exhaustion
+
     callbacks.onComplete(fullContent);
+  } catch (err) {
+    callbacks.onError?.(new Error(err instanceof Error ? err.message : 'Stream read error'));
+  } finally {
+    // Always release the reader lock so the stream can be GC'd
+    try { reader.releaseLock(); } catch { /* already released */ }
   }
+}

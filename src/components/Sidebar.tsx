@@ -38,11 +38,8 @@ export const Sidebar: React.FC = memo(() => {
 
   const handleDeleteChat = (e: React.MouseEvent, chatId: string) => {
     e.stopPropagation();
-    try {
-      deleteChat(chatId);
-    } catch (err) {
-      console.error('Failed to delete chat:', err);
-    }
+    // Best-effort deletion — failures are silently ignored
+    deleteChat(chatId);
   };
 
   return (
@@ -96,13 +93,10 @@ export const Sidebar: React.FC = memo(() => {
         <div className="p-3 sm:p-4 pl-[calc(0.75rem+env(safe-area-inset-left,0px))]">
           <button
             onClick={() => {
-              try {
+                // Best-effort — failures are silently ignored
                 createNewChat();
                 setIsOpen(false);
-              } catch (err) {
-                console.error('Failed to create new chat:', err);
-              }
-            }}
+              }}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 sm:py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-xl transition-all duration-200 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 font-medium text-sm sm:text-base active:scale-[0.98] touch-target"
             aria-label="Create new chat (Ctrl+N)"
           >
@@ -133,12 +127,9 @@ export const Sidebar: React.FC = memo(() => {
                     : 'border-transparent hover:bg-gray-100 text-gray-600 hover:text-gray-900'
               }`}
               onClick={() => {
-                try {
-                  switchChat(chat.id);
-                  setIsOpen(false);
-                } catch (err) {
-                  console.error('Failed to switch chat:', err);
-                }
+                // Best-effort — failures are silently ignored
+                switchChat(chat.id);
+                setIsOpen(false);
               }}
               role="button"
               tabIndex={0}
@@ -147,12 +138,9 @@ export const Sidebar: React.FC = memo(() => {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  try {
-                    switchChat(chat.id);
-                    setIsOpen(false);
-                  } catch (err) {
-                    console.error('Failed to switch chat:', err);
-                  }
+                  // Best-effort — failures are silently ignored
+                  switchChat(chat.id);
+                  setIsOpen(false);
                 }
               }}
             >

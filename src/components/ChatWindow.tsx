@@ -136,13 +136,18 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent }: Messag
                       {children}
                     </blockquote>
                   ),
-                  a: ({ href, children }) => (
-                    <a href={href} target="_blank" rel="noopener noreferrer" className={`underline underline-offset-2 ${
-                      isDark ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'
-                    }`}>
-                      {children}
-                    </a>
-                  ),
+                  a: ({ href, children }) => {
+                    // Defensive: only allow safe http/https URLs (blocks javascript:, data:, etc.)
+                    const isSafe = href && /^(https?:|mailto:|tel:)/.test(href);
+                    if (!isSafe) return null;
+                    return (
+                      <a href={href} target="_blank" rel="noopener noreferrer" className={`underline underline-offset-2 ${
+                        isDark ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'
+                      }`}>
+                        {children}
+                      </a>
+                    );
+                  },
                   hr: () => <hr className={`my-6 ${isDark ? 'border-gray-700' : 'border-gray-200'}`} />,
                   table: ({ children }) => (
                     <div className={`overflow-x-auto mb-4 rounded-lg border ${
@@ -253,11 +258,8 @@ export const ChatWindow: React.FC = () => {
   ];
 
   const handleSuggestionClick = async (text: string) => {
-    try {
-      await sendMessage(text);
-    } catch (err) {
-      console.error('Failed to send suggestion:', err);
-    }
+    // Best-effort — failures are silently ignored
+    await sendMessage(text);
   };
 
   if (error) {
