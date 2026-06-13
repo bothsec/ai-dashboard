@@ -1,4 +1,4 @@
-import React, { useState, memo } from 'react';
+import React, { useState, memo, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useChat } from '../context/ChatContext';
 import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles } from 'lucide-react';
@@ -23,6 +23,28 @@ export const Sidebar: React.FC = memo(() => {
 
   const isDark = settings.theme === 'dark';
 
+  // Keyboard shortcut: Ctrl/Cmd + N for new chat
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault();
+        createNewChat();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [createNewChat]);
+
+  const handleDeleteChat = (e: React.MouseEvent, chatId: string) => {
+    e.stopPropagation();
+    try {
+      deleteChat(chatId);
+    } catch (err) {
+      console.error('Failed to delete chat:', err);
+    }
+  };
+
   return (
     <>
       {/* Mobile menu button */}
@@ -33,9 +55,11 @@ export const Sidebar: React.FC = memo(() => {
             ? 'bg-gray-900/90 border-gray-700/50 text-gray-400 hover:text-white hover:border-gray-600'
             : 'bg-white/90 border-gray-200 text-gray-600 hover:text-gray-900 hover:border-gray-300'
         }`}
-        aria-label="Toggle sidebar"
+        aria-label={isOpen ? 'Close sidebar' : 'Open sidebar'}
+        aria-expanded={isOpen}
+        aria-controls="sidebar"
       >
-        {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        {isOpen ? <X className="w-5 h-5" aria-hidden="true" /> : <Menu className="w-5 h-5" aria-hidden="true" />}
       </button>
 
       {/* Backdrop */}
@@ -43,17 +67,22 @@ export const Sidebar: React.FC = memo(() => {
         <div 
           className={`fixed inset-0 z-30 backdrop-blur-sm md:hidden ${isDark ? 'bg-black/70' : 'bg-black/40'}`}
           onClick={() => setIsOpen(false)}
+          aria-hidden="true"
         />
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed md:relative inset-y-0 left-0 z-40 w-[85vw] sm:w-80 h-screen flex flex-col backdrop-blur-xl transition-all duration-300 ease-out md:translate-x-0 ${
-        isOpen ? 'translate-x-0' : '-translate-x-full'
-      } ${isDark ? 'bg-gray-900/98 border-gray-800/50' : 'bg-white/95 border-gray-200'}`}>
+      <aside 
+        id="sidebar"
+        className={`fixed md:relative inset-y-0 left-0 z-40 w-[85vw] sm:w-80 h-screen flex flex-col backdrop-blur-xl transition-all duration-300 ease-out md:translate-x-0 ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        } ${isDark ? 'bg-gray-900/98 border-gray-800/50' : 'bg-white/95 border-gray-200'}`}
+        aria-label="Chat sidebar"
+      >
         {/* Header */}
         <div className={`p-4 sm:p-5 pt-[calc(1rem+env(safe-area-inset-top,0px))] pl-[calc(1rem+env(safe-area-inset-left,0px))] border-b ${isDark ? 'border-gray-800/50' : 'border-gray-200'}`}>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20" aria-hidden="true">
               <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <div className="flex-1 min-w-0">
@@ -67,19 +96,30 @@ export const Sidebar: React.FC = memo(() => {
         <div className="p-3 sm:p-4 pl-[calc(0.75rem+env(safe-area-inset-left,0px))]">
           <button
             onClick={() => {
-              createNewChat();
-              setIsOpen(false);
+              try {
+                createNewChat();
+                setIsOpen(false);
+              } catch (err) {
+                console.error('Failed to create new chat:', err);
+              }
             }}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 sm:py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-xl transition-all duration-200 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 font-medium text-sm sm:text-base active:scale-[0.98] touch-target"
+            aria-label="Create new chat (Ctrl+N)"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4" aria-hidden="true" />
             <span>New Chat</span>
           </button>
         </div>
 
         {/* Chat list */}
-        <div className="flex-1 overflow-y-auto px-2 sm:px-3 pl-[calc(0.5rem+env(safe-area-inset-left,0px))] py-2 space-y-1 scroll-touch">
-          <h2 className={`px-2 sm:px-2 text-[10px] font-bold uppercase tracking-widest mb-3 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Recent Chats</h2>
+        <div 
+          className="flex-1 overflow-y-auto px-2 sm:px-3 pl-[calc(0.5rem+env(safe-area-inset-left,0px))] py-2 space-y-1 scroll-touch"
+          role="navigation"
+          aria-label="Chat history"
+        >
+          <h2 className={`px-2 sm:px-2 text-[10px] font-bold uppercase tracking-widest mb-3 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+            Recent Chats
+          </h2>
           {chats.map((chat) => (
             <div
               key={chat.id}
@@ -93,13 +133,33 @@ export const Sidebar: React.FC = memo(() => {
                     : 'border-transparent hover:bg-gray-100 text-gray-600 hover:text-gray-900'
               }`}
               onClick={() => {
-                switchChat(chat.id);
-                setIsOpen(false);
+                try {
+                  switchChat(chat.id);
+                  setIsOpen(false);
+                } catch (err) {
+                  console.error('Failed to switch chat:', err);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              aria-label={`Chat: ${chat.title || 'New Chat'}, ${chat.messages.length} messages, ${formatTime(chat.createdAt)}`}
+              aria-current={activeChatId === chat.id ? 'true' : undefined}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  try {
+                    switchChat(chat.id);
+                    setIsOpen(false);
+                  } catch (err) {
+                    console.error('Failed to switch chat:', err);
+                  }
+                }
               }}
             >
-              <MessageSquare className={`w-4 h-4 shrink-0 ${
-                activeChatId === chat.id ? 'text-indigo-500' : isDark ? 'text-gray-600 group-hover:text-gray-400' : 'text-gray-400 group-hover:text-gray-600'
-              }`} />
+              <MessageSquare 
+                className={`w-4 h-4 shrink-0 ${activeChatId === chat.id ? 'text-indigo-500' : isDark ? 'text-gray-600 group-hover:text-gray-400' : 'text-gray-400 group-hover:text-gray-600'}`} 
+                aria-hidden="true"
+              />
               <div className="flex-1 min-w-0">
                 <p className={`text-sm font-medium truncate ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
                   {chat.title || 'New Chat'}
@@ -109,23 +169,20 @@ export const Sidebar: React.FC = memo(() => {
                 </p>
               </div>
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteChat(chat.id);
-                }}
+                onClick={(e) => handleDeleteChat(e, chat.id)}
                 className={`opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all duration-200 ${
                   isDark ? 'text-gray-500 hover:text-red-400 hover:bg-red-500/10' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
                 }`}
-                aria-label="Delete chat"
+                aria-label={`Delete chat: ${chat.title || 'New Chat'}`}
               >
-                <Trash className="w-3.5 h-3.5" />
+                <Trash className="w-3.5 h-3.5" aria-hidden="true" />
               </button>
             </div>
           ))}
           
           {chats.length === 0 && (
-            <div className={`text-center py-8 px-4 ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3 ${isDark ? 'bg-gray-800/50' : 'bg-gray-100'}`}>
+            <div className={`text-center py-8 px-4 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} role="status">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3 ${isDark ? 'bg-gray-800/50' : 'bg-gray-100'}`} aria-hidden="true">
                 <MessageSquare className={`w-5 h-5 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} />
               </div>
               <p className="text-xs italic">No conversations yet</p>
@@ -137,9 +194,7 @@ export const Sidebar: React.FC = memo(() => {
         <div className={`p-3 sm:p-4 pl-[calc(0.75rem+env(safe-area-inset-left,0px))] border-t ${isDark ? 'border-gray-800/50' : 'border-gray-200'}`}>
           <div className="flex items-center gap-2">
               <ThemeToggle />
-              <div className={`w-9 h-9 rounded-lg flex items-center justify-center border ${
-                isDark ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700/50' : 'bg-gray-100 border-gray-200'
-              }`}>
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center border ${isDark ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700/50' : 'bg-gray-100 border-gray-200'}`} aria-hidden="true">
                 <Cpu className={`w-4 h-4 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
               </div>
             </div>

@@ -7,13 +7,33 @@ export const ChatInput = memo(() => {
   const [input, setInput] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isFocused, setIsFocused] = useState(false);
-  const { sendMessage, isStreaming } = useChat();
+  const { sendMessage, isStreaming, cancelStream } = useChat();
   const { settings } = useSettings();
   const isDark = settings.theme === 'dark';
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sendButtonRef = useRef<HTMLButtonElement>(null);
 
   const canSubmit = (input.trim().length > 0 || selectedFiles.length > 0) && !isStreaming;
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + K: Focus input
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        textareaRef.current?.focus();
+      }
+      // Escape: Cancel streaming
+      if (e.key === 'Escape' && isStreaming) {
+        e.preventDefault();
+        cancelStream();
+      }
+    };
+    
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [isStreaming, cancelStream]);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -35,6 +55,8 @@ export const ChatInput = memo(() => {
     if (fileInputRef.current) fileInputRef.current.value = '';
     
     await sendMessage(messageContent);
+    // Restore focus to textarea after sending
+    textareaRef.current?.focus();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -54,20 +76,30 @@ export const ChatInput = memo(() => {
     setSelectedFiles(prev => prev.filter(f => f !== file));
   };
 
+  // Auto-resize textarea - with cleanup
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    
+    const resizeTextarea = () => {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    };
+    
+    resizeTextarea();
+    
+    // Use ResizeObserver for more reliable height tracking
+    const resizeObserver = new ResizeObserver(resizeTextarea);
+    resizeObserver.observe(textarea);
+    
+    return () => resizeObserver.disconnect();
   }, [input]);
 
   return (
-    <div className={`shrink-0 px-3 md:px-6 lg:px-12 py-2 md:py-3 lg:py-4 ${
-      isDark ? '' : 'bg-white/50'
-    }`}>
+    <div className={`shrink-0 px-3 md:px-6 lg:px-12 py-2 md:py-3 lg:py-4 ${isDark ? '' : 'bg-white/50'}`}>
       <div className="max-w-3xl lg:max-w-2xl mx-auto">
         {/* ChatGPT-style input container */}
-        <div 
+        <form 
           className={`relative flex items-center gap-2 md:gap-3 rounded-full px-3 md:px-4 py-2.5 md:py-3 transition-all duration-300 ${
             isFocused 
               ? isDark
@@ -77,15 +109,14 @@ export const ChatInput = memo(() => {
                 ? 'bg-gray-800/60 hover:bg-gray-800/70 border border-gray-700/30 hover:border-gray-600/40'
                 : 'bg-white/60 hover:bg-white/80 border border-gray-200 hover:border-gray-300'
           }`}
+          onSubmit={handleSubmit}
+          aria-label="Message input form"
         >
           {/* Paperclip button */}
           <label 
             htmlFor="file-input" 
-            className={`cursor-pointer transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${
-              isDark
-                ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50'
-                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-            }`}
+            className={`cursor-pointer transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
+            aria-label="Attach files"
           >
             <Paperclip className="w-4 h-4 md:w-5 md:h-5" />
           </label>
@@ -96,6 +127,7 @@ export const ChatInput = memo(() => {
             multiple
             onChange={handleFileChange}
             className="hidden"
+            aria-label="File input"
           />
           
           {/* Textarea */}
@@ -113,23 +145,26 @@ export const ChatInput = memo(() => {
                 isDark ? 'text-gray-100 placeholder:text-gray-500' : 'text-gray-900 placeholder:text-gray-400'
               }`}
               style={{ minHeight: '20px', maxHeight: '128px' }}
+              aria-label="Message input"
+              aria-multiline="true"
             />
           </div>
 
           {/* File previews inline */}
           {selectedFiles.length > 0 && (
-            <div className="flex items-center gap-2 mr-2">
+            <div className="flex items-center gap-2 mr-2" role="list" aria-label="Attached files">
               {selectedFiles.map((file) => (
-                <div key={file.name} className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs ${
-                  isDark ? 'bg-gray-700/60 text-gray-300' : 'bg-gray-100 text-gray-700'
-                }`}>
-                  <Paperclip className="w-3 h-3" />
+                <div 
+                  key={file.name} 
+                  className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs ${isDark ? 'bg-gray-700/60 text-gray-300' : 'bg-gray-100 text-gray-700'}`}
+                  role="listitem"
+                >
+                  <Paperclip className="w-3 h-3" aria-hidden="true" />
                   <span className="max-w-[100px] truncate">{file.name}</span>
                   <button
+                    type="button"
                     onClick={() => removeFile(file)}
-                    className={`transition-colors duration-200 ml-1 ${
-                      isDark ? 'text-gray-400 hover:text-red-400' : 'text-gray-400 hover:text-red-500'
-                    }`}
+                    className={`transition-colors duration-200 ml-1 ${isDark ? 'text-gray-400 hover:text-red-400' : 'text-gray-400 hover:text-red-500'}`}
                     aria-label={`Remove ${file.name}`}
                   >
                     <X className="w-3 h-3" />
@@ -142,6 +177,7 @@ export const ChatInput = memo(() => {
           {/* Send button */}
           <button
             type="submit"
+            ref={sendButtonRef}
             disabled={!canSubmit}
             className={`flex-shrink-0 p-2 md:p-2.5 rounded-full transition-all duration-300 flex items-center justify-center ${
               canSubmit
@@ -150,18 +186,18 @@ export const ChatInput = memo(() => {
                   ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}
+            aria-label={isStreaming ? 'Cancel' : 'Send message'}
+            aria-disabled={!canSubmit}
           >
             {isStreaming ? (
-              <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" />
+              <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" aria-hidden="true" />
             ) : (
-              <Send className="w-4 h-4 md:w-5 md:h-5" />
+              <Send className="w-4 h-4 md:w-5 md:h-5" aria-hidden="true" />
             )}
           </button>
-        </div>
+        </form>
 
-        <p className={`text-center text-[10px] md:text-[11px] mt-1.5 md:mt-2 ${
-          isDark ? 'text-gray-600' : 'text-gray-500'
-        }`}>
+        <p className={`text-center text-[10px] md:text-[11px] mt-1.5 md:mt-2 ${isDark ? 'text-gray-600' : 'text-gray-500'}`}>
           AI can make mistakes. Consider checking important information.
         </p>
       </div>

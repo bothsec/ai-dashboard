@@ -46,8 +46,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           tokensPerSecond: 0,
           error: null,
         };
-      } catch (e) {
-        console.error('Failed to load chats', e);
+      } catch {
+        // Corrupted localStorage data — start fresh silently
       }
     }
     return {

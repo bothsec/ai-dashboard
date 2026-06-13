@@ -47,8 +47,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             ...(parsed.model || {}),
           },
         };
-      } catch (e) {
-        console.error('Failed to parse settings', e);
+      } catch {
+        // Corrupted settings — use defaults silently
       }
     }
     return defaultSettings;
