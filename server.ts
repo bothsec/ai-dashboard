@@ -60,8 +60,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// Parse JSON body with size limit
-app.use(express.json({ limit: '10kb' }));
+// Parse JSON body with size limit (chat conversations can grow large)
+app.use(express.json({ limit: '1mb' }));
 
 // Rate limit tracking (simple in-memory, use Redis for production)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
