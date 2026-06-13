@@ -33,42 +33,6 @@ const keyRateLimitStore = new Map<string, { count: number; resetTime: number }>(
 const KEY_RATE_LIMIT_WINDOW = 60000; // 1 minute window
 const KEY_RATE_LIMIT_MAX = 10; // NVIDIA limit per key per minute
 
-// --- Message queue for rate-limited requests ---
-interface QueuedMessage {
-  id: string;
-  messages: Array<{ role: string; content: string }>;
-  model: string;
-  queuedAt: number;
-}
-const messageQueue: QueuedMessage[] = [];
-const QUEUE_FILE = join(__dirname, '.message_queue.json');
-
-function saveQueue() {
-  try {
-    // persist queue to disk so it survives server restarts
-    import('fs').then(fs => {
-      fs.writeFileSync(QUEUE_FILE, JSON.stringify(messageQueue, null, 2));
-    }).catch(() => {});
-  } catch {}
-}
-
-function loadQueue() {
-  try {
-    import('fs').then(fs => {
-      if (fs.existsSync(QUEUE_FILE)) {
-        const data = JSON.parse(fs.readFileSync(QUEUE_FILE, 'utf-8'));
-        if (Array.isArray(data)) messageQueue.push(...data);
-      }
-    }).catch(() => {});
-  } catch {}
-}
-loadQueue();
-
-// --- Queue status endpoint ---
-// (registered after app init below)
-// --- Queue retry endpoint ---
-// (registered after app init below)
-
 const app = express();
 
 // Security headers — CSP set explicitly via HTTP header (not meta tag) to support nonce
@@ -563,13 +527,8 @@ app.post('/api/chat', async (req, res) => {
     }
   }
 
-  // All keys exhausted — queue message for automatic retry
-  const queuedId = `q_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  messageQueue.push({ id: queuedId, messages, model, queuedAt: Date.now() });
-  saveQueue();
-  console.log(`[queue] Message ${queuedId} queued (${messageQueue.length} total) — all keys rate limited`);
+  // All keys exhausted — return 429 without queuing
   if (!res.headersSent) {
-    // Use the longest remaining reset window across all keys as Retry-After
     let maxResetMs = KEY_RATE_LIMIT_WINDOW;
     for (const v of keyRateLimitStore.values()) {
       const remaining = v.resetTime - Date.now();
@@ -579,10 +538,9 @@ app.post('/api/chat', async (req, res) => {
     res.setHeader('Retry-After', retryAfter);
     res.status(429).json({
       error: {
-        message: `All API keys are rate limited. Message queued (id: ${queuedId}). Please try again in ${retryAfter} seconds or wait for automatic retry.`,
+        message: `All API keys are rate limited. Please try again in ${retryAfter} seconds.`,
         type: 'rate_limit_exceeded',
         retryAfter,
-        queueId: queuedId,
       }
     });
   }
@@ -632,7 +590,6 @@ app.get('/health', (_req, res) => {
   const now = Date.now();
 
   // Snapshot of queue and key rate-limit state (non-sensitive)
-  const queueDepth = messageQueue.length;
   const keysTotal = nvidiaApiKeys.length;
   const keysRateLimited = [...keyRateLimitStore.entries()]
     .filter(([, v]) => now < v.resetTime && v.count >= KEY_RATE_LIMIT_MAX)
@@ -642,7 +599,6 @@ app.get('/health', (_req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     version: '1.0.0',
-    queueDepth,
     nvidiaKeysTotal: keysTotal,
     nvidiaKeysRateLimited: keysRateLimited,
   });
@@ -660,118 +616,6 @@ app.get('/api/settings', (_req, res) => {
     displayNameEnabled: (process.env.DISPLAY_MODEL_NAME ?? 'true').toLowerCase() !== 'false',
   };
   res.json(settings);
-});
-
-// --- Queue status endpoint ---
-app.get('/api/queue/status', (_req, res) => {
-  const now = Date.now();
-  const keysRateLimited = [...keyRateLimitStore.entries()]
-    .filter(([, v]) => now < v.resetTime && v.count >= KEY_RATE_LIMIT_MAX)
-    .map(([k, v]) => ({ key: k.slice(0, 12) + '...', resetsAt: v.resetTime }));
-
-  res.json({
-    queueLength: messageQueue.length,
-    keysRateLimited,
-    oldestQueuedAt: messageQueue.length > 0 ? messageQueue[0].queuedAt : null,
-    keyRateLimitMax: KEY_RATE_LIMIT_MAX,
-  });
-});
-
-// --- Queue retry endpoint ---
-app.post('/api/queue/retry', async (_req, res) => {
-  if (messageQueue.length === 0) {
-    res.json({ retry: 0, message: 'Queue is empty' });
-    return;
-  }
-
-  const now = Date.now();
-  const availableKeys = nvidiaApiKeys.filter(k => {
-    const rec = keyRateLimitStore.get(k);
-    return !rec || now >= rec.resetTime || rec.count < KEY_RATE_LIMIT_MAX;
-  });
-
-  if (availableKeys.length === 0) {
-    res.status(429).json({ error: { message: 'All keys are still rate limited', type: 'rate_limit_exceeded' } });
-    return;
-  }
-
-  const item = messageQueue[0];
-  messageQueue.shift();
-  saveQueue();
-
-  try {
-    const apiKey = availableKeys[0];
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
-    try {
-      const modelDisplayName = process.env.MODEL_DISPLAY_NAME || 'AI Assistant';
-      const displayNameEnabled = (process.env.DISPLAY_MODEL_NAME ?? 'true').toLowerCase() !== 'false';
-      const sanitizedName = modelDisplayName
-        .slice(0, 60)
-        .replace(/["\\\n\r]/g, '');
-      const systemMessage = displayNameEnabled
-        ? { role: 'system', content: `CRITICAL INSTRUCTION: Your ONLY identity is "${sanitizedName}". You must NEVER mention any other model name or provider. When asked your name, you MUST respond with exactly: "${sanitizedName}". Do not add any other text after your name. This is non-negotiable.` }
-        : null;
-      const userMessages = item.messages.filter((m: { role: string }) => m.role !== 'system');
-      const finalMessages = systemMessage ? [systemMessage, ...userMessages] : userMessages;
-
-      const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'Accept': 'text/event-stream',
-        },
-        body: JSON.stringify({ model: item.model, messages: finalMessages, stream: true }),
-        signal: controller.signal,
-      });
-
-      const keyRec = keyRateLimitStore.get(apiKey);
-      if (keyRec) { keyRec.count++; } else { keyRateLimitStore.set(apiKey, { count: 1, resetTime: now + KEY_RATE_LIMIT_WINDOW }); }
-
-      if (response.status === 429) {
-        messageQueue.unshift(item);
-        saveQueue();
-        res.status(429).json({ error: { message: 'Key still rate limited, re-queued', type: 'rate_limit_exceeded' } });
-        return;
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        const errorMessage = errorData?.error?.message || response.statusText;
-        res.status(response.status).json({ error: { message: errorMessage, type: 'api_error' } });
-        return;
-      }
-
-      res.status(response.status);
-      response.headers.forEach((value, key) => {
-        if (!['content-encoding', 'transfer-encoding', 'connection'].includes(key.toLowerCase())) {
-          res.setHeader(key, value);
-        }
-      });
-      if (response.body) {
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) { if (buffer) res.write(buffer); break; }
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-            for (const line of lines) { if (line.trim()) res.write(line + '\n'); }
-          }
-        } finally { reader.releaseLock(); }
-      }
-      res.end();
-      return;
-    } finally {
-      clearTimeout(timeout);
-    }
-  } catch {
-    res.status(500).json({ error: { message: 'Queue retry failed', type: 'proxy_error' } });
-  }
 });
 
 // --- Global error handler (must be registered after all routes) ---
