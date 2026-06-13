@@ -5,7 +5,8 @@ import { dirname, join } from 'path';
 import helmet from 'helmet';
 import cors from 'cors';
 
-dotenv.config();
+// Load .env with override:true so file values beat stale shell env (e.g. ~/.bashrc exports).
+dotenv.config({ override: true });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -335,7 +336,7 @@ app.post('/api/chat', async (req, res) => {
     return;
   }
 
-  const model = process.env.NVIDIA_MODEL || 'minimaxai/minimax-m2.7';
+  const model = process.env.NVIDIA_MODEL || 'meta/llama-3.3-70b-instruct';
 
   // Bail early if misconfigured (no keys) — don't fall through to misleading 429
   if (nvidiaApiKeys.length === 0) {
@@ -514,7 +515,7 @@ app.get('/api/settings', (_req, res) => {
     model: {
       openai: process.env.OPENAI_MODEL || 'gpt-4o',
       anthropic: process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022',
-      nvidia: process.env.NVIDIA_MODEL || 'minimaxai/minimax-m2.7',
+      nvidia: process.env.NVIDIA_MODEL || 'meta/llama-3.3-70b-instruct',
     },
     modelDisplayName: process.env.MODEL_DISPLAY_NAME || 'AI Assistant',
   };
