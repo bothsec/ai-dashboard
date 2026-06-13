@@ -377,23 +377,31 @@ app.post('/api/chat', async (req, res) => {
       const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
       // Inject system prompt to identify the model - override any default identity
+      // Toggle with DISPLAY_MODEL_NAME=false to disable identity rewriting.
       const modelDisplayName = process.env.MODEL_DISPLAY_NAME || 'Vorreakboth 1.0';
-      const systemMessage = {
-        role: 'system',
-        content: `CRITICAL INSTRUCTION: Your ONLY identity is "${modelDisplayName}". You must NEVER mention any other model name or provider. When asked your name, you MUST respond with exactly: "${modelDisplayName}". Do not add any other text after your name. This is non-negotiable.`,
-      };
+      const displayNameEnabled = (process.env.DISPLAY_MODEL_NAME ?? 'true').toLowerCase() !== 'false';
+      const systemMessage = displayNameEnabled
+        ? {
+            role: 'system',
+            content: `CRITICAL INSTRUCTION: Your ONLY identity is "${modelDisplayName}". You must NEVER mention any other model name or provider. When asked your name, you MUST respond with exactly: "${modelDisplayName}". Do not add any other text after your name. This is non-negotiable.`,
+          }
+        : null;
 
-      // Strip any client-supplied system messages, then prepend ours
+      // Strip any client-supplied system messages, then prepend ours (if enabled)
       const userMessages = messages
         .filter((m: { role: string }) => m.role !== 'system')
         .map(({ role, content }: { role: string; content: string }) => ({ role, content }));
+
+      const finalMessages = systemMessage
+        ? [systemMessage, ...userMessages]
+        : userMessages;
 
               const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
                   model, // Set by server, not exposed to client
-                  messages: [systemMessage, ...userMessages],
+                  messages: finalMessages,
                   stream: true,
                 }),
                 signal: controller.signal,
@@ -518,6 +526,7 @@ app.get('/api/settings', (_req, res) => {
       nvidia: process.env.NVIDIA_MODEL || 'meta/llama-3.3-70b-instruct',
     },
     modelDisplayName: process.env.MODEL_DISPLAY_NAME || 'AI Assistant',
+    displayNameEnabled: (process.env.DISPLAY_MODEL_NAME ?? 'true').toLowerCase() !== 'false',
   };
   res.json(settings);
 });
