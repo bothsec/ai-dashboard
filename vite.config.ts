@@ -14,20 +14,13 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
     ],
     server: {
-      host: '0.0.0.0',
+      host: 'localhost',
       port: 8080,
       proxy: {
-        '/api/nvidia': {
-          target: 'https://integrate.api.nvidia.com',
+        '/api/chat': {
+          target: `http://localhost:${env.PORT || 3000}`,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/nvidia/, ''),
-          configure: (proxy: any) => {
-            proxy.on('proxyReq', (proxyReq: any) => {
-              if (env.NVIDIA_API_KEY) {
-                proxyReq.setHeader('Authorization', `Bearer ${env.NVIDIA_API_KEY}`)
-              }
-            })
-          },
+          rewrite: (path) => path.replace(/^\/api\/chat/, '/api/chat'),
         },
         '/api/openai': {
           target: 'https://api.openai.com',
@@ -50,11 +43,6 @@ export default defineConfig(({ mode }) => {
               if (key) proxyReq.setHeader('x-api-key', key as string)
             })
           },
-        },
-        '/api/chat': {
-          target: `http://localhost:${env.PORT || 3000}`,
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/chat/, '/api/chat'),
         },
       },
     },

@@ -75,6 +75,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Clean up any active stream on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
   const service = useMemo((): AIService => {
     return new ChatService();
   }, []);
@@ -92,7 +99,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       chats: [newChat, ...prev.chats],
       activeChatId: newChat.id,
     }));
-  }, [settings.activeProvider]);
+  }, []);
 
   const switchChat = useCallback((chatId: string) => {
     setState(prev => ({ ...prev, activeChatId: chatId }));
@@ -113,7 +120,23 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!content.trim()) return;
 
     let currentChatId = state.activeChatId;
-    
+    let isNewChat = false;
+
+    // Pre-build messages before any async work
+    const userMessage: Message = {
+      id: generateId(),
+      role: 'user',
+      content,
+      timestamp: Date.now(),
+    };
+    const assistantMessageId = generateId();
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+    };
+
     // Create chat if none exists
     if (!currentChatId) {
       const newChat: Chat = {
@@ -124,6 +147,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         provider: 'api',
       };
       currentChatId = newChat.id;
+      isNewChat = true;
       setState(prev => ({
         ...prev,
         chats: [newChat, ...prev.chats],
@@ -131,20 +155,15 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }));
     }
 
-    const userMessage: Message = {
-      id: generateId(),
-      role: 'user',
-      content,
-      timestamp: Date.now(),
-    };
-
-    const assistantMessageId = generateId();
-    const assistantMessage: Message = {
-      id: assistantMessageId,
-      role: 'assistant',
-      content: '',
-      timestamp: Date.now(),
-    };
+    // Compute history BEFORE setState so it's never stale.
+    // For a new chat: newChat.messages is [] → history = [userMessage].
+    // For an existing chat: state.chats still holds the correct messages.
+    const history: Message[] = isNewChat
+      ? [userMessage]
+      : (() => {
+          const chat = state.chats.find(c => c.id === currentChatId);
+          return chat ? [...chat.messages, userMessage] : [userMessage];
+        })();
 
     setState(prev => ({
       ...prev,
@@ -172,12 +191,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     abortControllerRef.current = controller;
 
     try {
-      // Find the latest history including the new user message
-      const activeChat = state.chats.find(c => c.id === currentChatId);
-      const history = activeChat ? activeChat.messages : [];
-
       await service.generateStream(
-        [...history, userMessage],
+        history,
         settings,
         {
           onChunk: (chunk) => {
@@ -236,18 +251,21 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     abortControllerRef.current = null;
     setState(prev => ({ ...prev, isStreaming: false }));
     setStreamingMessageId(null);
+    setStreamingContent('');
+    setTokensPerSecond(0);
   }, []);
 
   const clearMessages = useCallback(() => {
-    if (state.activeChatId) {
-      setState(prev => ({
+    setState(prev => {
+      if (!prev.activeChatId) return prev;
+      return {
         ...prev,
-        chats: prev.chats.map(chat => 
-          chat.id === state.activeChatId ? { ...chat, messages: [] } : chat
-        )
-      }));
-    }
-  }, [state.activeChatId]);
+        chats: prev.chats.map(chat =>
+          chat.id === prev.activeChatId ? { ...chat, messages: [] } : chat
+        ),
+      };
+    });
+  }, []);
 
   const contextValue = useMemo(() => ({
       ...state,

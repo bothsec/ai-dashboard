@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useSettings } from './context/SettingsContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsProvider } from './context/SettingsContext';
@@ -26,8 +27,15 @@ function AppContent() {
 }
 
 function App() {
+  // Remount key forces ErrorBoundary to re-render fresh after an error is reset,
+  // breaking the loop where a persistently-failing child would re-throw immediately.
+  const [errorBoundaryKey, setErrorBoundaryKey] = useState(0);
+
   return (
-    <ErrorBoundary>
+    <ErrorBoundary
+      key={errorBoundaryKey}
+      onReset={() => setErrorBoundaryKey(k => k + 1)}
+    >
       <SettingsProvider>
         <ChatProvider>
           <AppContent />

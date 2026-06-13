@@ -35,22 +35,34 @@ const KEY_RATE_LIMIT_MAX = 10; // NVIDIA limit per key per minute
 
 const app = express();
 
-// Security headers
-app.use(helmet());
+// Security headers — CSP set explicitly via HTTP header (not meta tag) to support nonce
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: false,
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"], // 'unsafe-inline' required for React SPA
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'", 'https://integrate.api.nvidia.com'],
+      frameAncestors: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+  frameguard: { action: 'deny' },
+  xContentTypeOptions: true,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+}));
 
-// CORS - restrict to known origins
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
+// CORS - restrict to known origins (must be explicitly configured)
+const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
-  : [
-      'http://localhost:8080',
-      'http://localhost:5173',
-      'http://140.238.43.61:8080',
-      'http://140.238.43.61:5173',
-    ];
+  : ['http://localhost:8080', 'http://localhost:5173']; // safe defaults — no hardcoded public IPs
+
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (curl, server-to-server)
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Require a present, allowlisted origin (blocks curl, null-origin, and spoofed origins)
+    if (origin && allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error(`Origin ${origin} not allowed by CORS policy`));
@@ -66,6 +78,17 @@ app.use(express.json({ limit: '1mb' }));
 // Rate limit tracking (simple in-memory, use Redis for production)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW = 60000; // 1 minute window
+
+// Periodic cleanup to prevent memory growth from expired entries
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of rateLimitStore.entries()) {
+    if (now > v.resetTime) rateLimitStore.delete(k);
+  }
+  for (const [k, v] of keyRateLimitStore.entries()) {
+    if (now > v.resetTime) keyRateLimitStore.delete(k);
+  }
+}, RATE_LIMIT_WINDOW);
 
 // Trusted proxy IPs (reverse proxies, load balancers) — adjust for your setup
 const TRUSTED_PROXIES = ['127.0.0.1', '::1', '::ffff:127.0.0.1'];
@@ -124,39 +147,47 @@ function createProxyWithRetry(
   }
 
   return async (req: express.Request, res: express.Response) => {
-    // Extract real client IP (handles X-Forwarded-For behind proxies)
-    let clientIp = req.ip || req.socket.remoteAddress || 'unknown';
-    // If behind a trusted proxy, use the leftmost untrusted IP from X-Forwarded-For
-    if (TRUSTED_PROXIES.includes(clientIp) && req.headers['x-forwarded-for']) {
-      const forwarded = (req.headers['x-forwarded-for'] as string).split(',')[0].trim();
-      if (forwarded) clientIp = forwarded;
-    }
+      // SSRF defense: only allow known-safe API paths
+      const safePathPattern = /^\/v1\/(chat\/completions|messages|embeddings|models|completions)/;
+      const decodedPath = decodeURIComponent(req.url);
+      if (!safePathPattern.test(decodedPath)) {
+        console.warn(`[${provider}] Blocked suspicious proxy path: ${decodedPath}`);
+        res.status(400).json({ error: { message: 'Invalid request path', type: 'invalid_request' } });
+        return;
+      }
 
-    // Check rate limit
-    const rateLimit = checkRateLimit(provider, clientIp);
-    if (!rateLimit.allowed) {
-      console.log(`[${provider}] Rate limited. Retry after ${rateLimit.retryAfter}s`);
-      res.setHeader('Retry-After', rateLimit.retryAfter || 60);
-      res.setHeader('X-RateLimit-Reset', rateLimit.retryAfter ? Date.now() + rateLimit.retryAfter * 1000 : Date.now() + 60000);
-      res.status(429).json({ 
-        error: { 
-          message: `Rate limit exceeded. Please wait ${rateLimit.retryAfter} seconds.`,
-          type: 'rate_limit_exceeded',
-          retryAfter: rateLimit.retryAfter
-        } 
-      });
-      return;
-    }
+      // Extract real client IP (handles X-Forwarded-For behind proxies)
+      let clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+      if (TRUSTED_PROXIES.includes(clientIp) && req.headers['x-forwarded-for']) {
+        const forwarded = (req.headers['x-forwarded-for'] as string).split(',')[0].trim();
+        if (forwarded) clientIp = forwarded;
+      }
 
-    let retries = 0;
-    let lastError: Error | null = null;
+      // Check rate limit
+      const rateLimit = checkRateLimit(provider, clientIp);
+      if (!rateLimit.allowed) {
+        console.log(`[${provider}] Rate limited. Retry after ${rateLimit.retryAfter}s`);
+        res.setHeader('Retry-After', rateLimit.retryAfter || 60);
+        res.setHeader('X-RateLimit-Reset', rateLimit.retryAfter ? Date.now() + rateLimit.retryAfter * 1000 : Date.now() + 60000);
+        res.status(429).json({
+          error: {
+            message: `Rate limit exceeded. Please wait ${rateLimit.retryAfter} seconds.`,
+            type: 'rate_limit_exceeded',
+            retryAfter: rateLimit.retryAfter
+          }
+        });
+        return;
+      }
 
-    while (retries < MAX_RETRIES) {
-      try {
-        // Build headers - convert express headers to fetch Headers
-        const headers = new Headers();
-        headers.set('Content-Type', 'application/json');
-        headers.set('Accept', 'text/event-stream');
+      let retries = 0;
+      let lastError: Error | null = null;
+
+      while (retries < MAX_RETRIES) {
+        try {
+          // Build headers - convert express headers to fetch Headers
+          const headers = new Headers();
+          headers.set('Content-Type', 'application/json');
+          headers.set('Accept', 'text/event-stream');
         
         // Add API key if provided
         if (apiKeyHeader && apiKey) {
@@ -258,18 +289,15 @@ function createProxyWithRetry(
       }
     }
 
-    // All retries exhausted
-    console.error(`[${provider}] All ${MAX_RETRIES} retries exhausted:`, lastError?.message);
-    if (!res.headersSent) {
-      res.status(502).json({ 
-        error: { 
-          message: `Proxy failed after ${MAX_RETRIES} retries: ${lastError?.message || 'Unknown error'}`,
-          type: 'proxy_error'
-        } 
-      });
+    // All retries exhausted — log details server-side only; generic message to client
+        console.error(`[${provider}] All ${MAX_RETRIES} retries exhausted:`, lastError?.message);
+        if (!res.headersSent) {
+          res.status(502).json({
+            error: { message: 'AI service temporarily unavailable. Please try again.', type: 'proxy_error' }
+          });
+        }
+      };
     }
-  };
-}
 
 // --- OpenAI Proxy ---
 if (process.env.OPENAI_API_KEY) {
@@ -396,18 +424,21 @@ app.post('/api/chat', async (req, res) => {
         ? [systemMessage, ...userMessages]
         : userMessages;
 
-              const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({
-                  model, // Set by server, not exposed to client
-                  messages: finalMessages,
-                  stream: true,
-                }),
-                signal: controller.signal,
-              });
-
-      clearTimeout(timeout);
+      let response: Response;
+      try {
+        response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            model, // Set by server, not exposed to client
+            messages: finalMessages,
+            stream: true,
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
 
       // Track per-key usage
       if (keyRateLimitStore.has(apiKey)) {

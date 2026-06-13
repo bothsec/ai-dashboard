@@ -32,7 +32,14 @@ export async function parseSSEStream(
 
       if (trimmedLine.startsWith('data: ')) {
         const jsonStr = trimmedLine.slice(6);
-        const data = JSON.parse(jsonStr);
+        let data: unknown;
+        try {
+          data = JSON.parse(jsonStr);
+        } catch {
+          // Skip malformed JSON — don't crash the stream
+          console.warn('[sseParser] Skipping malformed JSON:', jsonStr.slice(0, 80));
+          continue;
+        }
         const content = extractContent(data);
         if (content) {
           fullContent += content;
@@ -48,7 +55,8 @@ export async function parseSSEStream(
         break;
       }
 
-      const { done, value } = await reader.read();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { done, value } = await (reader.read as any)({ signal });
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });

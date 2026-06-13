@@ -13,16 +13,14 @@ interface MessageItemProps {
   isStreaming: boolean;
   isLast: boolean;
   streamingContent: string;
-  tokensPerSecond?: number;
 }
 
-const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, tokensPerSecond }: MessageItemProps) => {
+const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent }: MessageItemProps) => {
   const { settings } = useSettings();
   const isDark = msg.role === 'user' ? true : settings.theme === 'dark';
   const displayContent = (isLast && streamingContent) || msg.content;
   const hasContent = displayContent && displayContent.trim().length > 0;
   const showThinking = msg.role === 'assistant' && !hasContent && isStreaming && isLast;
-  const showSpeed = isLast && isStreaming && hasContent && !showThinking && typeof tokensPerSecond === 'number' && tokensPerSecond >= 1;
 
   return (
     <div className={`flex gap-4 md:gap-5 group animate-in slide-in-from-bottom-4 fade-in duration-300 py-2 ${
@@ -167,16 +165,6 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, tokensPe
           </div>
         )}
 
-        {/* Speed indicator */}
-        {showSpeed && (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg w-fit">
-            <Zap className="w-4 h-4 text-emerald-400" />
-            <span className="text-sm text-emerald-400 font-medium">
-              {tokensPerSecond?.toFixed(1)} tok/s
-            </span>
-          </div>
-        )}
-        
         {/* Timestamp */}
         <span className={`text-xs px-1 ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>
           {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -273,7 +261,7 @@ export const ChatWindow: React.FC = () => {
             {activeChat?.messages.map((msg, index) => {
               const isLast = index === (activeChat?.messages.length ?? 0) - 1;
               const isMessageStreaming = isStreaming && isLast && msg.id === streamingMessageId;
-              
+
               return (
                 <MessageItem
                   key={msg.id}
@@ -281,7 +269,6 @@ export const ChatWindow: React.FC = () => {
                   isStreaming={isMessageStreaming}
                   isLast={isLast}
                   streamingContent={isMessageStreaming ? streamingContent : ''}
-                  tokensPerSecond={isLast ? tokensPerSecond : undefined}
                 />
               );
             })}
@@ -291,11 +278,19 @@ export const ChatWindow: React.FC = () => {
 
       {/* Loading indicator */}
       {isStreaming && (
-        <div className={`absolute bottom-0 left-0 right-0 flex items-center justify-center py-3 ${isDark ? 'bg-gradient-to-t from-gray-950 to-transparent' : 'bg-gradient-to-t from-white to-transparent'}`}>
+        <div className={`absolute bottom-0 left-0 right-0 flex items-center justify-center py-3 gap-3 ${isDark ? 'bg-gradient-to-t from-gray-950 to-transparent' : 'bg-gradient-to-t from-white to-transparent'}`}>
           <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20">
             <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
             <span className="text-sm text-indigo-400 font-medium">Generating response...</span>
           </div>
+          {typeof tokensPerSecond === 'number' && tokensPerSecond >= 1 && (
+            <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+              <Zap className="w-4 h-4 text-emerald-400" />
+              <span className="text-sm text-emerald-400 font-medium">
+                {tokensPerSecond.toFixed(1)} tok/s
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>
