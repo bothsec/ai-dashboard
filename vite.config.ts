@@ -12,19 +12,6 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
-      // Inject model names only — NO API keys exposed to browser
-      {
-        name: 'inject-safe-env',
-        transformIndexHtml(html) {
-          const safeEnv: Record<string, string> = {}
-          const safeKeys = ['NVIDIA_MODEL', 'OPENAI_MODEL', 'ANTHROPIC_MODEL', 'PORT']
-          for (const key of safeKeys) {
-            if (env[key]) safeEnv[key] = env[key]
-          }
-          const envScript = `<script>window.__ENV_SERVER=${JSON.stringify(safeEnv)};</script>`
-          return html.replace('</body>', `${envScript}</body>`)
-        },
-      },
     ],
     server: {
       host: '0.0.0.0',
@@ -63,6 +50,11 @@ export default defineConfig(({ mode }) => {
               if (key) proxyReq.setHeader('x-api-key', key as string)
             })
           },
+        },
+        '/api/chat': {
+          target: `http://localhost:${env.PORT || 3000}`,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/chat/, '/api/chat'),
         },
       },
     },

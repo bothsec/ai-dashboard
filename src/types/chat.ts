@@ -1,4 +1,4 @@
-export type AIProvider = 'openai' | 'anthropic' | 'nvidia';
+export type AIProvider = 'openai' | 'anthropic' | 'api';
 
 export interface Message {
   id: string;
@@ -23,12 +23,12 @@ export interface Settings {
   apiKeys: {
     openai: string;
     anthropic: string;
-    nvidia: string;
+    api: string;
   };
   model: {
     openai: string;
     anthropic: string;
-    nvidia: string;
+    api: string;
   };
 }
 
@@ -36,5 +36,7 @@ export interface ChatState {
   chats: Chat[];
   activeChatId: string | null;
   isStreaming: boolean;
+  streamingMessageId: string | null;
+  tokensPerSecond: number;
   error: string | null;
 }

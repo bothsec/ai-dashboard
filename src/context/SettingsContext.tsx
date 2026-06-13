@@ -2,23 +2,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { Settings, AIProvider, Theme } from '../types/chat';
 
-/** Type-safe window.__ENV for server-injected environment variables */
-interface WindowEnv {
-  OPENAI_MODEL?: string;
-  ANTHROPIC_MODEL?: string;
-  NVIDIA_MODEL?: string;
-}
-
-declare global {
-  interface Window {
-    __ENV: WindowEnv;
-    __ENV_SERVER?: WindowEnv;
-  }
-}
-
-/** Get model from VITE env, server injection, or fallback */
-const getModel = (envKey: string, windowKey: keyof WindowEnv, fallback: string): string =>
-  import.meta.env[envKey] || (typeof window !== 'undefined' ? window.__ENV?.[windowKey] : '') || fallback;
+/** Get model from VITE env or fallback. Server-injected window.__ENV was removed. */
+const getModel = (envKey: string, fallback: string): string =>
+  import.meta.env[envKey] || fallback;
 
 interface SettingsContextType {
   settings: Settings;
@@ -31,16 +17,16 @@ interface SettingsContextType {
 
 const defaultSettings: Settings = {
   theme: 'dark',
-  activeProvider: 'nvidia',
+  activeProvider: 'api',
   apiKeys: {
     openai: '',
     anthropic: '',
-    nvidia: '',
+    api: '',
   },
   model: {
-    openai: getModel('VITE_OPENAI_MODEL', 'OPENAI_MODEL', 'gpt-4o'),
-    anthropic: getModel('VITE_ANTHROPIC_MODEL', 'ANTHROPIC_MODEL', 'claude-3-5-sonnet-20240620'),
-    nvidia: getModel('VITE_NVIDIA_MODEL', 'NVIDIA_MODEL', 'minimaxai/minimax-m2.7'),
+    openai: getModel('VITE_OPENAI_MODEL', 'gpt-4o'),
+    anthropic: getModel('VITE_ANTHROPIC_MODEL', 'claude-3-5-sonnet-20240620'),
+    api: getModel('VITE_API_MODEL_DEFAULT', ''),
   },
 };
 

@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { Message, ChatState, Chat } from '../types/chat';
 import { useSettings } from './SettingsContext';
-import { NvidiaService } from '../services/nvidiaService';
+import { ChatService } from '../services/chatService';
 import type { AIService } from '../services/aiService';
 
 interface ChatContextType extends ChatState {
@@ -42,6 +42,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           chats,
           activeChatId: chats.length > 0 ? chats[0].id : null,
           isStreaming: false,
+          streamingMessageId: null,
+          tokensPerSecond: 0,
           error: null,
         };
       } catch (e) {
@@ -52,6 +54,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       chats: [],
       activeChatId: null,
       isStreaming: false,
+      streamingMessageId: null,
+      tokensPerSecond: 0,
       error: null,
     };
   });
@@ -72,7 +76,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const service = useMemo((): AIService => {
-    return new NvidiaService();
+    return new ChatService();
   }, []);
 
   const createNewChat = useCallback(() => {
@@ -81,7 +85,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       title: 'New Chat',
       messages: [],
       createdAt: Date.now(),
-      provider: 'nvidia',
+      provider: 'api',
     };
     setState(prev => ({
       ...prev,
@@ -117,7 +121,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: content.slice(0, 40) + (content.length > 40 ? '...' : ''),
         messages: [],
         createdAt: Date.now(),
-        provider: 'nvidia',
+        provider: 'api',
       };
       currentChatId = newChat.id;
       setState(prev => ({
