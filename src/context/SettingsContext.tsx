@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { Settings, AIProvider } from '../types/chat';
+import type { Settings, AIProvider, Theme } from '../types/chat';
 
 /** Type-safe window.__ENV for server-injected environment variables */
 interface WindowEnv {
@@ -22,16 +22,17 @@ const getModel = (envKey: string, windowKey: keyof WindowEnv, fallback: string):
 
 interface SettingsContextType {
   settings: Settings;
+  setTheme: (theme: Theme) => void;
+  toggleTheme: () => void;
   updateSettings: (newSettings: Partial<Settings>) => void;
   updateApiKey: (provider: AIProvider, key: string) => void;
   updateModel: (provider: AIProvider, model: string) => void;
 }
 
-const DEFAULT_SETTINGS: Settings = {
+const defaultSettings: Settings = {
+  theme: 'dark',
   activeProvider: 'nvidia',
   apiKeys: {
-    // API keys are NOT exposed to browser for security.
-    // All requests go through server-side proxies that inject keys.
     openai: '',
     anthropic: '',
     nvidia: '',
@@ -52,10 +53,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       try {
         const parsed = JSON.parse(saved);
         return {
-          ...DEFAULT_SETTINGS,
-          activeProvider: parsed.activeProvider ?? DEFAULT_SETTINGS.activeProvider,
+          ...defaultSettings,
+          theme: (parsed.theme as Theme) || defaultSettings.theme,
+          activeProvider: parsed.activeProvider ?? defaultSettings.activeProvider,
           model: {
-            ...DEFAULT_SETTINGS.model,
+            ...defaultSettings.model,
             ...(parsed.model || {}),
           },
         };
@@ -63,17 +65,32 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         console.error('Failed to parse settings', e);
       }
     }
-    return DEFAULT_SETTINGS;
+    return defaultSettings;
   });
 
-  // Only persist provider selection and model choices — never API keys
+  // Apply theme to document
+  useEffect(() => {
+    document.documentElement.classList.remove('light', 'dark');
+    document.documentElement.classList.add(settings.theme);
+  }, [settings.theme]);
+
+  // Persist theme and settings — never persist API keys
   useEffect(() => {
     const toSave = {
+      theme: settings.theme,
       activeProvider: settings.activeProvider,
       model: settings.model,
     };
     localStorage.setItem('ai-dashboard-settings', JSON.stringify(toSave));
   }, [settings]);
+
+  const setTheme = (theme: Theme) => {
+    setSettings((prev) => ({ ...prev, theme }));
+  };
+
+  const toggleTheme = () => {
+    setSettings((prev) => ({ ...prev, theme: prev.theme === 'dark' ? 'light' : 'dark' }));
+  };
 
   const updateSettings = (newSettings: Partial<Settings>) => {
     setSettings((prev) => ({ ...prev, ...newSettings }));
@@ -94,7 +111,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   return (
-    <SettingsContext.Provider value={{ settings, updateSettings, updateApiKey, updateModel }}>
+    <SettingsContext.Provider
+      value={{ settings, setTheme, toggleTheme, updateSettings, updateApiKey, updateModel }}
+    >
       {children}
     </SettingsContext.Provider>
   );

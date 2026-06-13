@@ -2,14 +2,13 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { Message, ChatState, Chat } from '../types/chat';
 import { useSettings } from './SettingsContext';
-import { OpenAIService } from '../services/openaiService';
-import { AnthropicService } from '../services/anthropicService';
 import { NvidiaService } from '../services/nvidiaService';
 import type { AIService } from '../services/aiService';
 
 interface ChatContextType extends ChatState {
   streamingMessageId: string | null;
   streamingContent: string;
+  tokensPerSecond: number;
   sendMessage: (content: string) => Promise<void>;
   createNewChat: () => void;
   switchChat: (chatId: string) => void;
@@ -59,6 +58,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [streamingContent, setStreamingContent] = useState<string>('');
+  const [tokensPerSecond, setTokensPerSecond] = useState<number>(0);
+  const streamingStartRef = useRef<number>(0);
 
   // Persist chats to localStorage with debounce
   useEffect(() => {
@@ -71,13 +72,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const service = useMemo((): AIService => {
-    switch (settings.activeProvider) {
-      case 'openai': return new OpenAIService();
-      case 'anthropic': return new AnthropicService();
-      case 'nvidia': return new NvidiaService();
-      default: throw new Error(`Unsupported provider: ${settings.activeProvider}`);
-    }
-  }, [settings.activeProvider]);
+    return new NvidiaService();
+  }, []);
 
   const createNewChat = useCallback(() => {
     const newChat: Chat = {
@@ -85,7 +81,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       title: 'New Chat',
       messages: [],
       createdAt: Date.now(),
-      provider: settings.activeProvider,
+      provider: 'nvidia',
     };
     setState(prev => ({
       ...prev,
@@ -121,7 +117,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: content.slice(0, 40) + (content.length > 40 ? '...' : ''),
         messages: [],
         createdAt: Date.now(),
-        provider: settings.activeProvider,
+        provider: 'nvidia',
       };
       currentChatId = newChat.id;
       setState(prev => ({
@@ -165,6 +161,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setStreamingMessageId(assistantMessageId);
     setStreamingContent('');
+    setTokensPerSecond(0);
+    streamingStartRef.current = Date.now();
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -179,7 +177,17 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         settings,
         {
           onChunk: (chunk) => {
-            setStreamingContent(prev => prev + chunk);
+            setStreamingContent(prev => {
+              const newContent = prev + chunk;
+              // Calculate tokens per second (approx: chars / 4)
+              const elapsed = (Date.now() - streamingStartRef.current) / 1000;
+              if (elapsed > 0.5) { // Only update after 0.5s to be stable
+                const approxTokens = newContent.length / 4;
+                const tps = Math.round(approxTokens / elapsed * 10) / 10;
+                setTokensPerSecond(tps);
+              }
+              return newContent;
+            });
           },
           onComplete: (fullContent) => {
             setState(prev => ({
@@ -238,16 +246,17 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [state.activeChatId]);
 
   const contextValue = useMemo(() => ({
-    ...state,
-    streamingMessageId,
-    streamingContent,
-    sendMessage,
-    createNewChat,
-    switchChat,
-    deleteChat,
-    clearMessages,
-    cancelStream
-  }), [state, streamingMessageId, streamingContent, sendMessage, createNewChat, switchChat, deleteChat, clearMessages, cancelStream]);
+      ...state,
+      streamingMessageId,
+      streamingContent,
+      tokensPerSecond,
+      sendMessage,
+      createNewChat,
+      switchChat,
+      deleteChat,
+      clearMessages,
+      cancelStream
+    }), [state, streamingMessageId, streamingContent, tokensPerSecond, sendMessage, createNewChat, switchChat, deleteChat, clearMessages, cancelStream]);
 
   return (
     <ChatContext.Provider value={contextValue}>

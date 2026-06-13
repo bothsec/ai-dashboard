@@ -15,7 +15,10 @@ export interface Chat {
   provider: AIProvider;
 }
 
+export type Theme = 'dark' | 'light'
+
 export interface Settings {
+  theme: Theme;
   activeProvider: AIProvider;
   apiKeys: {
     openai: string;
