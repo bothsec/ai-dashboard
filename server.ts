@@ -378,7 +378,7 @@ app.post('/api/chat', async (req, res) => {
 
       // Inject system prompt to identify the model - override any default identity
       // Toggle with DISPLAY_MODEL_NAME=false to disable identity rewriting.
-      const modelDisplayName = process.env.MODEL_DISPLAY_NAME || 'Vorreakboth 1.0';
+      const modelDisplayName = process.env.MODEL_DISPLAY_NAME || 'AI Assistant';
       const displayNameEnabled = (process.env.DISPLAY_MODEL_NAME ?? 'true').toLowerCase() !== 'false';
       const systemMessage = displayNameEnabled
         ? {
