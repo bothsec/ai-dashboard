@@ -55,8 +55,10 @@ export async function parseSSEStream(
         break;
       }
 
+      // Browser's ReadableStreamDefaultReader.read() accepts { signal } for cancellation
+      // but TypeScript's lib definitions don't include this overload
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { done, value } = await (reader.read as any)({ signal });
+      const { done, value } = await (reader.read as unknown as (options?: { signal?: AbortSignal }) => Promise<{ done: boolean; value?: Uint8Array }>)({ signal });
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });

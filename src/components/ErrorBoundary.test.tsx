@@ -1,6 +1,12 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { render } from '@testing-library/react'
+import { act } from 'react'
 import { ErrorBoundary } from './ErrorBoundary'
+
+// Make act available globally for @testing-library/react which uses React.act internally
+beforeAll(() => {
+  Object.assign(globalThis, { act })
+})
 
 // Component that throws an error
 const ProblemChild = () => {

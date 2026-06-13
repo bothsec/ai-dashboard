@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, memo } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
 import { Send, Loader2, Paperclip, X } from 'lucide-react';
 
-export const ChatInput: React.FC = () => {
+export const ChatInput = memo(() => {
   const [input, setInput] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isFocused, setIsFocused] = useState(false);
@@ -159,7 +159,6 @@ export const ChatInput: React.FC = () => {
           </button>
         </div>
 
-        {/* Hint text */}
         <p className={`text-center text-[10px] md:text-[11px] mt-1.5 md:mt-2 ${
           isDark ? 'text-gray-600' : 'text-gray-500'
         }`}>
@@ -168,4 +167,4 @@ export const ChatInput: React.FC = () => {
       </div>
     </div>
   );
-};
+});

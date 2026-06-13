@@ -43,8 +43,9 @@ export class ChatService implements AIService {
           maxRetries: 3,
           baseDelay: 1000,
           onRetry: (attempt, error) => {
-            console.warn(`Retry ${attempt}/3:`, error.message);
-            callbacks.onError(new Error(`Retrying... (${attempt}/3)`));
+            console.warn(`[chat] Retry ${attempt}/3:`, error.message);
+            // Don't call callbacks.onError for retries — that's not an error state,
+            // it's normal backoff. Calling it shows a confusing red "Retry" message.
           },
         }
       );
