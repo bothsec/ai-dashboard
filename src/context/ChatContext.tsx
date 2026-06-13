@@ -9,12 +9,14 @@ interface ChatContextType extends ChatState {
   streamingMessageId: string | null;
   streamingContent: string;
   tokensPerSecond: number;
+  lastSentMessage: string | null;
   sendMessage: (content: string) => Promise<void>;
   createNewChat: () => void;
   switchChat: (chatId: string) => void;
   deleteChat: (chatId: string) => void;
   clearMessages: () => void;
   cancelStream: () => void;
+  dismissError: () => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -63,6 +65,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [streamingContent, setStreamingContent] = useState<string>('');
   const [tokensPerSecond, setTokensPerSecond] = useState<number>(0);
+  const [lastSentMessage, setLastSentMessage] = useState<string | null>(null);
   const streamingStartRef = useRef<number>(0);
 
   // Persist chats to localStorage with debounce
@@ -118,6 +121,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim()) return;
+
+    setLastSentMessage(content);
 
     let currentChatId = state.activeChatId;
     let isNewChat = false;
@@ -255,6 +260,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setTokensPerSecond(0);
   }, []);
 
+  const dismissError = useCallback(() => {
+    setState(prev => ({ ...prev, error: null }));
+  }, []);
+
   const clearMessages = useCallback(() => {
     setState(prev => {
       if (!prev.activeChatId) return prev;
@@ -272,13 +281,15 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       streamingMessageId,
       streamingContent,
       tokensPerSecond,
+      lastSentMessage,
       sendMessage,
       createNewChat,
       switchChat,
       deleteChat,
       clearMessages,
-      cancelStream
-    }), [state, streamingMessageId, streamingContent, tokensPerSecond, sendMessage, createNewChat, switchChat, deleteChat, clearMessages, cancelStream]);
+      cancelStream,
+      dismissError,
+    }), [state, streamingMessageId, streamingContent, tokensPerSecond, lastSentMessage, sendMessage, createNewChat, switchChat, deleteChat, clearMessages, cancelStream, dismissError]);
 
   return (
     <ChatContext.Provider value={contextValue}>

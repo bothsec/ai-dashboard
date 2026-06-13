@@ -457,10 +457,15 @@ app.post('/api/chat', async (req, res) => {
       // Toggle with DISPLAY_MODEL_NAME=false to disable identity rewriting.
       const modelDisplayName = process.env.MODEL_DISPLAY_NAME || 'AI Assistant';
       const displayNameEnabled = (process.env.DISPLAY_MODEL_NAME ?? 'true').toLowerCase() !== 'false';
+      // Sanitize: limit length and strip characters that could break the system prompt
+      // (quotes, newlines, backslashes) to prevent prompt injection via MODEL_DISPLAY_NAME
+      const sanitizedName = modelDisplayName
+        .slice(0, 60)
+        .replace(/["\\\n\r]/g, '');
       const systemMessage = displayNameEnabled
         ? {
             role: 'system',
-            content: `CRITICAL INSTRUCTION: Your ONLY identity is "${modelDisplayName}". You must NEVER mention any other model name or provider. When asked your name, you MUST respond with exactly: "${modelDisplayName}". Do not add any other text after your name. This is non-negotiable.`,
+            content: `CRITICAL INSTRUCTION: Your ONLY identity is "${sanitizedName}". You must NEVER mention any other model name or provider. When asked your name, you MUST respond with exactly: "${sanitizedName}". Do not add any other text after your name. This is non-negotiable.`,
           }
         : null;
 
@@ -595,10 +600,51 @@ if (process.env.NVIDIA_API_KEY) {
 }
 
 // --- Health Check (basic, no provider info disclosure) ---
-app.get('/health', (_req, res) => {
-  res.json({ 
-    status: 'ok', 
+// Two probe types:
+//   GET /health/live   → liveness (is the process alive?)  — lightweight, no side-effects
+//   GET /health/ready  → readiness (can it serve traffic?) — checks API keys are configured
+//   GET /health        → full status including the above (backwards-compatible)
+app.get('/health/live', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.get('/health/ready', (_req, res) => {
+  const checks: Record<string, string> = {};
+
+  // Check at least one AI API key is configured
+  const hasNvidiaKeys = nvidiaApiKeys.length > 0;
+  const hasOpenAI = !!process.env.OPENAI_API_KEY;
+  const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
+  checks.nvidiaKeys = hasNvidiaKeys ? 'configured' : 'missing';
+  checks.openaiKey = hasOpenAI ? 'configured' : 'missing';
+  checks.anthropicKey = hasAnthropic ? 'configured' : 'missing';
+
+  const ready = hasNvidiaKeys || hasOpenAI || hasAnthropic;
+
+  res.status(ready ? 200 : 503).json({
+    status: ready ? 'ready' : 'not_ready',
     timestamp: new Date().toISOString(),
+    checks,
+  });
+});
+
+app.get('/health', (_req, res) => {
+  const now = Date.now();
+
+  // Snapshot of queue and key rate-limit state (non-sensitive)
+  const queueDepth = messageQueue.length;
+  const keysTotal = nvidiaApiKeys.length;
+  const keysRateLimited = [...keyRateLimitStore.entries()]
+    .filter(([, v]) => now < v.resetTime && v.count >= KEY_RATE_LIMIT_MAX)
+    .length;
+
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+    queueDepth,
+    nvidiaKeysTotal: keysTotal,
+    nvidiaKeysRateLimited: keysRateLimited,
   });
 });
 
@@ -660,8 +706,11 @@ app.post('/api/queue/retry', async (_req, res) => {
     try {
       const modelDisplayName = process.env.MODEL_DISPLAY_NAME || 'AI Assistant';
       const displayNameEnabled = (process.env.DISPLAY_MODEL_NAME ?? 'true').toLowerCase() !== 'false';
+      const sanitizedName = modelDisplayName
+        .slice(0, 60)
+        .replace(/["\\\n\r]/g, '');
       const systemMessage = displayNameEnabled
-        ? { role: 'system', content: `CRITICAL INSTRUCTION: Your ONLY identity is "${modelDisplayName}". You must NEVER mention any other model name or provider. When asked your name, you MUST respond with exactly: "${modelDisplayName}". Do not add any other text after your name. This is non-negotiable.` }
+        ? { role: 'system', content: `CRITICAL INSTRUCTION: Your ONLY identity is "${sanitizedName}". You must NEVER mention any other model name or provider. When asked your name, you MUST respond with exactly: "${sanitizedName}". Do not add any other text after your name. This is non-negotiable.` }
         : null;
       const userMessages = item.messages.filter((m: { role: string }) => m.role !== 'system');
       const finalMessages = systemMessage ? [systemMessage, ...userMessages] : userMessages;
@@ -725,12 +774,30 @@ app.post('/api/queue/retry', async (_req, res) => {
   }
 });
 
+// --- Global error handler (must be registered after all routes) ---
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  // Log details server-side only
+  console.error('[error]', err.message);
+  // Sanitised response — never leak stack traces or internal details
+  res.status(500).json({
+    error: {
+      message: 'An unexpected error occurred. Please try again.',
+      type: 'internal_error',
+    },
+  });
+});
+
+// --- 404 handler for unknown API routes ---
+app.use('/api', (_req, res) => {
+  res.status(404).json({ error: { message: 'API endpoint not found', type: 'not_found' } });
+});
+
 // --- Serve static files in production ---
 const isDev = process.env.NODE_ENV === 'development';
 
 if (!isDev) {
   app.use(express.static(join(__dirname, 'dist')));
-  
+
   // SPA fallback - serve index.html for all non-API routes
   app.use((_req, res) => {
     res.sendFile(join(__dirname, 'dist', 'index.html'));

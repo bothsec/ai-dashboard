@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2 } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 
 interface MessageItemProps {
@@ -223,7 +223,7 @@ const MessageSkeleton = memo(() => {
 });
 
 export const ChatWindow: React.FC = () => {
-  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, tokensPerSecond, sendMessage } = useChat();
+  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, tokensPerSecond, sendMessage, dismissError, lastSentMessage } = useChat();
   const { settings } = useSettings();
   const scrollRef = useRef<HTMLDivElement>(null);
   const emptyStateRef = useRef<HTMLDivElement>(null);
@@ -262,15 +262,54 @@ export const ChatWindow: React.FC = () => {
     await sendMessage(text);
   };
 
+  // Detect network vs API errors for a more specific message
+  const isNetworkError = error && (
+    error.toLowerCase().includes('network') ||
+    error.toLowerCase().includes('fetch') ||
+    error.toLowerCase().includes('offline') ||
+    error.toLowerCase().includes('failed to connect')
+  );
+
   if (error) {
     return (
-      <div className="flex-1 flex items-center justify-center p-4" role="alert">
-        <div className="text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/10 mb-4">
-            <Bot className="w-8 h-8 text-red-400" aria-hidden="true" />
+      <div className="flex-1 flex items-center justify-center p-4" role="alert" aria-live="assertive">
+        <div className="text-center max-w-sm mx-auto">
+          <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 ${
+            isNetworkError ? 'bg-amber-500/10' : 'bg-red-500/10'
+          }`}>
+            {isNetworkError
+              ? <WifiOff className="w-8 h-8 text-amber-400" aria-hidden="true" />
+              : <Bot className="w-8 h-8 text-red-400" aria-hidden="true" />
+            }
           </div>
-          <h3 className="text-lg font-semibold text-red-400 mb-2" role="alert">Error</h3>
-          <p className="text-gray-400 max-w-md">{error}</p>
+          <h3 className={`text-lg font-semibold mb-2 ${isNetworkError ? 'text-amber-400' : 'text-red-400'}`} role="alert">
+            {isNetworkError ? 'You appear to be offline' : 'Something went wrong'}
+          </h3>
+          <p className="text-gray-400 mb-6 text-sm leading-relaxed">{error}</p>
+          <div className="flex items-center justify-center gap-3 flex-wrap">
+            {lastSentMessage && (
+              <button
+                onClick={() => sendMessage(lastSentMessage)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors text-sm font-medium"
+                aria-label="Retry last message"
+              >
+                <RefreshCw className="w-4 h-4" aria-hidden="true" />
+                Retry
+              </button>
+            )}
+            <button
+              onClick={dismissError}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
+                isDark
+                  ? 'bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700'
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-600 border border-gray-200'
+              }`}
+              aria-label="Dismiss error"
+            >
+              <X className="w-4 h-4" aria-hidden="true" />
+              Dismiss
+            </button>
+          </div>
         </div>
       </div>
     );
