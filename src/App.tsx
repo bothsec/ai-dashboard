@@ -10,7 +10,7 @@ import SketchCanvas from './components/SketchCanvas';
 
 const AppInner = memo(function AppInner() {
   const [showSketch, setShowSketch] = useState(false);
-  const { sendMessage, isStreaming } = useChat();
+  const { sendMessage, isStreaming, cancelStream, createNewChat } = useChat();
 
   // Listen for sketch:toggle from Sidebar button
   useEffect(() => {
@@ -18,6 +18,32 @@ const AppInner = memo(function AppInner() {
     window.addEventListener('sketch:toggle', handler);
     return () => window.removeEventListener('sketch:toggle', handler);
   }, []);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isMod = e.ctrlKey || e.metaKey;
+      // Ctrl/Cmd+N — new chat
+      if (isMod && e.key === 'n') {
+        e.preventDefault();
+        createNewChat();
+        return;
+      }
+      // Escape — cancel streaming or close sketch
+      if (e.key === 'Escape') {
+        if (isStreaming) {
+          cancelStream();
+        } else if (showSketch) {
+          setShowSketch(false);
+        } else {
+          window.dispatchEvent(new CustomEvent('pe:close'));
+        }
+        return;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isStreaming, cancelStream, showSketch, createNewChat]);
 
   const handleAskAI = useCallback((sketchDataUrl: string) => {
     const prompt =

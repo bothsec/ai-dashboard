@@ -31,15 +31,22 @@ export const ChatInput = memo(() => {
         e.preventDefault();
         textareaRef.current?.focus();
       }
-      // Escape: Cancel streaming
+      // Escape: Cancel streaming (handled globally in App, but kept here for local focus)
       if (e.key === 'Escape' && isStreaming) {
         e.preventDefault();
         cancelStream();
       }
     };
 
+    // Listen for pe:close event dispatched by App.tsx Escape handler
+    const handlePeClose = () => setShowPromptEngineer(false);
+
     window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    window.addEventListener('pe:close', handlePeClose);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+      window.removeEventListener('pe:close', handlePeClose);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStreaming, cancelStream]);
 
