@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message } from '../types/chat';
 
@@ -265,6 +265,27 @@ export const ChatWindow: React.FC = () => {
     await sendMessage(text);
   }, [sendMessage]);
 
+  const handleExportChat = useCallback(() => {
+    if (!activeChat || activeChat.messages.length === 0) return;
+    const lines: string[] = [
+      `# ${activeChat.title || 'Chat Export'}`,
+      `*Exported on ${new Date().toLocaleString()}*\n`,
+    ];
+    for (const msg of activeChat.messages) {
+      const ts = new Date(msg.timestamp).toLocaleString();
+      lines.push(`## ${msg.role === 'user' ? 'You' : 'Assistant'} — ${ts}`);
+      lines.push(msg.content || '');
+      lines.push('\n---\n');
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chat-${new Date().toISOString().slice(0, 10)}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [activeChat]);
+
   // Detect network vs API errors for a more specific message
   const isNetworkError = error && (
     error.toLowerCase().includes('network') ||
@@ -320,13 +341,31 @@ export const ChatWindow: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden relative">
-      <div 
+      <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto py-6 md:py-8 lg:py-10 px-4 md:px-8 lg:px-12"
         role="log"
         aria-live="polite"
         aria-label="Chat messages"
       >
+        {/* Export button — only shown when chat has messages */}
+        {activeChat && activeChat.messages.length > 0 && (
+          <div className="max-w-4xl mx-auto flex justify-end mb-2">
+            <button
+              onClick={handleExportChat}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                isDark
+                  ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
+                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+              }`}
+              aria-label="Export chat as Markdown"
+              title="Export as Markdown"
+            >
+              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+              Export
+            </button>
+          </div>
+        )}
         {activeChat && activeChat.messages.length === 0 ? (
           /* Empty state */
           <div 
