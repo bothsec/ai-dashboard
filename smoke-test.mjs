@@ -1,0 +1,12 @@
+import { chromium } from 'playwright';
+const browser = await chromium.launch({ timeout: 10000 });
+const page = await browser.newPage();
+const errors = [];
+page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
+page.on('pageerror', err => errors.push(err.message));
+await page.goto('http://localhost:8080', { waitUntil: 'domcontentloaded', timeout: 10000 });
+const title = await page.title();
+await browser.close();
+console.log('Title:', title);
+console.log('Console errors:', errors.length === 0 ? 'none' : errors.join(' | '));
+console.log('STATUS:', errors.length === 0 ? 'PASS' : 'FAIL');

@@ -6,18 +6,9 @@ import { ChatProvider, useChat } from './context/ChatContext';
 import { Sidebar } from './components/Sidebar';
 import { ChatWindow } from './components/ChatWindow';
 import { ChatInput } from './components/ChatInput';
-import SketchCanvas from './components/SketchCanvas';
 
 const AppInner = memo(function AppInner() {
-  const [showSketch, setShowSketch] = useState(false);
-  const { sendMessage, isStreaming, cancelStream, createNewChat } = useChat();
-
-  // Listen for sketch:toggle from Sidebar button
-  useEffect(() => {
-    const handler = () => setShowSketch(prev => !prev);
-    window.addEventListener('sketch:toggle', handler);
-    return () => window.removeEventListener('sketch:toggle', handler);
-  }, []);
+  const { isStreaming, cancelStream, createNewChat } = useChat();
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -29,12 +20,10 @@ const AppInner = memo(function AppInner() {
         createNewChat();
         return;
       }
-      // Escape — cancel streaming or close sketch
+      // Escape — cancel streaming or close prompt engineer
       if (e.key === 'Escape') {
         if (isStreaming) {
           cancelStream();
-        } else if (showSketch) {
-          setShowSketch(false);
         } else {
           window.dispatchEvent(new CustomEvent('pe:close'));
         }
@@ -43,14 +32,7 @@ const AppInner = memo(function AppInner() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isStreaming, cancelStream, showSketch, createNewChat]);
-
-  const handleAskAI = useCallback((sketchDataUrl: string) => {
-    const prompt =
-      'Here is a sketch. Please describe what it shows, and offer any helpful suggestions about it.\n\n' +
-      `![sketch](${sketchDataUrl})`;
-    sendMessage(prompt);
-  }, [sendMessage]);
+  }, [isStreaming, cancelStream, createNewChat]);
 
   return (
     <div className="flex h-dvh md:h-screen overflow-hidden font-sans selection:bg-indigo-500/30">
@@ -67,15 +49,6 @@ const AppInner = memo(function AppInner() {
         <div className="flex-1 overflow-hidden">
           <ChatWindow />
         </div>
-
-        {/* Drawing Canvas — shown when sketch mode is active */}
-        {showSketch && (
-          <div className="shrink-0 px-3 md:px-6 lg:px-12 py-2">
-            <div className="max-w-3xl lg:max-w-2xl mx-auto">
-              <SketchCanvas onAskAI={handleAskAI} disabled={isStreaming} />
-            </div>
-          </div>
-        )}
 
         <ErrorBoundary
           fallback={
