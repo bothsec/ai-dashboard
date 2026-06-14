@@ -4,8 +4,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import helmet from 'helmet';
 import cors from 'cors';
-
-// Load .env with override:true so file values beat stale shell env (e.g. ~/.bashrc exports).
+import { summarizeUrl } from './src/services/urlSummarizer';
 dotenv.config({ override: true });
 
 const __filename = fileURLToPath(import.meta.url);
@@ -129,7 +128,7 @@ app.use(cors({
     if (origin && allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error(`Origin ${origin} not allowed by CORS policy`));
+      if (!origin) return callback(null, false);
     }
   },
   methods: ['GET', 'POST'],
@@ -681,7 +680,6 @@ app.get('/api/settings', (_req, res) => {
 
 // --- Global error handler (must be registered after all routes) ---
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  // Log details server-side only
   console.error('[error]', err.message);
   // Sanitised response — never leak stack traces or internal details
   res.status(500).json({
@@ -690,6 +688,29 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
       type: 'internal_error',
     },
   });
+});
+
+// --- URL Summarizer: fetch any public URL, extract readable text for AI ---
+// GET /api/summarize?url=... → { title, siteName, text, url }
+app.get('/api/summarize', async (req, res) => {
+  const rawUrl = (req.query.url as string | undefined) ?? '';
+
+  if (!rawUrl) {
+    res.status(400).json({ error: { message: 'url query parameter is required', type: 'invalid_request' } });
+    return;
+  }
+  if (rawUrl.length > 2000) {
+    res.status(400).json({ error: { message: 'URL is too long (max 2000 chars)', type: 'invalid_request' } });
+    return;
+  }
+
+  try {
+    const result = await summarizeUrl(rawUrl);
+    res.json(result);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    res.status(422).json({ error: { message: msg, type: 'summarize_error' } });
+  }
 });
 
 // --- 404 handler for unknown API routes ---

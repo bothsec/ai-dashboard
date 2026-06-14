@@ -29,6 +29,10 @@ export default defineConfig(({ mode }) => {
           target: `http://localhost:${env.PORT || 3000}`,
           changeOrigin: true,
         },
+        '/api/summarize': {
+          target: `http://localhost:${env.PORT || 3000}`,
+          changeOrigin: true,
+        },
         '/api/openai': {
           target: 'https://api.openai.com',
           changeOrigin: true,
