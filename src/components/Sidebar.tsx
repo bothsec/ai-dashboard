@@ -1,7 +1,7 @@
 import { useState, memo, useEffect, useCallback } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useChat } from '../context/ChatContext';
-import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles } from 'lucide-react';
+import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles, Pencil } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 
 // Move outside component — pure function, no deps on component scope
@@ -186,6 +186,13 @@ export const Sidebar = memo(() => {
         <div className={`p-3 sm:p-4 pl-[calc(0.75rem+env(safe-area-inset-left,0px))] border-t ${isDark ? 'border-gray-800/50' : 'border-gray-200'}`}>
           <div className="flex items-center gap-2">
               <ThemeToggle />
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent('sketch:toggle'))}
+                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors ${isDark ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700/50 hover:border-indigo-500/50' : 'bg-gray-100 border-gray-200 hover:border-indigo-400'}`}
+                title="Drawing Canvas"
+              >
+                <Pencil className={`w-4 h-4 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
+              </button>
               <div className={`w-9 h-9 rounded-lg flex items-center justify-center border ${isDark ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700/50' : 'bg-gray-100 border-gray-200'}`} aria-hidden="true">
                 <Cpu className={`w-4 h-4 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
               </div>
