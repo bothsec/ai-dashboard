@@ -1,27 +1,31 @@
-import React, { useState, memo, useEffect } from 'react';
+import { useState, memo, useEffect, useCallback } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useChat } from '../context/ChatContext';
 import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 
-export const Sidebar: React.FC = memo(() => {
+// Move outside component — pure function, no deps on component scope
+const formatTime = (timestamp: number) => {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  return date.toLocaleDateString();
+};
+
+export const Sidebar = memo(() => {
   const { settings } = useSettings();
   const { chats, activeChatId, createNewChat, switchChat, deleteChat } = useChat();
   const [isOpen, setIsOpen] = useState(false);
 
-  const formatTime = (timestamp: number) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
-    if (days === 0) return 'Today';
-    if (days === 1) return 'Yesterday';
-    if (days < 7) return `${days} days ago`;
-    return date.toLocaleDateString();
-  };
-
   const isDark = settings.theme === 'dark';
+
+  const toggleSidebar = useCallback(() => setIsOpen(prev => !prev), []);
+  const closeSidebar = useCallback(() => setIsOpen(false), []);
 
   // Keyboard shortcut: Ctrl/Cmd + N for new chat
   useEffect(() => {
@@ -31,22 +35,32 @@ export const Sidebar: React.FC = memo(() => {
         createNewChat();
       }
     };
-    
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createNewChat]);
 
-  const handleDeleteChat = (e: React.MouseEvent, chatId: string) => {
+  const handleDeleteChat = useCallback((e: React.MouseEvent, chatId: string) => {
     e.stopPropagation();
-    // Best-effort deletion — failures are silently ignored
     deleteChat(chatId);
-  };
+  }, [deleteChat]);
+
+  const handleSwitchChat = useCallback((chatId: string) => {
+    switchChat(chatId);
+    setIsOpen(false);
+  }, [switchChat]);
+
+  const handleNewChat = useCallback(() => {
+    createNewChat();
+    setIsOpen(false);
+  }, [createNewChat]);
 
   return (
     <>
       {/* Mobile menu button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={toggleSidebar}
         className={`fixed top-4 left-4 z-50 md:hidden p-2.5 backdrop-blur-xl border rounded-xl transition-all duration-200 ${
           isDark
             ? 'bg-gray-900/90 border-gray-700/50 text-gray-400 hover:text-white hover:border-gray-600'
@@ -61,15 +75,15 @@ export const Sidebar: React.FC = memo(() => {
 
       {/* Backdrop */}
       {isOpen && (
-        <div 
+        <div
           className={`fixed inset-0 z-30 backdrop-blur-sm md:hidden ${isDark ? 'bg-black/70' : 'bg-black/40'}`}
-          onClick={() => setIsOpen(false)}
+          onClick={closeSidebar}
           aria-hidden="true"
         />
       )}
 
       {/* Sidebar */}
-      <aside 
+      <aside
         id="sidebar"
         className={`fixed md:relative inset-y-0 left-0 z-40 w-[85vw] sm:w-80 h-screen flex flex-col backdrop-blur-xl transition-all duration-300 ease-out md:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
@@ -92,11 +106,7 @@ export const Sidebar: React.FC = memo(() => {
         {/* New Chat button */}
         <div className="p-3 sm:p-4 pl-[calc(0.75rem+env(safe-area-inset-left,0px))]">
           <button
-            onClick={() => {
-                // Best-effort — failures are silently ignored
-                createNewChat();
-                setIsOpen(false);
-              }}
+            onClick={handleNewChat}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 sm:py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-xl transition-all duration-200 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 font-medium text-sm sm:text-base active:scale-[0.98] touch-target"
             aria-label="Create new chat (Ctrl+N)"
           >
@@ -106,7 +116,7 @@ export const Sidebar: React.FC = memo(() => {
         </div>
 
         {/* Chat list */}
-        <div 
+        <div
           className="flex-1 overflow-y-auto px-2 sm:px-3 pl-[calc(0.5rem+env(safe-area-inset-left,0px))] py-2 space-y-1 scroll-touch"
           role="navigation"
           aria-label="Chat history"
@@ -126,11 +136,7 @@ export const Sidebar: React.FC = memo(() => {
                     ? 'border-transparent hover:bg-gray-800/50 text-gray-400 hover:text-gray-200'
                     : 'border-transparent hover:bg-gray-100 text-gray-600 hover:text-gray-900'
               }`}
-              onClick={() => {
-                // Best-effort — failures are silently ignored
-                switchChat(chat.id);
-                setIsOpen(false);
-              }}
+              onClick={() => handleSwitchChat(chat.id)}
               role="button"
               tabIndex={0}
               aria-label={`Chat: ${chat.title || 'New Chat'}, ${chat.messages.length} messages, ${formatTime(chat.createdAt)}`}
@@ -138,14 +144,12 @@ export const Sidebar: React.FC = memo(() => {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  // Best-effort — failures are silently ignored
-                  switchChat(chat.id);
-                  setIsOpen(false);
+                  handleSwitchChat(chat.id);
                 }
               }}
             >
-              <MessageSquare 
-                className={`w-4 h-4 shrink-0 ${activeChatId === chat.id ? 'text-indigo-500' : isDark ? 'text-gray-600 group-hover:text-gray-400' : 'text-gray-400 group-hover:text-gray-600'}`} 
+              <MessageSquare
+                className={`w-4 h-4 shrink-0 ${activeChatId === chat.id ? 'text-indigo-500' : isDark ? 'text-gray-600 group-hover:text-gray-400' : 'text-gray-400 group-hover:text-gray-600'}`}
                 aria-hidden="true"
               />
               <div className="flex-1 min-w-0">
@@ -167,7 +171,7 @@ export const Sidebar: React.FC = memo(() => {
               </button>
             </div>
           ))}
-          
+
           {chats.length === 0 && (
             <div className={`text-center py-8 px-4 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} role="status">
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3 ${isDark ? 'bg-gray-800/50' : 'bg-gray-100'}`} aria-hidden="true">

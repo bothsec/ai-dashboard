@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, memo, useMemo } from 'react';
+import { useRef, useEffect, memo, useMemo, useCallback } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
 import ReactMarkdown from 'react-markdown';
@@ -7,6 +7,14 @@ import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
 import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
+
+// Stable — no component-state dependency
+const SUGGESTIONS = [
+  { icon: '📝', text: 'Help me write code' },
+  { icon: '🔍', text: 'Explain something' },
+  { icon: '💡', text: 'Brainstorm ideas' },
+  { icon: '🐛', text: 'Debug my code' },
+];
 
 interface MessageItemProps {
   msg: { id: string; role: string; content: string; timestamp: number };
@@ -250,17 +258,11 @@ export const ChatWindow: React.FC = () => {
     }
   }, [activeChat]);
 
-  const suggestions = [
-    { icon: '📝', text: 'Help me write code' },
-    { icon: '🔍', text: 'Explain something' },
-    { icon: '💡', text: 'Brainstorm ideas' },
-    { icon: '🐛', text: 'Debug my code' },
-  ];
+  const suggestions = SUGGESTIONS; // stable reference, no re-creation
 
-  const handleSuggestionClick = async (text: string) => {
-    // Best-effort — failures are silently ignored
+  const handleSuggestionClick = useCallback(async (text: string) => {
     await sendMessage(text);
-  };
+  }, [sendMessage]);
 
   // Detect network vs API errors for a more specific message
   const isNetworkError = error && (
