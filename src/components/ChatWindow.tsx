@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message } from '../types/chat';
 
@@ -27,6 +27,7 @@ interface MessageItemProps {
 const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent }: MessageItemProps) => {
   const { settings } = useSettings();
   const [speaking, setSpeaking] = useState(false);
+  const [copied, setCopied] = useState(false);
   const isDark = msg.role === 'user' ? true : settings.theme === 'dark';
   const displayContent = (isLast && streamingContent) || msg.content;
   const hasContent = displayContent && displayContent.trim().length > 0;
@@ -77,119 +78,140 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent }: Messag
         
         {/* Message bubble */}
         {displayContent && (
-          <div 
-            className={`px-5 py-4 rounded-2xl shadow-sm transition-all duration-200 ${
-              msg.role === 'user' 
-                ? 'bg-gradient-to-br from-indigo-600 to-indigo-700 text-white rounded-tr-md shadow-lg shadow-indigo-500/20' 
-                : isDark
-                  ? 'bg-gradient-to-br from-gray-800/95 to-gray-900/95 border border-gray-700/50 text-gray-100 rounded-tl-md shadow-xl shadow-black/30'
-                  : 'bg-white border border-gray-200 text-gray-900 rounded-tl-md shadow-xl shadow-black/10'
-            }`}
-          >
-            <div className={`text-[15px] md:text-[15px] leading-[1.75] ${
-              msg.role === 'user' ? '' : 'prose prose-invert dark:prose-invert max-w-none'
-            }`}>
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeSanitize, rehypeHighlight]}
-                components={{
-                  p: ({ children }) => (
-                    <p className={`mb-4 last:mb-0 leading-relaxed ${isDark ? 'text-gray-100' : 'text-gray-800'}`}>{children}</p>
-                  ),
-                  h1: ({ children }) => (
-                    <h1 className={`text-xl font-bold mb-3 mt-6 first:mt-0 ${isDark ? 'text-white' : 'text-gray-900'}`}>{children}</h1>
-                  ),
-                  h2: ({ children }) => (
-                    <h2 className={`text-lg font-bold mb-2 mt-5 first:mt-0 ${isDark ? 'text-white' : 'text-gray-900'}`}>{children}</h2>
-                  ),
-                  h3: ({ children }) => (
-                    <h3 className={`text-base font-semibold mb-2 mt-4 first:mt-0 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>{children}</h3>
-                  ),
-                  h4: ({ children }) => (
-                    <h4 className={`text-sm font-semibold mb-2 mt-3 first:mt-0 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{children}</h4>
-                  ),
-                  ul: ({ children }) => (
-                    <ul className={`list-disc list-inside mb-4 space-y-1.5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{children}</ul>
-                  ),
-                  ol: ({ children }) => (
-                    <ol className={`list-decimal list-inside mb-4 space-y-1.5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{children}</ol>
-                  ),
-                  li: ({ children }) => (
-                    <li className={isDark ? 'text-gray-300' : 'text-gray-600'}>{children}</li>
-                  ),
-                  code: ({ className, children }) => {
-                    const isInline = !className;
-                    if (isInline) {
+          <div className="relative group/bubble">
+            <div
+              className={`px-5 py-4 rounded-2xl shadow-sm transition-all duration-200 ${
+                msg.role === 'user'
+                  ? 'bg-gradient-to-br from-indigo-600 to-indigo-700 text-white rounded-tr-md shadow-lg shadow-indigo-500/20'
+                  : isDark
+                    ? 'bg-gradient-to-br from-gray-800/95 to-gray-900/95 border border-gray-700/50 text-gray-100 rounded-tl-md shadow-xl shadow-black/30'
+                    : 'bg-white border border-gray-200 text-gray-900 rounded-tl-md shadow-xl shadow-black/10'
+              }`}
+            >
+              <div className={`text-[15px] md:text-[15px] leading-[1.75] ${
+                msg.role === 'user' ? '' : 'prose prose-invert dark:prose-invert max-w-none'
+              }`}>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeSanitize, rehypeHighlight]}
+                  components={{
+                    p: ({ children }) => (
+                      <p className={`mb-4 last:mb-0 leading-relaxed ${isDark ? 'text-gray-100' : 'text-gray-800'}`}>{children}</p>
+                    ),
+                    h1: ({ children }) => (
+                      <h1 className={`text-xl font-bold mb-3 mt-6 first:mt-0 ${isDark ? 'text-white' : 'text-gray-900'}`}>{children}</h1>
+                    ),
+                    h2: ({ children }) => (
+                      <h2 className={`text-lg font-bold mb-2 mt-5 first:mt-0 ${isDark ? 'text-white' : 'text-gray-900'}`}>{children}</h2>
+                    ),
+                    h3: ({ children }) => (
+                      <h3 className={`text-base font-semibold mb-2 mt-4 first:mt-0 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>{children}</h3>
+                    ),
+                    h4: ({ children }) => (
+                      <h4 className={`text-sm font-semibold mb-2 mt-3 first:mt-0 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{children}</h4>
+                    ),
+                    ul: ({ children }) => (
+                      <ul className={`list-disc list-inside mb-4 space-y-1.5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{children}</ul>
+                    ),
+                    ol: ({ children }) => (
+                      <ol className={`list-decimal list-inside mb-4 space-y-1.5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{children}</ol>
+                    ),
+                    li: ({ children }) => (
+                      <li className={isDark ? 'text-gray-300' : 'text-gray-600'}>{children}</li>
+                    ),
+                    code: ({ className, children }) => {
+                      const isInline = !className;
+                      if (isInline) {
+                        return (
+                          <code className={isDark ? 'bg-gray-700/60 px-1.5 py-0.5 rounded text-sm font-mono text-indigo-300' : 'bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-indigo-600'}>
+                            {children}
+                          </code>
+                        );
+                      }
                       return (
-                        <code className={isDark ? 'bg-gray-700/60 px-1.5 py-0.5 rounded text-sm font-mono text-indigo-300' : 'bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-indigo-600'}>
+                        <code className={className}>
                           {children}
                         </code>
                       );
-                    }
-                    return (
-                      <code className={className}>
-                        {children}
-                      </code>
-                    );
-                  },
-                  pre: ({ children }) => (
-                    <pre className={`rounded-xl p-4 mb-4 overflow-x-auto text-sm border leading-relaxed ${
-                      isDark ? 'bg-gray-900/90 border-gray-700/40' : 'bg-gray-100 border-gray-200'
-                    }`}>
-                      {children}
-                    </pre>
-                  ),
-                  blockquote: ({ children }) => (
-                    <blockquote className={`border-l-4 border-indigo-500/50 pl-4 py-1 italic mb-4 rounded-r-lg ${
-                      isDark ? 'text-gray-400 bg-gray-800/30' : 'text-gray-600 bg-gray-50'
-                    }`}>
-                      {children}
-                    </blockquote>
-                  ),
-                  a: ({ href, children }) => {
-                    // Defensive: only allow safe http/https URLs (blocks javascript:, data:, etc.)
-                    const isSafe = href && /^(https?:|mailto:|tel:)/.test(href);
-                    if (!isSafe) return null;
-                    return (
-                      <a href={href} target="_blank" rel="noopener noreferrer" className={`underline underline-offset-2 ${
-                        isDark ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'
+                    },
+                    pre: ({ children }) => (
+                      <pre className={`rounded-xl p-4 mb-4 overflow-x-auto text-sm border leading-relaxed ${
+                        isDark ? 'bg-gray-900/90 border-gray-700/40' : 'bg-gray-100 border-gray-200'
                       }`}>
                         {children}
-                      </a>
-                    );
-                  },
-                  hr: () => <hr className={`my-6 ${isDark ? 'border-gray-700' : 'border-gray-200'}`} />,
-                  table: ({ children }) => (
-                    <div className={`overflow-x-auto mb-4 rounded-lg border ${
-                      isDark ? 'border-gray-700/40' : 'border-gray-200'
-                    }`}>
-                      <table className="min-w-full">{children}</table>
-                    </div>
-                  ),
-                  thead: ({ children }) => (
-                    <thead className={isDark ? 'bg-gray-800/50' : 'bg-gray-100'}>{children}</thead>
-                  ),
-                  th: ({ children }) => (
-                    <th className={`px-4 py-2.5 text-left text-sm font-semibold border-b ${
-                      isDark ? 'text-gray-200 border-gray-700' : 'text-gray-800 border-gray-200'
-                    }`}>{children}</th>
-                  ),
-                  td: ({ children }) => (
-                    <td className={`px-4 py-2.5 text-sm border-b ${
-                      isDark ? 'text-gray-300 border-gray-700/40' : 'text-gray-600 border-gray-200'
-                    }`}>{children}</td>
-                  ),
-                  strong: ({ children }) => (
-                    <strong className={`font-semibold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>{children}</strong>
-                  ),
-                  em: ({ children }) => (
-                    <em className={isDark ? 'text-gray-300' : 'text-gray-600'}>{children}</em>
-                  ),
-                }}
-              >
-                {displayContent}
-              </ReactMarkdown>
+                      </pre>
+                    ),
+                    blockquote: ({ children }) => (
+                      <blockquote className={`border-l-4 border-indigo-500/50 pl-4 py-1 italic mb-4 rounded-r-lg ${
+                        isDark ? 'text-gray-400 bg-gray-800/30' : 'text-gray-600 bg-gray-50'
+                      }`}>
+                        {children}
+                      </blockquote>
+                    ),
+                    a: ({ href, children }) => {
+                      const isSafe = href && /^(https?:|mailto:|tel:)/.test(href);
+                      if (!isSafe) return null;
+                      return (
+                        <a href={href} target="_blank" rel="noopener noreferrer" className={`underline underline-offset-2 ${
+                          isDark ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'
+                        }`}>
+                          {children}
+                        </a>
+                      );
+                    },
+                    hr: () => <hr className={`my-6 ${isDark ? 'border-gray-700' : 'border-gray-200'}`} />,
+                    table: ({ children }) => (
+                      <div className={`overflow-x-auto mb-4 rounded-lg border ${
+                        isDark ? 'border-gray-700/40' : 'border-gray-200'
+                      }`}>
+                        <table className="min-w-full">{children}</table>
+                      </div>
+                    ),
+                    thead: ({ children }) => (
+                      <thead className={isDark ? 'bg-gray-800/50' : 'bg-gray-100'}>{children}</thead>
+                    ),
+                    th: ({ children }) => (
+                      <th className={`px-4 py-2.5 text-left text-sm font-semibold border-b ${
+                        isDark ? 'text-gray-200 border-gray-700' : 'text-gray-800 border-gray-200'
+                      }`}>{children}</th>
+                    ),
+                    td: ({ children }) => (
+                      <td className={`px-4 py-2.5 text-sm border-b ${
+                        isDark ? 'text-gray-300 border-gray-700/40' : 'text-gray-600 border-gray-200'
+                      }`}>{children}</td>
+                    ),
+                    strong: ({ children }) => (
+                      <strong className={`font-semibold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>{children}</strong>
+                    ),
+                    em: ({ children }) => (
+                      <em className={isDark ? 'text-gray-300' : 'text-gray-600'}>{children}</em>
+                    ),
+                  }}
+                >
+                  {displayContent}
+                </ReactMarkdown>
+              </div>
             </div>
+            {/* Copy button — shown on hover */}
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(displayContent).then(() => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                });
+              }}
+              className={`absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover/bubble:opacity-100 transition-opacity ${
+                msg.role === 'user'
+                  ? 'bg-indigo-700/80 hover:bg-indigo-600/90 text-white/80 hover:text-white'
+                  : isDark
+                    ? 'bg-gray-700/80 hover:bg-gray-600/90 text-gray-400 hover:text-gray-200'
+                    : 'bg-gray-100/90 hover:bg-gray-200/90 text-gray-500 hover:text-gray-700'
+              }`}
+              aria-label={copied ? 'Copied!' : 'Copy message'}
+              title={copied ? 'Copied!' : 'Copy'}
+            >
+              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+            </button>
           </div>
         )}
 
