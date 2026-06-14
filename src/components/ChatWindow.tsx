@@ -1,11 +1,11 @@
-import { useRef, useEffect, memo, useMemo, useCallback } from 'react';
+import { useRef, useEffect, memo, useMemo, useCallback, useState } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message } from '../types/chat';
 
@@ -26,6 +26,7 @@ interface MessageItemProps {
 
 const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent }: MessageItemProps) => {
   const { settings } = useSettings();
+  const [speaking, setSpeaking] = useState(false);
   const isDark = msg.role === 'user' ? true : settings.theme === 'dark';
   const displayContent = (isLast && streamingContent) || msg.content;
   const hasContent = displayContent && displayContent.trim().length > 0;
@@ -192,10 +193,34 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent }: Messag
           </div>
         )}
 
-        {/* Timestamp */}
+        {/* Timestamp + TTS for AI messages */}
         <span className={`text-xs px-1 ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>
           {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
+        {msg.role === 'assistant' && hasContent && !isStreaming && (
+          <button
+            onClick={() => {
+              if (speaking) {
+                speechSynthesis.cancel();
+                setSpeaking(false);
+              } else {
+                const utterance = new SpeechSynthesisUtterance(displayContent.replace(/[#*_`~\[\]]/g, ''));
+                utterance.rate = 1.1;
+                utterance.pitch = 1;
+                utterance.onend = () => setSpeaking(false);
+                utterance.onerror = () => setSpeaking(false);
+                speechSynthesis.cancel();
+                speechSynthesis.speak(utterance);
+                setSpeaking(true);
+              }
+            }}
+            className={`text-xs px-1 transition-colors ${isDark ? 'text-gray-600 hover:text-indigo-400' : 'text-gray-400 hover:text-indigo-600'}`}
+            aria-label={speaking ? 'Stop reading aloud' : 'Read aloud'}
+            title={speaking ? 'Stop' : 'Read aloud'}
+          >
+            {speaking ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+          </button>
+        )}
       </div>
     </div>
   );
