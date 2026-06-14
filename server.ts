@@ -51,15 +51,73 @@ app.use(helmet({
   },
   frameguard: { action: 'deny' },
   xContentTypeOptions: true,
-  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  referrerPolicy: { policy: 'same-origin' }, // strictest — no referrer leaks
 }));
 
-// Add request ID to every response for traceability
+// --- Auth: bearer token validation ---
+const AUTH_SECRET = process.env.AUTH_SECRET_TOKEN;
+const AUTH_COOKIE_NAME = 'ai_auth';
+const AUTH_COOKIE_MAXAGE = 86400; // 24 hours in seconds
+
+// Auth middleware — validates bearer token OR HttpOnly cookie
+function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  // Skip if no AUTH_SECRET is configured (auth disabled)
+  if (!AUTH_SECRET) return next();
+
+  const bearerToken =
+    req.headers.authorization?.startsWith('Bearer ')
+      ? req.headers.authorization.slice(7)
+      : undefined;
+  const cookieToken: string | undefined = (() => {
+    const cookieHeader = req.headers.cookie as string | undefined;
+    if (!cookieHeader) return undefined;
+    const match = cookieHeader.match(new RegExp(`${AUTH_COOKIE_NAME}=([^;]+)`));
+    return match ? match[1] : undefined;
+  })();
+
+  const token = bearerToken || cookieToken;
+  if (!token || token !== AUTH_SECRET) {
+    res.status(401).json({ error: { message: 'Unauthorized', type: 'auth_required' } });
+    return;
+  }
+  next();
+}
+
+// Mount auth middleware globally for all /api routes
+app.use('/api', requireAuth);
+
+// --- Auth: Login endpoint (sets HttpOnly cookie + returns token) ---
+// POST /api/auth/login  { password: string }  →  Set-Cookie + { ok: true }
+// If AUTH_SECRET_TOKEN is not set, auth is disabled and this returns ok.
+app.post('/api/auth/login', express.json(), (req, res) => {
+  if (!AUTH_SECRET) {
+    // Auth disabled — allow access
+    res.json({ ok: true, authEnabled: false });
+    return;
+  }
+  const { password } = req.body ?? {};
+  if (!password || password !== AUTH_SECRET) {
+    res.status(401).json({ error: { message: 'Invalid password', type: 'auth_failed' } });
+    return;
+  }
+  // Set HttpOnly cookie valid for 24h (secure in production via HTTPS)
+  res.setHeader('Set-Cookie', `${AUTH_COOKIE_NAME}=${AUTH_SECRET}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${AUTH_COOKIE_MAXAGE}`);
+  res.json({ ok: true, authEnabled: true });
+});
+
+// --- Auth: Check if auth is required ---
+// GET /api/auth/status → { authRequired: boolean }
+app.get('/api/auth/status', (_req, res) => {
+  res.json({ authRequired: !!AUTH_SECRET });
+});
+
+// Add request ID to every response for traceability (sanitize to prevent log injection)
 app.use((req, res, next) => {
-  const id =
-    (req.headers['x-request-id'] as string) ||
-    (typeof crypto !== 'undefined' && crypto.randomUUID?.()) ||
-    `req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const raw = req.headers['x-request-id'] as string | undefined;
+  // Allow only safe characters; UUID format wins, otherwise truncate to 64
+  const id = (typeof crypto !== 'undefined' && crypto.randomUUID?.())
+    ? crypto.randomUUID() // always generate a fresh UUID — ignore client input
+    : `req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   res.setHeader('X-Request-Id', id);
   next();
 });
@@ -157,14 +215,20 @@ function createProxyWithRetry(
   }
 
   return async (req: express.Request, res: express.Response) => {
-      // SSRF defense: only allow known-safe API paths
-      const safePathPattern = /^\/v1\/(chat\/completions|messages|embeddings|models|completions)/;
-      const decodedPath = decodeURIComponent(req.url);
-      if (!safePathPattern.test(decodedPath)) {
-        console.warn(`[${provider}] Blocked suspicious proxy path: ${decodedPath}`);
-        res.status(400).json({ error: { message: 'Invalid request path', type: 'invalid_request' } });
-        return;
-      }
+        // SSRF defense: parse full URL, validate the path only (ignores query string)
+        let pathname: string;
+        try {
+          pathname = new URL(req.url, 'https://placeholder').pathname;
+        } catch {
+          res.status(400).json({ error: { message: 'Invalid request URL', type: 'invalid_request' } });
+          return;
+        }
+        const safePathPattern = /^\/v1\/(chat\/completions|messages|embeddings|models|completions)/;
+        if (!safePathPattern.test(pathname)) {
+          console.warn(`[${provider}] Blocked suspicious proxy path: ${pathname}`);
+          res.status(400).json({ error: { message: 'Invalid request path', type: 'invalid_request' } });
+          return;
+        }
 
       // Extract real client IP (handles X-Forwarded-For behind proxies)
       let clientIp = req.ip || req.socket.remoteAddress || 'unknown';
@@ -434,8 +498,9 @@ app.post('/api/chat', async (req, res) => {
       // Sanitize: limit length and strip characters that could break the system prompt
       // (quotes, newlines, backslashes) to prevent prompt injection via MODEL_DISPLAY_NAME
       const sanitizedName = modelDisplayName
-        .slice(0, 60)
-        .replace(/["\\\n\r]/g, '');
+              .slice(0, 60)
+              // Allowlist: only safe alphanumeric, spaces, underscores, hyphens, periods, commas
+              .replace(/[^a-zA-Z0-9 _.,-]/g, '');
       const systemMessage = displayNameEnabled
         ? {
             role: 'system',
@@ -482,9 +547,10 @@ app.post('/api/chat', async (req, res) => {
       }
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        const errorMessage = errorData?.detail || errorData?.error?.message || response.statusText;
-        res.status(response.status).json({ error: { message: errorMessage, type: 'api_error' } });
+        // Return generic error — do NOT forward upstream error body (could leak infra details)
+        res.status(response.status).json({
+          error: { message: 'AI service request failed. Please try again.', type: 'api_error' }
+        });
         return;
       }
 
@@ -577,22 +643,11 @@ app.get('/health/live', (_req, res) => {
 });
 
 app.get('/health/ready', (_req, res) => {
-  const checks: Record<string, string> = {};
-
-  // Check at least one AI API key is configured
-  const hasNvidiaKeys = nvidiaApiKeys.length > 0;
-  const hasOpenAI = !!process.env.OPENAI_API_KEY;
-  const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
-  checks.nvidiaKeys = hasNvidiaKeys ? 'configured' : 'missing';
-  checks.openaiKey = hasOpenAI ? 'configured' : 'missing';
-  checks.anthropicKey = hasAnthropic ? 'configured' : 'missing';
-
-  const ready = hasNvidiaKeys || hasOpenAI || hasAnthropic;
-
+  // Check basic readiness — don't disclose which keys are configured (security: no recon)
+  const ready = nvidiaApiKeys.length > 0 || !!process.env.OPENAI_API_KEY || !!process.env.ANTHROPIC_API_KEY;
   res.status(ready ? 200 : 503).json({
     status: ready ? 'ready' : 'not_ready',
     timestamp: new Date().toISOString(),
-    checks,
   });
 });
 

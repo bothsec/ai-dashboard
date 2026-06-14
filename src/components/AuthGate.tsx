@@ -1,0 +1,149 @@
+import { useState, useEffect, useCallback, memo } from 'react';
+import { Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { setAuthToken } from '../services/chatService';
+
+interface AuthGateProps {
+  children: React.ReactNode;
+}
+
+interface AuthStatus {
+  authRequired: boolean;
+}
+
+export const AuthGate = memo(function AuthGate({ children }: AuthGateProps) {
+  const [authRequired, setAuthRequired] = useState<boolean | null>(null); // null = loading
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Check if auth is required on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/status');
+        if (!cancelled) {
+          const data: AuthStatus = await res.json();
+          setAuthRequired(data.authRequired);
+        }
+      } catch {
+        if (!cancelled) setAuthRequired(false); // fail open (server might be unreachable)
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleLogin = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password.trim()) return;
+    setError('');
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        // Store token in memory (not localStorage — security)
+        if (data.authEnabled !== false) {
+          setAuthToken(password.trim());
+        }
+        setAuthRequired(false);
+      } else {
+        setError(data.error?.message || 'Login failed');
+      }
+    } catch {
+      setError('Connection failed. Is the server running?');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [password]);
+
+  // Still checking auth status
+  if (authRequired === null) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-900">
+        <div className="flex flex-col items-center gap-4">
+          <ShieldCheck className="w-10 h-10 text-indigo-500 animate-pulse" />
+          <p className="text-gray-400 text-sm">Checking access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Auth required — show login modal
+  if (authRequired) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-900">
+        <div className="w-full max-w-sm mx-4">
+          <div className="bg-gray-800 border border-gray-700 rounded-2xl p-8 shadow-2xl">
+            {/* Header */}
+            <div className="flex flex-col items-center mb-6">
+              <div className="w-14 h-14 bg-indigo-600/20 rounded-full flex items-center justify-center mb-4">
+                <Lock className="w-7 h-7 text-indigo-400" />
+              </div>
+              <h1 className="text-xl font-semibold text-white">AI Dashboard</h1>
+              <p className="text-gray-400 text-sm mt-1 text-center">
+                Enter your access password to continue
+              </p>
+            </div>
+
+            {/* Login form */}
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="Access password"
+                  autoFocus
+                  autoComplete="current-password"
+                  className="w-full bg-gray-900/80 border border-gray-600 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent pr-12 transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(s => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword
+                    ? <EyeOff className="w-4 h-4" />
+                    : <Eye className="w-4 h-4" />
+                  }
+                </button>
+              </div>
+
+              {error && (
+                <p className="text-red-400 text-sm text-center" role="alert">
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={isLoading || !password.trim()}
+                className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 disabled:text-indigo-400 text-white font-medium py-3 rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  'Sign In'
+                )}
+              </button>
+            </form>
+
+            <p className="text-gray-600 text-xs text-center mt-5">
+              This server is password-protected
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Auth not required — render app
+  return <>{children}</>;
+});

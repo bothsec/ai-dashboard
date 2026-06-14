@@ -3,6 +3,11 @@ import type { Message, Settings } from '../types/chat';
 import { parseSSEStream } from './sseParser';
 import { withRetry } from './retry';
 
+// In-memory auth token — not stored anywhere persistent (security: no localStorage exposure)
+let _authToken: string | null = null;
+export function setAuthToken(token: string | null) { _authToken = token; }
+export function getAuthToken(): string | null { return _authToken; }
+
 export class ChatService implements AIService {
   async generateStream(
     messages: Message[],
@@ -13,13 +18,15 @@ export class ChatService implements AIService {
     try {
       await withRetry(
         async () => {
-          // Call our server-side /api/chat endpoint which hides the model name
-          // The server adds the model and forwards to NVIDIA
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+          };
+          const token = getAuthToken();
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+
           const response = await fetch('/api/chat', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers,
             signal,
             body: JSON.stringify({
               messages: messages.map(({ role, content }) => ({ role, content })),
