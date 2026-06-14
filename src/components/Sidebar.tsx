@@ -1,8 +1,9 @@
 import { useState, memo, useEffect, useCallback } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useChat } from '../context/ChatContext';
-import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles, Pencil, Search, X as XIcon } from 'lucide-react';
+import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles, Pencil, Search, X as XIcon, Palette } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
+import { ThemesModal } from './ThemesModal';
 
 // Move outside component — pure function, no deps on component scope
 const formatTime = (timestamp: number) => {
@@ -22,6 +23,7 @@ export const Sidebar = memo(() => {
   const { chats, activeChatId, createNewChat, switchChat, deleteChat } = useChat();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showThemesModal, setShowThemesModal] = useState(false);
 
   const isDark = settings.theme === 'dark';
 
@@ -236,9 +238,17 @@ export const Sidebar = memo(() => {
               <div className={`w-9 h-9 rounded-lg flex items-center justify-center border ${isDark ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700/50' : 'bg-gray-100 border-gray-200'}`} aria-hidden="true">
                 <Cpu className={`w-4 h-4 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
               </div>
+            <button
+                onClick={() => setShowThemesModal(true)}
+                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors ${isDark ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700/50 hover:border-indigo-500/50' : 'bg-gray-100 border-gray-200 hover:border-indigo-400'}`}
+                title="Chat Themes"
+              >
+                <Palette className={`w-4 h-4 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
+              </button>
           </div>
         </div>
       </aside>
+        {showThemesModal && <ThemesModal onClose={() => setShowThemesModal(false)} />}
     </>
   );
 });

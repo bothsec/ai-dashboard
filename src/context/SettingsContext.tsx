@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import type { Settings, AIProvider, Theme } from '../types/chat';
+import type { Settings, AIProvider, Theme, ChatTheme } from '../types/chat';
 
 /** Get model from VITE env or fallback. Server-injected window.__ENV was removed. */
 const getModel = (envKey: string, fallback: string): string =>
@@ -10,6 +10,7 @@ interface SettingsContextType {
   settings: Settings;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
+  setChatTheme: (chatTheme: ChatTheme) => void;
   updateSettings: (newSettings: Partial<Settings>) => void;
   updateApiKey: (provider: AIProvider, key: string) => void;
   updateModel: (provider: AIProvider, model: string) => void;
@@ -17,6 +18,7 @@ interface SettingsContextType {
 
 const defaultSettings: Settings = {
   theme: 'dark',
+  chatTheme: 'default',
   activeProvider: 'api',
   apiKeys: {
     openai: '',
@@ -41,6 +43,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return {
           ...defaultSettings,
           theme: (parsed.theme as Theme) || defaultSettings.theme,
+          chatTheme: (parsed.chatTheme as ChatTheme) || defaultSettings.chatTheme,
           activeProvider: parsed.activeProvider ?? defaultSettings.activeProvider,
           model: {
             ...defaultSettings.model,
@@ -64,6 +67,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     const toSave = {
       theme: settings.theme,
+      chatTheme: settings.chatTheme,
       activeProvider: settings.activeProvider,
       model: settings.model,
     };
@@ -76,6 +80,10 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const toggleTheme = useCallback(() => {
     setSettings((prev) => ({ ...prev, theme: prev.theme === 'dark' ? 'light' : 'dark' }));
+  }, []);
+
+  const setChatTheme = useCallback((chatTheme: ChatTheme) => {
+    setSettings((prev) => ({ ...prev, chatTheme }));
   }, []);
 
   const updateSettings = useCallback((newSettings: Partial<Settings>) => {
@@ -97,8 +105,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   const contextValue = useMemo(() => ({
-    settings, setTheme, toggleTheme, updateSettings, updateApiKey, updateModel,
-  }), [settings, setTheme, toggleTheme, updateSettings, updateApiKey, updateModel]);
+    settings, setTheme, toggleTheme, setChatTheme, updateSettings, updateApiKey, updateModel,
+  }), [settings, setTheme, toggleTheme, setChatTheme, updateSettings, updateApiKey, updateModel]);
 
   return (
     <SettingsContext.Provider value={contextValue}>

@@ -17,8 +17,11 @@ export interface Chat {
 
 export type Theme = 'dark' | 'light'
 
+export type ChatTheme = 'default' | 'midnight' | 'ocean' | 'forest' | 'sunset' | 'minimal'
+
 export interface Settings {
   theme: Theme;
+  chatTheme: ChatTheme;
   activeProvider: AIProvider;
   apiKeys: {
     openai: string;

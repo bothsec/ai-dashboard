@@ -7,7 +7,7 @@ import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
 import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
-import type { Message } from '../types/chat';
+import type { Message, ChatTheme } from '../types/chat';
 
 // Stable — no component-state dependency
 const SUGGESTIONS = [
@@ -22,18 +22,68 @@ interface MessageItemProps {
   isStreaming: boolean;
   isLast: boolean;
   streamingContent: string;
+  chatTheme: ChatTheme;
 }
 
-const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent }: MessageItemProps) => {
+const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatTheme }: MessageItemProps) => {
   const { settings } = useSettings();
   const [speaking, setSpeaking] = useState(false);
   const [copied, setCopied] = useState(false);
   const [activeReaction, setActiveReaction] = useState<string | null>(null);
   const reactions = ['👍', '❤️', '😄', '😮'];
   const isDark = msg.role === 'user' ? true : settings.theme === 'dark';
+  const activeChatTheme = chatTheme ?? settings.chatTheme;
+
+  // Per-theme accent colors — complete class names
+  const themeAccent = activeChatTheme === 'midnight' ? 'blue' :
+    activeChatTheme === 'ocean' ? 'cyan' :
+    activeChatTheme === 'forest' ? 'emerald' :
+    activeChatTheme === 'sunset' ? 'orange' :
+    activeChatTheme === 'minimal' ? 'neutral' :
+    'indigo';
+
   const displayContent = (isLast && streamingContent) || msg.content;
   const hasContent = displayContent && displayContent.trim().length > 0;
   const showThinking = msg.role === 'assistant' && !hasContent && isStreaming && isLast;
+
+  // User avatar + bubble: complete class names per theme
+  const userAccent = activeChatTheme === 'midnight' ? {
+    avatar: 'from-blue-500 to-indigo-600 shadow-blue-500/25',
+    bubble: 'from-blue-600 to-indigo-600 shadow-blue-500/20',
+  } : activeChatTheme === 'ocean' ? {
+    avatar: 'from-cyan-500 to-teal-600 shadow-cyan-500/25',
+    bubble: 'from-cyan-600 to-teal-600 shadow-cyan-500/20',
+  } : activeChatTheme === 'forest' ? {
+    avatar: 'from-emerald-500 to-green-600 shadow-emerald-500/25',
+    bubble: 'from-emerald-600 to-green-600 shadow-emerald-500/20',
+  } : activeChatTheme === 'sunset' ? {
+    avatar: 'from-orange-500 to-rose-600 shadow-orange-500/25',
+    bubble: 'from-orange-600 to-rose-600 shadow-orange-500/20',
+  } : activeChatTheme === 'minimal' ? {
+    avatar: 'from-neutral-500 to-neutral-600 shadow-neutral-500/25',
+    bubble: 'from-neutral-600 to-neutral-700 shadow-neutral-500/20',
+  } : {
+    avatar: 'from-indigo-500 to-purple-600 shadow-indigo-500/25',
+    bubble: 'from-indigo-600 to-indigo-700 shadow-indigo-500/20',
+  };
+
+  // AI avatar accent color: complete class names per theme
+  const aiAccentColor = activeChatTheme === 'midnight' ? 'text-blue-400' :
+    activeChatTheme === 'ocean' ? 'text-cyan-400' :
+    activeChatTheme === 'forest' ? 'text-emerald-400' :
+    activeChatTheme === 'sunset' ? 'text-orange-400' :
+    activeChatTheme === 'minimal' ? 'text-neutral-400' :
+    'text-indigo-400';
+
+  // AI bubble: complete class names per theme + dark/light
+  const aiBubbleClass = isDark
+    ? activeChatTheme === 'midnight' ? 'from-blue-950/90 to-indigo-950/90 border-blue-800/40' :
+      activeChatTheme === 'ocean' ? 'from-cyan-950/90 to-teal-950/90 border-cyan-800/40' :
+      activeChatTheme === 'forest' ? 'from-green-950/90 to-emerald-950/90 border-green-800/40' :
+      activeChatTheme === 'sunset' ? 'from-orange-950/90 to-rose-950/90 border-orange-800/40' :
+      activeChatTheme === 'minimal' ? 'from-neutral-900/95 to-neutral-950/95 border-neutral-700/40' :
+      'from-gray-800/95 to-gray-900/95 border-gray-700/50'
+    : 'bg-white border-gray-200 text-gray-900';
 
   return (
     <div 
@@ -44,12 +94,12 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent }: Messag
       aria-label={`${msg.role === 'user' ? 'You' : 'Assistant'} message`}
     >
       {/* Avatar */}
-      <div 
+      <div
         className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110 ${
-          msg.role === 'user' 
-            ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25' 
+          msg.role === 'user'
+            ? `bg-gradient-to-br ${userAccent.avatar} text-white`
             : isDark
-              ? 'bg-gradient-to-br from-gray-800 to-gray-900 text-indigo-400 border border-gray-700/50 shadow-lg shadow-black/20'
+              ? `bg-gradient-to-br from-gray-800 to-gray-900 ${aiAccentColor} border border-gray-700/50 shadow-lg shadow-black/20`
               : 'bg-gray-100 text-indigo-600 border border-gray-200 shadow-lg shadow-black/10'
         }`}
         aria-hidden="true"
@@ -61,33 +111,52 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent }: Messag
         msg.role === 'user' ? 'items-end' : ''
       }`}>
         {/* Thinking indicator */}
-        {showThinking && (
-          <div 
-            className="flex items-center gap-3 px-5 py-3.5 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-2xl rounded-tl-md animate-in slide-in-from-left-4 duration-400"
-            role="status"
-            aria-label="AI is thinking"
-          >
-            <div className="flex gap-1.5" aria-hidden="true">
-              <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-              <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-              <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"></div>
+        {showThinking && (() => {
+          const t = themeAccent; // 'blue' | 'cyan' | 'emerald' | 'orange' | 'neutral' | 'indigo'
+          const dotClass = t === 'blue' ? 'bg-blue-400' :
+            t === 'cyan' ? 'bg-cyan-400' :
+            t === 'emerald' ? 'bg-emerald-400' :
+            t === 'orange' ? 'bg-orange-400' :
+            t === 'neutral' ? 'bg-neutral-400' :
+            'bg-indigo-400';
+          const textClass = t === 'blue' ? 'text-blue-400' :
+            t === 'cyan' ? 'text-cyan-400' :
+            t === 'emerald' ? 'text-emerald-400' :
+            t === 'orange' ? 'text-orange-400' :
+            t === 'neutral' ? 'text-neutral-400' :
+            'text-indigo-400';
+          const bgClass = t === 'blue' ? 'from-blue-500/10 to-blue-600/10 border-blue-500/20' :
+            t === 'cyan' ? 'from-cyan-500/10 to-cyan-600/10 border-cyan-500/20' :
+            t === 'emerald' ? 'from-emerald-500/10 to-emerald-600/10 border-emerald-500/20' :
+            t === 'orange' ? 'from-orange-500/10 to-orange-600/10 border-orange-500/20' :
+            t === 'neutral' ? 'from-neutral-500/10 to-neutral-600/10 border-neutral-500/20' :
+            'from-indigo-500/10 to-purple-500/10 border-indigo-500/20';
+          return (
+            <div
+              className={`flex items-center gap-3 px-5 py-3.5 bg-gradient-to-r ${bgClass} rounded-2xl rounded-tl-md animate-in slide-in-from-left-4 duration-400`}
+              role="status"
+              aria-label="AI is thinking"
+            >
+              <div className="flex gap-1.5" aria-hidden="true">
+                <div className={`w-2 h-2 ${dotClass} rounded-full animate-bounce [animation-delay:-0.3s]`}></div>
+                <div className={`w-2 h-2 ${dotClass} rounded-full animate-bounce [animation-delay:-0.15s]`}></div>
+                <div className={`w-2 h-2 ${dotClass} rounded-full animate-bounce`}></div>
+              </div>
+              <span className={`text-sm ${textClass} font-medium`}>
+                Thinking...
+              </span>
             </div>
-            <span className="text-sm text-indigo-400 font-medium">
-              Thinking...
-            </span>
-          </div>
-        )}
-        
+          );
+        })()}
+
         {/* Message bubble */}
         {displayContent && (
           <div className="relative group/bubble">
             <div
               className={`px-5 py-4 rounded-2xl shadow-sm transition-all duration-200 ${
                 msg.role === 'user'
-                  ? 'bg-gradient-to-br from-indigo-600 to-indigo-700 text-white rounded-tr-md shadow-lg shadow-indigo-500/20'
-                  : isDark
-                    ? 'bg-gradient-to-br from-gray-800/95 to-gray-900/95 border border-gray-700/50 text-gray-100 rounded-tl-md shadow-xl shadow-black/30'
-                    : 'bg-white border border-gray-200 text-gray-900 rounded-tl-md shadow-xl shadow-black/10'
+                  ? `bg-gradient-to-br ${userAccent.bubble} text-white rounded-tr-md`
+                  : aiBubbleClass + ' text-gray-100 rounded-tl-md shadow-xl shadow-black/30'
               }`}
             >
               <div className={`text-[15px] md:text-[15px] leading-[1.75] ${
@@ -306,6 +375,12 @@ export const ChatWindow: React.FC = () => {
   const emptyStateRef = useRef<HTMLDivElement>(null);
   const [isPinned, setIsPinned] = useState(true);
   const isDark = settings.theme === 'dark';
+  const chatTheme = settings.chatTheme;
+  const isMidnight = chatTheme === 'midnight';
+  const isOcean = chatTheme === 'ocean';
+  const isForest = chatTheme === 'forest';
+  const isSunset = chatTheme === 'sunset';
+  const isMinimal = chatTheme === 'minimal';
 
   const activeChat = useMemo(() => 
     chats.find(c => c.id === activeChatId),
@@ -422,7 +497,16 @@ export const ChatWindow: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden relative">
+    <div
+      className={`flex-1 flex flex-col h-full min-h-0 overflow-hidden relative ${
+        isMidnight ? 'bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950' :
+        isOcean ? 'bg-gradient-to-br from-slate-950 via-cyan-950 to-teal-950' :
+        isForest ? 'bg-gradient-to-br from-slate-950 via-green-950 to-emerald-950' :
+        isSunset ? 'bg-gradient-to-br from-slate-950 via-rose-950 to-orange-950' :
+        isMinimal ? 'bg-neutral-950' :
+        'bg-gradient-to-br from-gray-950 via-slate-900 to-indigo-950'
+      }`}
+    >
       <div
         ref={scrollRef}
         onScroll={handleScroll}
@@ -505,6 +589,7 @@ export const ChatWindow: React.FC = () => {
                   isStreaming={isMessageStreaming}
                   isLast={isLast}
                   streamingContent={isMessageStreaming ? streamingContent : ''}
+                  chatTheme={chatTheme}
                 />
               );
             })}
