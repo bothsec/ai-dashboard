@@ -28,6 +28,8 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent }: Messag
   const { settings } = useSettings();
   const [speaking, setSpeaking] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [activeReaction, setActiveReaction] = useState<string | null>(null);
+  const reactions = ['👍', '❤️', '😄', '😮'];
   const isDark = msg.role === 'user' ? true : settings.theme === 'dark';
   const displayContent = (isLast && streamingContent) || msg.content;
   const hasContent = displayContent && displayContent.trim().length > 0;
@@ -212,6 +214,25 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent }: Messag
             >
               {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
             </button>
+
+            {/* Reaction buttons — shown on hover for AI messages */}
+            {msg.role === 'assistant' && !isStreaming && (
+              <div className="absolute -bottom-8 left-0 flex items-center gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
+                {reactions.map(emoji => (
+                  <button
+                    key={emoji}
+                    onClick={() => setActiveReaction(prev => prev === emoji ? null : emoji)}
+                    className={`text-sm px-1 py-0.5 rounded hover:bg-gray-700/50 transition-colors ${
+                      activeReaction === emoji ? 'scale-125' : 'scale-100'
+                    }`}
+                    aria-label={`React with ${emoji}`}
+                    title={emoji}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
