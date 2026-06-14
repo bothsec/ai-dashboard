@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 
@@ -369,11 +369,29 @@ const MessageSkeleton = memo(() => {
 });
 
 export const ChatWindow: React.FC = () => {
-  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, tokensPerSecond, sendMessage, dismissError, lastSentMessage } = useChat();
+  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, tokensPerSecond, sendMessage, dismissError, lastSentMessage, lastUserMessage, regenerateLastResponse } = useChat();
   const { settings } = useSettings();
   const scrollRef = useRef<HTMLDivElement>(null);
   const emptyStateRef = useRef<HTMLDivElement>(null);
   const [isPinned, setIsPinned] = useState(true);
+  // Show regenerate button briefly after a response completes
+  const [showRegenerate, setShowRegenerate] = useState(false);
+
+  // Show regenerate briefly when streaming ends with a successful response
+  useEffect(() => {
+    if (isStreaming) return;
+    if (lastUserMessage && activeChat?.messages.some(m => m.role === 'assistant')) {
+      setShowRegenerate(true);
+      const t = setTimeout(() => setShowRegenerate(false), 8000);
+      return () => clearTimeout(t);
+    }
+  }, [isStreaming]);
+
+  // Hide regenerate when user starts typing a new message
+  useEffect(() => {
+    if (lastSentMessage) setShowRegenerate(false);
+  }, [lastSentMessage]);
+
   const isDark = settings.theme === 'dark';
   const chatTheme = settings.chatTheme;
   const isMidnight = chatTheme === 'midnight';
@@ -660,6 +678,30 @@ export const ChatWindow: React.FC = () => {
               </span>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Regenerate button — shown briefly after a successful response */}
+      {showRegenerate && !isStreaming && activeChat && activeChat.messages.length > 0 && (
+        <div
+          className={`absolute bottom-0 left-0 right-0 flex items-center justify-center py-3 gap-3 ${isDark ? 'bg-gradient-to-t from-gray-950 to-transparent' : 'bg-gradient-to-t from-white to-transparent'}`}
+        >
+          <button
+            onClick={() => regenerateLastResponse()}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-500/30 transition-colors text-sm font-medium"
+            aria-label="Regenerate last response"
+            title="Generate a new response to your last message"
+          >
+            <RotateCw className="w-4 h-4" aria-hidden="true" />
+            Regenerate
+          </button>
+          <button
+            onClick={() => setShowRegenerate(false)}
+            className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs transition-colors ${isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-800' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
+            aria-label="Dismiss"
+          >
+            <X className="w-3.5 h-3.5" aria-hidden="true" />
+          </button>
         </div>
       )}
     </div>

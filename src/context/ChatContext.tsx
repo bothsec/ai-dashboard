@@ -13,6 +13,8 @@ interface ChatContextType extends ChatState {
   streamingContent: string;
   tokensPerSecond: number;
   lastSentMessage: string | null;
+  lastUserMessage: string | null;
+  regenerateLastResponse: () => void;
   sendMessage: (content: string) => Promise<void>;
   createNewChat: () => void;
   switchChat: (chatId: string) => void;
@@ -37,7 +39,7 @@ const generateId = () => {
 
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { settings } = useSettings();
-  
+
   const [state, setState] = useState<ChatState>(() => {
     const saved = localStorage.getItem('ai-dashboard-chats');
     if (saved) {
@@ -69,6 +71,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [streamingContent, setStreamingContent] = useState<string>('');
   const [tokensPerSecond, setTokensPerSecond] = useState<number>(0);
   const [lastSentMessage, setLastSentMessage] = useState<string | null>(null);
+  // Persisted separately so regeneration works even after a successful response
+  const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
   const streamingStartRef = useRef<number>(0);
 
   // Persist chats to localStorage with debounce
@@ -120,10 +124,36 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, []);
 
+  const cancelStream = useCallback(() => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setState(prev => ({ ...prev, isStreaming: false }));
+    setStreamingMessageId(null);
+    setStreamingContent('');
+    setTokensPerSecond(0);
+  }, []);
+
+  const dismissError = useCallback(() => {
+    setState(prev => ({ ...prev, error: null }));
+  }, []);
+
+  const clearMessages = useCallback(() => {
+    setState(prev => {
+      if (!prev.activeChatId) return prev;
+      return {
+        ...prev,
+        chats: prev.chats.map(chat =>
+          chat.id === prev.activeChatId ? { ...chat, messages: [] } : chat
+        ),
+      };
+    });
+  }, []);
+
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim()) return;
 
     setLastSentMessage(content);
+    setLastUserMessage(content);
 
     let currentChatId = state.activeChatId;
     let isNewChat = false;
@@ -234,6 +264,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }));
             setStreamingMessageId(null);
             setStreamingContent('');
+            setLastSentMessage(null); // clear so error retry takes over if needed
           },
           onError: (err) => {
             setState(prev => ({ ...prev, isStreaming: false, error: err.message }));
@@ -254,30 +285,37 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [state.activeChatId, state.chats, service, settings]);
 
-  const cancelStream = useCallback(() => {
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = null;
-    setState(prev => ({ ...prev, isStreaming: false }));
-    setStreamingMessageId(null);
-    setStreamingContent('');
-    setTokensPerSecond(0);
-  }, []);
+  // Regenerate: delete last assistant response(s) and re-send the last user message
+  const regenerateLastResponse = useCallback(() => {
+    const msgToResend = lastUserMessage;
+    if (!msgToResend) return;
 
-  const dismissError = useCallback(() => {
-    setState(prev => ({ ...prev, error: null }));
-  }, []);
-
-  const clearMessages = useCallback(() => {
+    // Delete trailing assistant messages from the active chat
     setState(prev => {
       if (!prev.activeChatId) return prev;
       return {
         ...prev,
-        chats: prev.chats.map(chat =>
-          chat.id === prev.activeChatId ? { ...chat, messages: [] } : chat
-        ),
+        chats: prev.chats.map(chat => {
+          if (chat.id === prev.activeChatId) {
+            const msgs = [...chat.messages];
+            while (msgs.length > 0 && msgs[msgs.length - 1].role === 'assistant') {
+              msgs.pop();
+            }
+            return { ...chat, messages: msgs };
+          }
+          return chat;
+        }),
       };
     });
-  }, []);
+
+    // Clear streaming state
+    setStreamingMessageId(null);
+    setStreamingContent('');
+    setTokensPerSecond(0);
+
+    // Re-send after a micro-task to let the state update settle
+    setTimeout(() => sendMessage(msgToResend), 0);
+  }, [lastUserMessage, sendMessage]);
 
   const contextValue = useMemo(() => ({
       ...state,
@@ -285,6 +323,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       streamingContent,
       tokensPerSecond,
       lastSentMessage,
+      lastUserMessage,
+      regenerateLastResponse,
       sendMessage,
       createNewChat,
       switchChat,
@@ -292,7 +332,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearMessages,
       cancelStream,
       dismissError,
-    }), [state, streamingMessageId, streamingContent, tokensPerSecond, lastSentMessage, sendMessage, createNewChat, switchChat, deleteChat, clearMessages, cancelStream, dismissError]);
+    }), [state, streamingMessageId, streamingContent, tokensPerSecond, lastSentMessage, lastUserMessage, regenerateLastResponse, sendMessage, createNewChat, switchChat, deleteChat, clearMessages, cancelStream, dismissError]);
 
   return (
     <ChatContext.Provider value={contextValue}>
