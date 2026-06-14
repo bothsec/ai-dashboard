@@ -54,6 +54,16 @@ app.use(helmet({
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
 }));
 
+// Add request ID to every response for traceability
+app.use((req, res, next) => {
+  const id =
+    (req.headers['x-request-id'] as string) ||
+    (typeof crypto !== 'undefined' && crypto.randomUUID?.()) ||
+    `req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  res.setHeader('X-Request-Id', id);
+  next();
+});
+
 // CORS - restrict to known origins (must be explicitly configured)
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())

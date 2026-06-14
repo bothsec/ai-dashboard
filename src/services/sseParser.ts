@@ -81,9 +81,11 @@ export async function parseSSEStream(
 
     callbacks.onComplete(fullContent);
   } catch (err) {
-    callbacks.onError?.(new Error(err instanceof Error ? err.message : 'Stream read error'));
+    // Preserve original error stack and type — wrapping loses debugging info
+    callbacks.onError?.(err instanceof Error ? err : new Error(String(err)));
   } finally {
-    // Always release the reader lock so the stream can be GC'd
+    // Cancel the stream first, then release the lock
+    try { await reader.cancel(); } catch { /* already cancelled */ }
     try { reader.releaseLock(); } catch { /* already released */ }
   }
 }
