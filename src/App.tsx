@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsProvider } from './context/SettingsContext';
 import { ChatProvider } from './context/ChatContext';
@@ -6,15 +6,14 @@ import { Sidebar } from './components/Sidebar';
 import { ChatWindow } from './components/ChatWindow';
 import { ChatInput } from './components/ChatInput';
 
-function App() {
-  // Remount key forces ErrorBoundary to re-render fresh after an error is reset,
-  // breaking the loop where a persistently-failing child would re-throw immediately.
+const App = memo(function App() {
   const [errorBoundaryKey, setErrorBoundaryKey] = useState(0);
+  const handleReset = useCallback(() => setErrorBoundaryKey(k => k + 1), []);
 
   return (
     <ErrorBoundary
       key={errorBoundaryKey}
-      onReset={() => setErrorBoundaryKey(k => k + 1)}
+      onReset={handleReset}
     >
       <SettingsProvider>
         <ChatProvider>
@@ -49,6 +48,6 @@ function App() {
       </SettingsProvider>
     </ErrorBoundary>
   );
-}
+});
 
 export default App;
