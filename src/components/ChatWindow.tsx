@@ -416,6 +416,23 @@ export const ChatWindow: React.FC = () => {
     }
   }, [activeChat]);
 
+  // Handle "scroll to message" events from ChatSearchModal
+  useEffect(() => {
+    const handleScrollToMessage = (e: Event) => {
+      const { messageId } = (e as CustomEvent).detail;
+      // Wait for render, then scroll
+      requestAnimationFrame(() => {
+        const el = scrollRef.current?.querySelector(`[data-message-id="${messageId}"]`);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Highlight briefly
+        el?.classList.add('ring-2', 'ring-indigo-500/50');
+        setTimeout(() => el?.classList.remove('ring-2', 'ring-indigo-500/50'), 1500);
+      });
+    };
+    window.addEventListener('chat:scroll-to-message', handleScrollToMessage);
+    return () => window.removeEventListener('chat:scroll-to-message', handleScrollToMessage);
+  }, []);
+
   const suggestions = SUGGESTIONS; // stable reference, no re-creation
 
   const handleSuggestionClick = useCallback(async (text: string) => {
@@ -583,14 +600,15 @@ export const ChatWindow: React.FC = () => {
               const isMessageStreaming = isStreaming && isLast && msg.id === streamingMessageId;
 
               return (
+                <div key={msg.id} data-message-id={msg.id}>
                 <MessageItem
-                  key={msg.id}
                   msg={msg}
                   isStreaming={isMessageStreaming}
                   isLast={isLast}
                   streamingContent={isMessageStreaming ? streamingContent : ''}
                   chatTheme={chatTheme}
                 />
+                </div>
               );
             })}
             

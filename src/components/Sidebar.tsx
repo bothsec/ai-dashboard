@@ -1,9 +1,10 @@
 import { useState, memo, useEffect, useCallback } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useChat } from '../context/ChatContext';
-import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles, Pencil, Search, X as XIcon, Palette } from 'lucide-react';
+import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles, Pencil, Search, X as XIcon, Palette, Command } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { ThemesModal } from './ThemesModal';
+import { ChatSearchModal } from './ChatSearchModal';
 
 // Move outside component — pure function, no deps on component scope
 const formatTime = (timestamp: number) => {
@@ -24,6 +25,7 @@ export const Sidebar = memo(() => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showThemesModal, setShowThemesModal] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
 
   const isDark = settings.theme === 'dark';
 
@@ -38,6 +40,18 @@ export const Sidebar = memo(() => {
 
   const toggleSidebar = useCallback(() => setIsOpen(prev => !prev), []);
   const closeSidebar = useCallback(() => setIsOpen(false), []);
+
+  // Keyboard shortcut: Ctrl/Cmd + K for search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowSearchModal(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Keyboard shortcut: Ctrl/Cmd + N for new chat
   useEffect(() => {
@@ -67,6 +81,13 @@ export const Sidebar = memo(() => {
     createNewChat();
     setIsOpen(false);
   }, [createNewChat]);
+
+  const handleSearchSelect = useCallback((chatId: string, messageId: string) => {
+    switchChat(chatId);
+    setShowSearchModal(false);
+    // Dispatch event so ChatWindow can scroll to the message
+    window.dispatchEvent(new CustomEvent('chat:scroll-to-message', { detail: { messageId } }));
+  }, [switchChat]);
 
   return (
     <>
@@ -245,10 +266,18 @@ export const Sidebar = memo(() => {
               >
                 <Palette className={`w-4 h-4 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
               </button>
+            <button
+                onClick={() => setShowSearchModal(true)}
+                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors ${isDark ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700/50 hover:border-indigo-500/50' : 'bg-gray-100 border-gray-200 hover:border-indigo-400'}`}
+                title="Search (Ctrl+K)"
+              >
+                <Command className={`w-4 h-4 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
+              </button>
           </div>
         </div>
       </aside>
         {showThemesModal && <ThemesModal onClose={() => setShowThemesModal(false)} />}
+        {showSearchModal && <ChatSearchModal onClose={() => setShowSearchModal(false)} onSelectMessage={handleSearchSelect} />}
     </>
   );
 });
