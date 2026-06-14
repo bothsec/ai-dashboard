@@ -52,11 +52,20 @@ export async function parseSSEStream(
   };
 
   try {
-    while (true) {
-      if (signal?.aborted) break;
+    // Check HTTP status before attempting to read the body
+    if (!response.ok) {
+      const bodyText = await response.text().catch(() => '');
+      callbacks.onError?.(new Error(`HTTP ${response.status}: ${response.statusText}${bodyText ? ` — ${bodyText}` : ''}`));
+      return;
+    }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { done, value } = await (reader.read as unknown as (options?: { signal?: AbortSignal }) => Promise<{ done: boolean; value?: Uint8Array }>)({ signal });
+    while (true) {
+      if (signal?.aborted) {
+        callbacks.onError?.(new Error('Stream aborted'));
+        return;
+      }
+
+      const { done, value } = await reader.read();
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });

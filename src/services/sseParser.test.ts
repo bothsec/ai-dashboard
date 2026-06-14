@@ -198,6 +198,8 @@ describe('parseSSEStream', () => {
     const encoder = new TextEncoder()
 
     const fakeResponse = {
+      ok: true,
+      status: 200,
       body: {
         getReader: () => ({
           read: vi.fn()

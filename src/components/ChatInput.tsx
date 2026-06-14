@@ -30,9 +30,10 @@ export const ChatInput = memo(() => {
         cancelStream();
       }
     };
-    
+
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStreaming, cancelStream]);
 
   const handleSubmit = async (e?: React.FormEvent) => {

@@ -37,6 +37,7 @@ export class ChatService implements AIService {
               const d = data as { choices?: Array<{ delta?: { content?: string } }> };
               return d.choices?.[0]?.delta?.content || '';
             },
+            signal,
           });
         },
         {

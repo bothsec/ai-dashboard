@@ -1,8 +1,8 @@
-import React from 'react';
+import { memo } from 'react';
 import { Sun, Moon } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 
-export const ThemeToggle: React.FC = () => {
+export const ThemeToggle = memo(() => {
   const { settings, toggleTheme } = useSettings();
 
   return (
@@ -19,4 +19,4 @@ export const ThemeToggle: React.FC = () => {
       )}
     </button>
   );
-};
+});

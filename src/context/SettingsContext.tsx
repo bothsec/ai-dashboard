@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { Settings, AIProvider, Theme } from '../types/chat';
 
 /** Get model from VITE env or fallback. Server-injected window.__ENV was removed. */
@@ -70,36 +70,38 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     localStorage.setItem('ai-dashboard-settings', JSON.stringify(toSave));
   }, [settings]);
 
-  const setTheme = (theme: Theme) => {
+  const setTheme = useCallback((theme: Theme) => {
     setSettings((prev) => ({ ...prev, theme }));
-  };
+  }, []);
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     setSettings((prev) => ({ ...prev, theme: prev.theme === 'dark' ? 'light' : 'dark' }));
-  };
+  }, []);
 
-  const updateSettings = (newSettings: Partial<Settings>) => {
+  const updateSettings = useCallback((newSettings: Partial<Settings>) => {
     setSettings((prev) => ({ ...prev, ...newSettings }));
-  };
+  }, []);
 
-  const updateApiKey = (provider: AIProvider, key: string) => {
+  const updateApiKey = useCallback((provider: AIProvider, key: string) => {
     setSettings((prev) => ({
       ...prev,
       apiKeys: { ...prev.apiKeys, [provider]: key },
     }));
-  };
+  }, []);
 
-  const updateModel = (provider: AIProvider, model: string) => {
+  const updateModel = useCallback((provider: AIProvider, model: string) => {
     setSettings((prev) => ({
       ...prev,
       model: { ...prev.model, [provider]: model },
     }));
-  };
+  }, []);
+
+  const contextValue = useMemo(() => ({
+    settings, setTheme, toggleTheme, updateSettings, updateApiKey, updateModel,
+  }), [settings, setTheme, toggleTheme, updateSettings, updateApiKey, updateModel]);
 
   return (
-    <SettingsContext.Provider
-      value={{ settings, setTheme, toggleTheme, updateSettings, updateApiKey, updateModel }}
-    >
+    <SettingsContext.Provider value={contextValue}>
       {children}
     </SettingsContext.Provider>
   );
