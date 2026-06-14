@@ -68,8 +68,10 @@ export const ChatInput = memo(() => {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setSelectedFiles(Array.from(e.target.files));
+    // Guard against null target (possible with detached/cross-origin events)
+    const target = e.target as HTMLInputElement | null;
+    if (target?.files && target.files.length > 0) {
+      setSelectedFiles(Array.from(target.files));
     }
   };
 

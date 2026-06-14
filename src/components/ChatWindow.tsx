@@ -7,6 +7,7 @@ import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
 import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
+import type { Message } from '../types/chat';
 
 // Stable — no component-state dependency
 const SUGGESTIONS = [
@@ -17,7 +18,7 @@ const SUGGESTIONS = [
 ];
 
 interface MessageItemProps {
-  msg: { id: string; role: string; content: string; timestamp: number };
+  msg: Message;
   isStreaming: boolean;
   isLast: boolean;
   streamingContent: string;
@@ -192,7 +193,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent }: Messag
         )}
 
         {/* Timestamp */}
-        <span className={`text-xs px-1 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} aria-live="off">
+        <span className={`text-xs px-1 ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>
           {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
       </div>

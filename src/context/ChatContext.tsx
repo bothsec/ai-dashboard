@@ -5,6 +5,9 @@ import { useSettings } from './SettingsContext';
 import { ChatService } from '../services/chatService';
 import type { AIService } from '../services/aiService';
 
+// Stable singleton — instantiated once at module load, not per-render
+const globalChatService = new ChatService();
+
 interface ChatContextType extends ChatState {
   streamingMessageId: string | null;
   streamingContent: string;
@@ -85,9 +88,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const service = useMemo((): AIService => {
-    return new ChatService();
-  }, []);
+  const service: AIService = globalChatService;
 
   const createNewChat = useCallback(() => {
     const newChat: Chat = {
@@ -237,6 +238,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           onError: (err) => {
             setState(prev => ({ ...prev, isStreaming: false, error: err.message }));
             setStreamingMessageId(null);
+            setStreamingContent(''); // clear stale partial content
+            setTokensPerSecond(0);
           },
         },
         controller.signal
