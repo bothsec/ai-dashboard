@@ -14,13 +14,20 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
     ],
     server: {
-      host: 'localhost',
+      host: '0.0.0.0',
       port: 8080,
       proxy: {
         '/api/chat': {
           target: `http://localhost:${env.PORT || 3000}`,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/chat/, '/api/chat'),
+        },
+        '/api/auth/login': {
+          target: `http://localhost:${env.PORT || 3000}`,
+          changeOrigin: true,
+        },
+        '/api/auth/status': {
+          target: `http://localhost:${env.PORT || 3000}`,
+          changeOrigin: true,
         },
         '/api/openai': {
           target: 'https://api.openai.com',

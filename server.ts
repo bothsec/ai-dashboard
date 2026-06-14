@@ -83,15 +83,10 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
   next();
 }
 
-// Mount auth middleware globally for all /api routes
-app.use('/api', requireAuth);
-
-// --- Auth: Login endpoint (sets HttpOnly cookie + returns token) ---
+// --- Auth routes (must be defined BEFORE the auth middleware) ---
 // POST /api/auth/login  { password: string }  →  Set-Cookie + { ok: true }
-// If AUTH_SECRET_TOKEN is not set, auth is disabled and this returns ok.
 app.post('/api/auth/login', express.json(), (req, res) => {
   if (!AUTH_SECRET) {
-    // Auth disabled — allow access
     res.json({ ok: true, authEnabled: false });
     return;
   }
@@ -100,16 +95,17 @@ app.post('/api/auth/login', express.json(), (req, res) => {
     res.status(401).json({ error: { message: 'Invalid password', type: 'auth_failed' } });
     return;
   }
-  // Set HttpOnly cookie valid for 24h (secure in production via HTTPS)
   res.setHeader('Set-Cookie', `${AUTH_COOKIE_NAME}=${AUTH_SECRET}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${AUTH_COOKIE_MAXAGE}`);
   res.json({ ok: true, authEnabled: true });
 });
 
-// --- Auth: Check if auth is required ---
-// GET /api/auth/status → { authRequired: boolean }
+// GET /api/auth/status → { authRequired: boolean } (unauthenticated)
 app.get('/api/auth/status', (_req, res) => {
   res.json({ authRequired: !!AUTH_SECRET });
 });
+
+// Mount auth middleware globally for all remaining /api routes
+app.use('/api', requireAuth);
 
 // Add request ID to every response for traceability (sanitize to prevent log injection)
 app.use((req, res, next) => {
