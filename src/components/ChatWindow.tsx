@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message } from '../types/chat';
 
@@ -304,6 +304,7 @@ export const ChatWindow: React.FC = () => {
   const { settings } = useSettings();
   const scrollRef = useRef<HTMLDivElement>(null);
   const emptyStateRef = useRef<HTMLDivElement>(null);
+  const [isPinned, setIsPinned] = useState(true);
   const isDark = settings.theme === 'dark';
 
   const activeChat = useMemo(() => 
@@ -311,12 +312,25 @@ export const ChatWindow: React.FC = () => {
     [chats, activeChatId]
   );
 
-  // Scroll to bottom when new messages arrive
+  // Track if user manually scrolled up (unpinned)
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    // If user scrolled >100px from bottom, unpin. If scrolled back to bottom, re-pin.
+    if (distFromBottom > 100) {
+      setIsPinned(false);
+    } else if (distFromBottom < 20) {
+      setIsPinned(true);
+    }
+  }, []);
+
+  // Scroll to bottom when new messages arrive (only if pinned)
   useEffect(() => {
-    if (scrollRef.current) {
+    if (isPinned && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [activeChat?.messages, streamingContent]);
+  }, [activeChat?.messages, streamingContent, isPinned]);
 
   // Focus management for empty state
   useEffect(() => {
@@ -411,6 +425,7 @@ export const ChatWindow: React.FC = () => {
     <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden relative">
       <div
         ref={scrollRef}
+        onScroll={handleScroll}
         className="flex-1 overflow-y-auto py-6 md:py-8 lg:py-10 px-4 md:px-8 lg:px-12"
         role="log"
         aria-live="polite"
@@ -497,6 +512,27 @@ export const ChatWindow: React.FC = () => {
             {/* Show skeleton when streaming but no message content yet */}
             {isStreaming && activeChat?.messages.length === 0 && (
               <MessageSkeleton />
+            )}
+
+            {/* Floating "scroll to bottom" button — shown when unpinned */}
+            {!isPinned && (
+              <button
+                onClick={() => {
+                  setIsPinned(true);
+                  if (scrollRef.current) {
+                    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+                  }
+                }}
+                className={`sticky bottom-4 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg transition-colors z-10 ${
+                  isDark
+                    ? 'bg-gray-700/90 text-gray-200 hover:bg-gray-600/90'
+                    : 'bg-white/90 text-gray-700 hover:bg-gray-100 shadow-black/20'
+                }`}
+                aria-label="Scroll to latest messages"
+              >
+                <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
+                Jump to latest
+              </button>
             )}
           </div>
         )}
