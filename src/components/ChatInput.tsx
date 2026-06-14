@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, memo } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
-import { Send, Loader2, Paperclip, X, Link, Sparkles } from 'lucide-react';
+import { Send, Loader2, Paperclip, X, Link, Sparkles, Bookmark } from 'lucide-react';
 import PromptEngineer from './PromptEngineer';
+import { PromptLibrary } from './PromptLibrary';
 
 // Regex to detect a standalone URL in input
 const URL_REGEX = /^https?:\/\/[^\s]+$/;
@@ -14,6 +15,7 @@ export const ChatInput = memo(() => {
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [showPromptEngineer, setShowPromptEngineer] = useState(false);
+  const [showPromptLibrary, setShowPromptLibrary] = useState(false);
   const { sendMessage, isStreaming, cancelStream } = useChat();
   const { settings } = useSettings();
   const isDark = settings.theme === 'dark';
@@ -150,6 +152,20 @@ export const ChatInput = memo(() => {
           </div>
         )}
 
+        {/* Prompt Library panel */}
+        {showPromptLibrary && (
+          <div className="mb-3">
+            <PromptLibrary
+              onUse={(prompt) => {
+                setInput(prompt);
+                setShowPromptLibrary(false);
+                setTimeout(() => textareaRef.current?.focus(), 50);
+              }}
+              onClose={() => setShowPromptLibrary(false)}
+            />
+          </div>
+        )}
+
         {/* ChatGPT-style input container */}
         <form 
           className={`relative flex items-center gap-2 md:gap-3 rounded-full px-3 md:px-4 py-2.5 md:py-3 transition-all duration-300 ${
@@ -185,13 +201,40 @@ export const ChatInput = memo(() => {
           {/* Prompt Engineer button */}
           <button
             type="button"
-            onClick={() => setShowPromptEngineer(prev => !prev)}
+            onClick={() => { setShowPromptEngineer(prev => !prev); setShowPromptLibrary(false); }}
             className={`transition-colors duration-200 p-1 rounded-full flex items-center justify-center shrink-0 ${isDark ? 'text-violet-400 hover:text-violet-300 hover:bg-gray-700/50' : 'text-violet-600 hover:text-violet-700 hover:bg-gray-100'} ${showPromptEngineer ? (isDark ? 'bg-gray-700/60 text-violet-300' : 'bg-violet-100 text-violet-700') : ''}`}
             aria-label="Prompt Engineer"
             title="Prompt Engineer — craft better prompts"
           >
             <Sparkles className="w-4 h-4 md:w-5 md:h-5" />
           </button>
+
+          {/* Prompt Library button */}
+          <button
+            type="button"
+            onClick={() => { setShowPromptLibrary(prev => !prev); setShowPromptEngineer(false); }}
+            className={`transition-colors duration-200 p-1 rounded-full flex items-center justify-center shrink-0 ${isDark ? 'text-amber-400 hover:text-amber-300 hover:bg-gray-700/50' : 'text-amber-600 hover:text-amber-700 hover:bg-gray-100'} ${showPromptLibrary ? (isDark ? 'bg-gray-700/60 text-amber-300' : 'bg-amber-100 text-amber-700') : ''}`}
+            aria-label="Prompt Library"
+            title="Prompt Library — saved prompts"
+          >
+            <Bookmark className="w-4 h-4 md:w-5 md:h-5" />
+          </button>
+
+          {/* Save current input to library */}
+          {input.trim().length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                const w = window as unknown as { __savePrompt?: (text: string) => void };
+                w.__savePrompt?.(input);
+              }}
+              className={`transition-colors duration-200 p-1 rounded-full flex items-center justify-center shrink-0 ${isDark ? 'text-gray-500 hover:text-amber-400 hover:bg-gray-700/50' : 'text-gray-400 hover:text-amber-600 hover:bg-gray-100'}`}
+              aria-label="Save to Prompt Library"
+              title="Save current input to Prompt Library"
+            >
+              <Bookmark className="w-3.5 h-3.5 md:w-4 md:h-4 fill-current" />
+            </button>
+          )}
 
           {/* Textarea */}
           <div className="flex-1 min-w-0 flex items-center">
