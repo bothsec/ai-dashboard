@@ -1,12 +1,17 @@
 import React, { useState, useRef, useEffect, memo } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
-import { Send, Loader2, Paperclip, X } from 'lucide-react';
+import { Send, Loader2, Paperclip, X, Link } from 'lucide-react';
+
+// Regex to detect a standalone URL in input
+const URL_REGEX = /^https?:\/\/[^\s]+$/;
 
 export const ChatInput = memo(() => {
   const [input, setInput] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isFocused, setIsFocused] = useState(false);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
   const { sendMessage, isStreaming, cancelStream } = useChat();
   const { settings } = useSettings();
   const isDark = settings.theme === 'dark';
@@ -35,6 +40,26 @@ export const ChatInput = memo(() => {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStreaming, cancelStream]);
+
+  // --- URL Summarizer ---
+  const handleSummarize = async () => {
+    const url = input.trim();
+    if (!URL_REGEX.test(url)) return;
+    setIsSummarizing(true);
+    setSummaryError(null);
+    try {
+      const res = await fetch(`/api/summarize?url=${encodeURIComponent(url)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || 'Failed to summarize');
+      // Prepend summary as context, original URL as reference
+      const summary = `Here's a summary of "${data.title}" (${data.siteName ?? url}):\n\n${data.text}\n\n---\nSource: ${url}`;
+      setInput(summary);
+    } catch (err) {
+      setSummaryError(err instanceof Error ? err.message : 'Failed to summarize');
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -177,6 +202,29 @@ export const ChatInput = memo(() => {
             </div>
           )}
 
+          {/* Summarize URL button — shown when input is a standalone URL */}
+          {URL_REGEX.test(input.trim()) && !isStreaming && (
+            <button
+              type="button"
+              onClick={handleSummarize}
+              disabled={isSummarizing}
+              className={`flex items-center gap-1.5 shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
+                isDark
+                  ? 'bg-indigo-600/80 hover:bg-indigo-600 text-white disabled:opacity-50'
+                  : 'bg-indigo-100 hover:bg-indigo-200 text-indigo-700 disabled:opacity-50'
+              }`}
+              aria-label="Summarize this URL"
+              title="Summarize the page content before sending"
+            >
+              {isSummarizing ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Link className="w-3.5 h-3.5" />
+              )}
+              <span>{isSummarizing ? 'Summarizing…' : 'Summarize URL'}</span>
+            </button>
+          )}
+
           {/* Send button */}
           <button
             type="submit"
@@ -199,6 +247,13 @@ export const ChatInput = memo(() => {
             )}
           </button>
         </form>
+
+        {/* URL summary error */}
+        {summaryError && (
+          <p className="text-center text-[11px] mt-1.5 text-red-500" role="alert">
+            {summaryError}
+          </p>
+        )}
 
         <p className={`text-center text-[10px] md:text-[11px] mt-1.5 md:mt-2 ${isDark ? 'text-gray-600' : 'text-gray-500'}`}>
           AI can make mistakes. Consider checking important information.
