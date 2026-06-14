@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, memo } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
-import { Send, Loader2, Paperclip, X, Link } from 'lucide-react';
+import { Send, Loader2, Paperclip, X, Link, Sparkles } from 'lucide-react';
+import PromptEngineer from './PromptEngineer';
 
 // Regex to detect a standalone URL in input
 const URL_REGEX = /^https?:\/\/[^\s]+$/;
@@ -12,6 +13,7 @@ export const ChatInput = memo(() => {
   const [isFocused, setIsFocused] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [showPromptEngineer, setShowPromptEngineer] = useState(false);
   const { sendMessage, isStreaming, cancelStream } = useChat();
   const { settings } = useSettings();
   const isDark = settings.theme === 'dark';
@@ -126,6 +128,21 @@ export const ChatInput = memo(() => {
   return (
     <div className={`shrink-0 px-3 md:px-6 lg:px-12 py-2 md:py-3 lg:py-4 ${isDark ? '' : 'bg-white/50'}`}>
       <div className="max-w-3xl lg:max-w-2xl mx-auto">
+        {/* Prompt Engineer panel */}
+        {showPromptEngineer && (
+          <div className="mb-3">
+            <PromptEngineer
+              onUse={(prompt) => {
+                setInput(prompt);
+                setShowPromptEngineer(false);
+                setTimeout(() => textareaRef.current?.focus(), 50);
+              }}
+              onClose={() => setShowPromptEngineer(false)}
+              disabled={isStreaming}
+            />
+          </div>
+        )}
+
         {/* ChatGPT-style input container */}
         <form 
           className={`relative flex items-center gap-2 md:gap-3 rounded-full px-3 md:px-4 py-2.5 md:py-3 transition-all duration-300 ${
@@ -141,8 +158,8 @@ export const ChatInput = memo(() => {
           aria-label="Message input form"
         >
           {/* Paperclip button */}
-          <label 
-            htmlFor="file-input" 
+          <label
+            htmlFor="file-input"
             className={`cursor-pointer transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
             aria-label="Attach files"
           >
@@ -157,7 +174,18 @@ export const ChatInput = memo(() => {
             className="hidden"
             aria-label="File input"
           />
-          
+
+          {/* Prompt Engineer button */}
+          <button
+            type="button"
+            onClick={() => setShowPromptEngineer(prev => !prev)}
+            className={`transition-colors duration-200 p-1 rounded-full flex items-center justify-center shrink-0 ${isDark ? 'text-violet-400 hover:text-violet-300 hover:bg-gray-700/50' : 'text-violet-600 hover:text-violet-700 hover:bg-gray-100'} ${showPromptEngineer ? (isDark ? 'bg-gray-700/60 text-violet-300' : 'bg-violet-100 text-violet-700') : ''}`}
+            aria-label="Prompt Engineer"
+            title="Prompt Engineer — craft better prompts"
+          >
+            <Sparkles className="w-4 h-4 md:w-5 md:h-5" />
+          </button>
+
           {/* Textarea */}
           <div className="flex-1 min-w-0 flex items-center">
             <textarea
