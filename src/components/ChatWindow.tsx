@@ -5,9 +5,11 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
+import { BookmarkPanel } from './BookmarkPanel';
+import type { BookmarkedMessage } from './BookmarkPanel';
 
 // Stable — no component-state dependency
 const SUGGESTIONS = [
@@ -23,9 +25,10 @@ interface MessageItemProps {
   isLast: boolean;
   streamingContent: string;
   chatTheme: ChatTheme;
+  activeChatId: string;
 }
 
-const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatTheme }: MessageItemProps) => {
+const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatTheme, activeChatId }: MessageItemProps) => {
   const { settings } = useSettings();
   const [speaking, setSpeaking] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -38,6 +41,17 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
       }
     } catch { /* ignore */ }
     return null;
+  });
+
+  const [isBookmarked, setIsBookmarked] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('bookmarked_messages');
+      if (stored) {
+        const bookmarks: BookmarkedMessage[] = JSON.parse(stored);
+        return bookmarks.some(b => b.id === msg.id);
+      }
+    } catch { /* ignore */ }
+    return false;
   });
 
   // Persist reaction to localStorage
@@ -53,6 +67,36 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
       localStorage.setItem('msg_reactions', JSON.stringify(reactionsMap));
     } catch { /* ignore */ }
   }, [activeReaction, msg.id]);
+
+  // Persist bookmark to localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('bookmarked_messages');
+      const bookmarks: BookmarkedMessage[] = stored ? JSON.parse(stored) : [];
+      const chatTitle = document.querySelector('[data-chat-title]')?.textContent ?? 'Untitled chat';
+      if (isBookmarked) {
+        // Avoid duplicates
+        if (!bookmarks.some(b => b.id === msg.id)) {
+          bookmarks.unshift({
+            id: msg.id,
+            chatId: activeChatId,
+            role: msg.role,
+            content: msg.content,
+            timestamp: msg.timestamp,
+            chatTitle,
+          });
+        }
+      } else {
+        const filtered = bookmarks.filter(b => b.id !== msg.id);
+        if (filtered.length !== bookmarks.length) {
+          localStorage.setItem('bookmarked_messages', JSON.stringify(filtered));
+          window.dispatchEvent(new CustomEvent('bookmarks:refresh'));
+        }
+        return;
+      }
+      localStorage.setItem('bookmarked_messages', JSON.stringify(bookmarks));
+    } catch { /* ignore */ }
+  }, [isBookmarked, msg.id, msg.role, msg.content, msg.timestamp, activeChatId]);
   const reactions = ['👍', '❤️', '😄', '😮'];
   const isDark = msg.role === 'user' ? true : settings.theme === 'dark';
   const activeChatTheme = chatTheme ?? settings.chatTheme;
@@ -310,6 +354,14 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
             {/* Reaction buttons — shown on hover for AI messages */}
             {msg.role === 'assistant' && !isStreaming && (
               <div className="absolute -bottom-8 left-0 flex items-center gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
+                <button
+                  onClick={() => setIsBookmarked(prev => !prev)}
+                  className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${isBookmarked ? 'text-amber-400' : 'text-gray-500'}`}
+                  aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark message'}
+                  title={isBookmarked ? 'Remove bookmark' : 'Bookmark'}
+                >
+                  <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-current' : ''}`} />
+                </button>
                 {reactions.map(emoji => (
                   <button
                     key={emoji}
@@ -399,6 +451,7 @@ export const ChatWindow: React.FC = () => {
   const [isPinned, setIsPinned] = useState(true);
   // Show regenerate button briefly after a response completes
   const [showRegenerate, setShowRegenerate] = useState(false);
+  const [showBookmarksPanel, setShowBookmarksPanel] = useState(false);
 
   // Show regenerate briefly when streaming ends with a successful response
   useEffect(() => {
@@ -582,7 +635,23 @@ export const ChatWindow: React.FC = () => {
       >
         {/* Export button — only shown when chat has messages */}
         {activeChat && activeChat.messages.length > 0 && (
-          <div className="max-w-4xl mx-auto flex justify-end mb-2">
+          <div className="max-w-4xl mx-auto flex justify-end gap-2 mb-2">
+            <button
+              onClick={() => setShowBookmarksPanel(prev => !prev)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                showBookmarksPanel
+                  ? isDark ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-amber-50 text-amber-600 border border-amber-200'
+                  : isDark
+                    ? 'text-gray-500 hover:text-amber-400 hover:bg-gray-800'
+                    : 'text-gray-400 hover:text-amber-600 hover:bg-gray-100'
+              }`}
+              aria-label="Toggle bookmarks panel"
+              aria-pressed={showBookmarksPanel}
+              title="Bookmarks"
+            >
+              <Bookmark className={`w-3.5 h-3.5 ${showBookmarksPanel ? 'fill-current' : ''}`} />
+              Bookmarks
+            </button>
             <button
               onClick={handleExportChat}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
@@ -655,6 +724,7 @@ export const ChatWindow: React.FC = () => {
                   isLast={isLast}
                   streamingContent={isMessageStreaming ? streamingContent : ''}
                   chatTheme={chatTheme}
+                  activeChatId={activeChatId ?? ''}
                 />
                 </div>
               );
@@ -691,7 +761,7 @@ export const ChatWindow: React.FC = () => {
 
       {/* Loading indicator */}
       {isStreaming && (
-        <div 
+        <div
           className={`absolute bottom-0 left-0 right-0 flex items-center justify-center py-3 gap-3 ${isDark ? 'bg-gradient-to-t from-gray-950 to-transparent' : 'bg-gradient-to-t from-white to-transparent'}`}
           role="status"
           aria-label="AI is generating response"
@@ -734,6 +804,9 @@ export const ChatWindow: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* Bookmarks panel */}
+      {showBookmarksPanel && <BookmarkPanel onClose={() => setShowBookmarksPanel(false)} />}
     </div>
   );
 };
