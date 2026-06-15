@@ -21,6 +21,7 @@ interface ChatContextType extends ChatState {
   createNewChat: () => void;
   switchChat: (chatId: string) => void;
   deleteChat: (chatId: string) => void;
+  renameChat: (chatId: string, title: string) => void;
   clearMessages: () => void;
   cancelStream: () => void;
   dismissError: () => void;
@@ -159,6 +160,16 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...prev,
       chats: prev.chats.map(c =>
         c.id === chatId ? { ...c, pinned: !c.pinned } : c
+      ),
+    }));
+  }, []);
+
+  const renameChat = useCallback((chatId: string, title: string) => {
+    if (!title.trim()) return;
+    setState(prev => ({
+      ...prev,
+      chats: prev.chats.map(c =>
+        c.id === chatId ? { ...c, title: title.trim() } : c
       ),
     }));
   }, []);
@@ -427,11 +438,12 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createNewChat,
       switchChat,
       deleteChat,
+      renameChat,
       clearMessages,
       cancelStream,
       dismissError,
       togglePinChat,
-    }), [state, streamingMessageId, streamingContent, tokensPerSecond, lastSentMessage, lastUserMessage, regenerateLastResponse, retryLastMessage, editLastMessage, sendMessage, createNewChat, switchChat, deleteChat, clearMessages, cancelStream, dismissError, togglePinChat]);
+    }), [state, streamingMessageId, streamingContent, tokensPerSecond, lastSentMessage, lastUserMessage, regenerateLastResponse, retryLastMessage, editLastMessage, sendMessage, createNewChat, switchChat, deleteChat, renameChat, clearMessages, cancelStream, dismissError, togglePinChat]);
 
   return (
     <ChatContext.Provider value={contextValue}>

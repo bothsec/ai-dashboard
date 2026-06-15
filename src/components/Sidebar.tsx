@@ -1,7 +1,7 @@
 import { useState, memo, useEffect, useCallback } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useChat } from '../context/ChatContext';
-import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles, Search, X as XIcon, Palette, Command, Pin } from 'lucide-react';
+import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles, Search, X as XIcon, Palette, Command, Pin, Pencil } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { ThemesModal } from './ThemesModal';
 import { ChatSearchModal } from './ChatSearchModal';
@@ -21,11 +21,13 @@ const formatTime = (timestamp: number) => {
 
 export const Sidebar = memo(() => {
   const { settings } = useSettings();
-  const { chats, activeChatId, createNewChat, switchChat, deleteChat, togglePinChat } = useChat();
+  const { chats, activeChatId, createNewChat, switchChat, deleteChat, togglePinChat, renameChat } = useChat();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showThemesModal, setShowThemesModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
+  const [renamingChatId, setRenamingChatId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
 
   const isDark = settings.theme === 'dark';
 
@@ -76,6 +78,26 @@ export const Sidebar = memo(() => {
     e.stopPropagation();
     togglePinChat(chatId);
   }, [togglePinChat]);
+
+  const handleStartRename = useCallback((e: React.MouseEvent, chat: { id: string; title: string }) => {
+    e.stopPropagation();
+    setRenamingChatId(chat.id);
+    setRenameValue(chat.title || 'New Chat');
+  }, []);
+
+  const handleRenameSubmit = useCallback((e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (renamingChatId && renameValue.trim()) {
+      renameChat(renamingChatId, renameValue.trim());
+    }
+    setRenamingChatId(null);
+    setRenameValue('');
+  }, [renamingChatId, renameValue, renameChat]);
+
+  const handleRenameCancel = useCallback(() => {
+    setRenamingChatId(null);
+    setRenameValue('');
+  }, []);
 
   const handleSwitchChat = useCallback((chatId: string) => {
     switchChat(chatId);
@@ -222,29 +244,55 @@ export const Sidebar = memo(() => {
                   aria-hidden="true"
                 />
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium truncate ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
-                    {chat.title || 'New Chat'}
-                  </p>
+                  {renamingChatId === chat.id ? (
+                    <form onSubmit={handleRenameSubmit} onKeyDown={e => { if (e.key === 'Escape') handleRenameCancel(); }} className="flex items-center gap-1">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={renameValue}
+                        onChange={e => setRenameValue(e.target.value)}
+                        onBlur={handleRenameSubmit}
+                        className={`flex-1 min-w-0 px-1.5 py-0.5 rounded text-sm outline-none ${isDark ? 'bg-gray-700 text-gray-100 border border-indigo-500/50' : 'bg-white text-gray-900 border border-indigo-300'}`}
+                        aria-label="New chat title"
+                        onClick={e => e.stopPropagation()}
+                      />
+                    </form>
+                  ) : (
+                    <p className={`text-sm font-medium truncate ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                      {chat.title || 'New Chat'}
+                    </p>
+                  )}
                   <p className={`text-[10px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>
                     {formatTime(chat.createdAt)} • {chat.messages.length} messages{(chat.totalTokens ?? 0) > 0 && ` • ${(chat.totalTokens! / 1000).toFixed(1)}k tok`}
                   </p>
                 </div>
-                <button
-                  onClick={(e) => handleTogglePin(e, chat.id)}
-                  className={`opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all duration-200 ${chat.pinned ? 'opacity-100' : ''} ${isDark ? 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10' : 'text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50'}`}
-                  aria-label={chat.pinned ? `Unpin chat: ${chat.title || 'New Chat'}` : `Pin chat: ${chat.title || 'New Chat'}`}
-                >
-                  <Pin className={`w-3.5 h-3.5 ${chat.pinned ? 'fill-current' : ''}`} aria-hidden="true" />
-                </button>
-                <button
-                  onClick={(e) => handleDeleteChat(e, chat.id)}
-                  className={`opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all duration-200 ${
-                    isDark ? 'text-gray-500 hover:text-red-400 hover:bg-red-500/10' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
-                  }`}
-                  aria-label={`Delete chat: ${chat.title || 'New Chat'}`}
-                >
-                  <Trash className="w-3.5 h-3.5" aria-hidden="true" />
-                </button>
+                {renamingChatId !== chat.id && (
+                  <>
+                    <button
+                      onClick={(e) => handleStartRename(e, chat)}
+                      className={`opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all duration-200 ${isDark ? 'text-gray-500 hover:text-blue-400 hover:bg-blue-500/10' : 'text-gray-400 hover:text-blue-500 hover:bg-blue-50'}`}
+                      aria-label={`Rename chat: ${chat.title || 'New Chat'}`}
+                    >
+                      <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
+                    </button>
+                    <button
+                      onClick={(e) => handleTogglePin(e, chat.id)}
+                      className={`opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all duration-200 ${chat.pinned ? 'opacity-100' : ''} ${isDark ? 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10' : 'text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50'}`}
+                      aria-label={chat.pinned ? `Unpin chat: ${chat.title || 'New Chat'}` : `Pin chat: ${chat.title || 'New Chat'}`}
+                    >
+                      <Pin className={`w-3.5 h-3.5 ${chat.pinned ? 'fill-current' : ''}`} aria-hidden="true" />
+                    </button>
+                    <button
+                      onClick={(e) => handleDeleteChat(e, chat.id)}
+                      className={`opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all duration-200 ${
+                        isDark ? 'text-gray-500 hover:text-red-400 hover:bg-red-500/10' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+                      }`}
+                      aria-label={`Delete chat: ${chat.title || 'New Chat'}`}
+                    >
+                      <Trash className="w-3.5 h-3.5" aria-hidden="true" />
+                    </button>
+                  </>
+                )}
               </div>
             ))
           ) : (
