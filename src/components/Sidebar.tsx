@@ -226,7 +226,7 @@ export const Sidebar = memo(() => {
                     {chat.title || 'New Chat'}
                   </p>
                   <p className={`text-[10px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>
-                    {formatTime(chat.createdAt)} • {chat.messages.length} messages
+                    {formatTime(chat.createdAt)} • {chat.messages.length} messages{(chat.totalTokens ?? 0) > 0 && ` • ${(chat.totalTokens! / 1000).toFixed(1)}k tok`}
                   </p>
                 </div>
                 <button
