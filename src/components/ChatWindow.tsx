@@ -97,6 +97,14 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
     } catch { /* ignore */ }
   }, [reaction, msg.id]);
 
+  // Auto-clear reaction after 5 seconds (satisfies noUnusedParameters)
+  useEffect(() => {
+    if (reaction) {
+      const timer = setTimeout(() => setReaction(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [reaction, setReaction]);
+
   const isDark = msg.role === 'user' ? true : settings.theme === 'dark';
   const activeChatTheme = chatTheme ?? settings.chatTheme;
 
