@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, memo } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
-import { Send, Loader2, Paperclip, X, Link, Sparkles, Bookmark } from 'lucide-react';
+import { Send, Loader2, Paperclip, X, Link, Sparkles, Bookmark, Edit2 } from 'lucide-react';
 import PromptEngineer from './PromptEngineer';
 import { PromptLibrary } from './PromptLibrary';
 
@@ -16,7 +16,8 @@ export const ChatInput = memo(() => {
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [showPromptEngineer, setShowPromptEngineer] = useState(false);
   const [showPromptLibrary, setShowPromptLibrary] = useState(false);
-  const { sendMessage, isStreaming, cancelStream, createNewChat, clearMessages } = useChat();
+  const [isEditing, setIsEditing] = useState(false);
+  const { sendMessage, isStreaming, cancelStream, createNewChat, clearMessages, editLastMessage, lastSentMessage } = useChat();
   const { settings } = useSettings();
   const isDark = settings.theme === 'dark';
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -109,13 +110,23 @@ export const ChatInput = memo(() => {
     setSelectedFiles([]);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
     if (fileInputRef.current) fileInputRef.current.value = '';
-    
-    await sendMessage(messageContent);
+    setIsEditing(false);
+
+    if (isEditing) {
+      await editLastMessage(messageContent);
+    } else {
+      await sendMessage(messageContent);
+    }
     // Restore focus to textarea after sending
     textareaRef.current?.focus();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape' && isEditing) {
+      setIsEditing(false);
+      setInput('');
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -191,14 +202,14 @@ export const ChatInput = memo(() => {
         {/* ChatGPT-style input container */}
         <form
           className={`relative flex items-center gap-2 md:gap-3 rounded-full px-3 md:px-4 py-2.5 md:py-3 transition-all duration-300 ${
-            isFocused
+            isFocused || isEditing
               ? isDark
                 ? 'bg-gray-800/90 shadow-2xl shadow-black/40 border border-gray-600/50'
                 : 'bg-white/90 shadow-lg shadow-gray-900/10 border border-gray-300'
               : isDark
                 ? 'bg-gray-800/60 hover:bg-gray-800/70 border border-gray-700/30 hover:border-gray-600/40'
                 : 'bg-white/60 hover:bg-white/80 border border-gray-200 hover:border-gray-300'
-          }`}
+          } ${isEditing ? (isDark ? '!border-blue-500/50' : '!border-blue-400') : ''}`}
           onSubmit={handleSubmit}
           aria-label="Message input form"
         >
@@ -267,7 +278,7 @@ export const ChatInput = memo(() => {
               onKeyDown={handleKeyDown}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
-              placeholder="Message AI..."
+              placeholder={isEditing ? 'Edit your message… (Enter to resend, Esc to cancel)' : 'Message AI…'}
               rows={1}
               className={`w-full bg-transparent border-none outline-none resize-none leading-relaxed text-sm py-0.5 max-h-32 focus:outline-none focus:ring-0 ${
                 isDark ? 'text-gray-100 placeholder:text-gray-500' : 'text-gray-900 placeholder:text-gray-400'
@@ -346,6 +357,23 @@ export const ChatInput = memo(() => {
               <Send className="w-4 h-4 md:w-5 md:h-5" aria-hidden="true" />
             )}
           </button>
+
+          {/* Edit button — shown when not streaming, not editing, and lastSentMessage exists */}
+          {!isStreaming && !isEditing && lastSentMessage && (
+            <button
+              type="button"
+              onClick={() => {
+                setIsEditing(true);
+                setInput(lastSentMessage);
+                setTimeout(() => textareaRef.current?.focus(), 50);
+              }}
+              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${isDark ? 'text-blue-400 hover:text-blue-300 hover:bg-gray-700/50' : 'text-blue-600 hover:text-blue-700 hover:bg-gray-100'}`}
+              aria-label="Edit last message"
+              title="Edit your last message"
+            >
+              <Edit2 className="w-4 h-4" />
+            </button>
+          )}
 
           {/* Character / word count — visible when input has content */}
           {input.length > 0 && (

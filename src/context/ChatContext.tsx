@@ -15,6 +15,7 @@ interface ChatContextType extends ChatState {
   lastSentMessage: string | null;
   lastUserMessage: string | null;
   regenerateLastResponse: () => void;
+  editLastMessage: (newContent: string) => void;
   sendMessage: (content: string) => Promise<void>;
   createNewChat: () => void;
   switchChat: (chatId: string) => void;
@@ -317,6 +318,43 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setTimeout(() => sendMessage(msgToResend), 0);
   }, [lastUserMessage, sendMessage]);
 
+  // Edit the last user message: update its content and delete all trailing assistant messages, then resend
+  const editLastMessage = useCallback((newContent: string) => {
+    if (!newContent.trim()) return;
+    const currentChatId = state.activeChatId;
+    if (!currentChatId) return;
+
+    // Update the last user message content and remove all trailing assistant messages
+    setState(prev => {
+      const chat = prev.chats.find(c => c.id === currentChatId);
+      if (!chat) return prev;
+      const msgs = [...chat.messages];
+      // Find the last user message
+      let lastUserIdx = -1;
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].role === 'user') { lastUserIdx = i; break; }
+      }
+      if (lastUserIdx === -1) return prev;
+      // Update content and trim trailing assistants
+      msgs[lastUserIdx] = { ...msgs[lastUserIdx], content: newContent };
+      while (msgs.length > lastUserIdx + 1) msgs.pop();
+      return {
+        ...prev,
+        chats: prev.chats.map(c => c.id === currentChatId ? { ...c, messages: msgs } : c),
+      };
+    });
+
+    // Clear streaming state
+    setStreamingMessageId(null);
+    setStreamingContent('');
+    setTokensPerSecond(0);
+    setLastSentMessage(newContent);
+    setLastUserMessage(newContent);
+
+    // Send the edited message
+    setTimeout(() => sendMessage(newContent), 0);
+  }, [state.activeChatId, sendMessage]);
+
   const contextValue = useMemo(() => ({
       ...state,
       streamingMessageId,
@@ -325,6 +363,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       lastSentMessage,
       lastUserMessage,
       regenerateLastResponse,
+      editLastMessage,
       sendMessage,
       createNewChat,
       switchChat,
@@ -332,7 +371,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearMessages,
       cancelStream,
       dismissError,
-    }), [state, streamingMessageId, streamingContent, tokensPerSecond, lastSentMessage, lastUserMessage, regenerateLastResponse, sendMessage, createNewChat, switchChat, deleteChat, clearMessages, cancelStream, dismissError]);
+    }), [state, streamingMessageId, streamingContent, tokensPerSecond, lastSentMessage, lastUserMessage, regenerateLastResponse, editLastMessage, sendMessage, createNewChat, switchChat, deleteChat, clearMessages, cancelStream, dismissError]);
 
   return (
     <ChatContext.Provider value={contextValue}>
