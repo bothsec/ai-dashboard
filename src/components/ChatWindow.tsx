@@ -457,17 +457,6 @@ export const ChatWindow: React.FC = () => {
     await sendMessage(text);
   }, [sendMessage]);
 
-  const handleCopyChat = useCallback(async () => {
-    if (!activeChat || activeChat.messages.length === 0) return;
-    const lines: string[] = [];
-    for (const msg of activeChat.messages) {
-      const ts = new Date(msg.timestamp).toLocaleString();
-      lines.push(`${msg.role === 'user' ? 'You' : 'Assistant'} [${ts}]: ${msg.content || ''}`);
-      lines.push('');
-    }
-    await navigator.clipboard.writeText(lines.join('\n'));
-  }, [activeChat]);
-
   const handleExportChat = useCallback(() => {
     if (!activeChat || activeChat.messages.length === 0) return;
     const lines: string[] = [
