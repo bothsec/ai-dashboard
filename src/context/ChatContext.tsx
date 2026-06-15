@@ -117,6 +117,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       messages: [],
       createdAt: Date.now(),
       provider: 'api',
+      totalTokens: 0,
     };
     setState(prev => ({
       ...prev,
@@ -206,6 +207,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         messages: [],
         createdAt: Date.now(),
         provider: 'api',
+        totalTokens: 0,
       };
       currentChatId = newChat.id;
       isNewChat = true;
@@ -270,6 +272,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
           },
           onComplete: (fullContent) => {
+            const addedTokens = Math.round(fullContent.length / 4);
             setState(prev => ({
               ...prev,
               isStreaming: false,
@@ -277,6 +280,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 if (chat.id === currentChatId) {
                   return {
                     ...chat,
+                    totalTokens: (chat.totalTokens || 0) + addedTokens,
                     messages: chat.messages.map(msg =>
                       msg.id === assistantMessageId
                         ? { ...msg, content: fullContent }
