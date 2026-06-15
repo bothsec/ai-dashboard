@@ -1,7 +1,7 @@
 import { useState, memo, useEffect, useCallback } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useChat } from '../context/ChatContext';
-import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles, Search, X as XIcon, Palette, Command } from 'lucide-react';
+import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles, Search, X as XIcon, Palette, Command, Pin } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { ThemesModal } from './ThemesModal';
 import { ChatSearchModal } from './ChatSearchModal';
@@ -21,7 +21,7 @@ const formatTime = (timestamp: number) => {
 
 export const Sidebar = memo(() => {
   const { settings } = useSettings();
-  const { chats, activeChatId, createNewChat, switchChat, deleteChat } = useChat();
+  const { chats, activeChatId, createNewChat, switchChat, deleteChat, togglePinChat } = useChat();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showThemesModal, setShowThemesModal] = useState(false);
@@ -29,14 +29,14 @@ export const Sidebar = memo(() => {
 
   const isDark = settings.theme === 'dark';
 
-  // Filter chats by search query (matches title or message content)
+  // Filter chats by search query (matches title or message content), pinned first
   const filteredChats = searchQuery.trim()
     ? chats.filter(chat => {
         const q = searchQuery.toLowerCase();
         if (chat.title.toLowerCase().includes(q)) return true;
         return chat.messages.some(msg => msg.content.toLowerCase().includes(q));
-      })
-    : chats;
+      }).sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
+    : chats.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 
   const toggleSidebar = useCallback(() => setIsOpen(prev => !prev), []);
   const closeSidebar = useCallback(() => setIsOpen(false), []);
@@ -71,6 +71,11 @@ export const Sidebar = memo(() => {
     e.stopPropagation();
     deleteChat(chatId);
   }, [deleteChat]);
+
+  const handleTogglePin = useCallback((e: React.MouseEvent, chatId: string) => {
+    e.stopPropagation();
+    togglePinChat(chatId);
+  }, [togglePinChat]);
 
   const handleSwitchChat = useCallback((chatId: string) => {
     switchChat(chatId);
@@ -224,6 +229,13 @@ export const Sidebar = memo(() => {
                     {formatTime(chat.createdAt)} • {chat.messages.length} messages
                   </p>
                 </div>
+                <button
+                  onClick={(e) => handleTogglePin(e, chat.id)}
+                  className={`opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all duration-200 ${chat.pinned ? 'opacity-100' : ''} ${isDark ? 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10' : 'text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50'}`}
+                  aria-label={chat.pinned ? `Unpin chat: ${chat.title || 'New Chat'}` : `Pin chat: ${chat.title || 'New Chat'}`}
+                >
+                  <Pin className={`w-3.5 h-3.5 ${chat.pinned ? 'fill-current' : ''}`} aria-hidden="true" />
+                </button>
                 <button
                   onClick={(e) => handleDeleteChat(e, chat.id)}
                   className={`opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all duration-200 ${
