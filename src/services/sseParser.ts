@@ -9,6 +9,7 @@ interface SSEParseOptions {
 
 /**
  * Shared SSE stream parser for OpenAI, Anthropic, and NVIDIA services.
+ * Handles SSE protocol with JSON data frames, [DONE] markers, and event lines.
  */
 export async function parseSSEStream(
   response: Response,
@@ -16,7 +17,10 @@ export async function parseSSEStream(
   options: SSEParseOptions
 ): Promise<void> {
   const reader = response.body?.getReader();
-  if (!reader) throw new Error('ReadableStream not supported');
+  if (!reader) {
+    callbacks.onError?.(new Error('ReadableStream not supported'));
+    return;
+  }
 
   const { extractContent, signal } = options;
   let fullContent = '';
@@ -26,13 +30,18 @@ export async function parseSSEStream(
   const processLines = (lines: string[]) => {
     for (const line of lines) {
       const trimmedLine = line.trim();
-      if (!trimmedLine || trimmedLine === 'data: [DONE]' || trimmedLine.startsWith('event:')) {
-        continue;
-      }
+      if (!trimmedLine || trimmedLine === 'data: [DONE]') continue;
+      if (trimmedLine.startsWith('event:')) continue;
 
       if (trimmedLine.startsWith('data: ')) {
         const jsonStr = trimmedLine.slice(6);
-        const data = JSON.parse(jsonStr);
+        let data: unknown;
+        try {
+          data = JSON.parse(jsonStr);
+        } catch {
+          // Skip malformed JSON — don't crash the stream
+          continue;
+        }
         const content = extractContent(data);
         if (content) {
           fullContent += content;
@@ -42,10 +51,18 @@ export async function parseSSEStream(
     }
   };
 
-  while (true) {
+  try {
+    // Check HTTP status before attempting to read the body
+    if (!response.ok) {
+      const bodyText = await response.text().catch(() => '');
+      callbacks.onError?.(new Error(`HTTP ${response.status}: ${response.statusText}${bodyText ? ` — ${bodyText}` : ''}`));
+      return;
+    }
+
+    while (true) {
       if (signal?.aborted) {
-        reader.cancel();
-        break;
+        callbacks.onError?.(new Error('Stream aborted'));
+        return;
       }
 
       const { done, value } = await reader.read();
@@ -61,7 +78,14 @@ export async function parseSSEStream(
     if (buffer.trim()) {
       processLines([buffer]);
     }
-    
-    // Call onComplete only after successful stream exhaustion
+
     callbacks.onComplete(fullContent);
+  } catch (err) {
+    // Preserve original error stack and type — wrapping loses debugging info
+    callbacks.onError?.(err instanceof Error ? err : new Error(String(err)));
+  } finally {
+    // Cancel the stream first, then release the lock
+    try { await reader.cancel(); } catch { /* already cancelled */ }
+    try { reader.releaseLock(); } catch { /* already released */ }
   }
+}

@@ -62,29 +62,23 @@ describe('withRetry', () => {
   })
 
   it('should throw after max retries', async () => {
-    const fn = vi.fn().mockRejectedValue(new Error('always fails'))
-    
-    const promise = withRetry(fn, { maxRetries: 2, baseDelay: 100 })
-    
-    await vi.runAllTimersAsync()
-    
-    await expect(promise).rejects.toThrow('always fails')
+    vi.useRealTimers()
+    const fn = vi.fn().mockImplementation(async () => {
+      throw new Error('always fails')
+    })
+
+    await expect(withRetry(fn, { maxRetries: 2, baseDelay: 10 })).rejects.toThrow('always fails')
     expect(fn).toHaveBeenCalledTimes(3) // initial + 2 retries
   })
 
   it('should not retry on abort', async () => {
-    const fn = vi.fn().mockRejectedValue(new Error('AbortError'))
-    fn.mockImplementation(() => {
-      const err = new Error('AbortError')
-      err.name = 'AbortError'
-      return Promise.reject(err)
+    const err = new Error('AbortError')
+    err.name = 'AbortError'
+    const fn = vi.fn().mockImplementation(async () => {
+      throw err
     })
-    
-    const promise = withRetry(fn, { maxRetries: 3, baseDelay: 100 })
-    
-    await vi.runAllTimersAsync()
-    
-    await expect(promise).rejects.toThrow('AbortError')
+
+    await expect(withRetry(fn, { maxRetries: 3, baseDelay: 100 })).rejects.toThrow('AbortError')
     expect(fn).toHaveBeenCalledTimes(1) // No retries on abort
   })
 })

@@ -12,35 +12,26 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
-      // Inject model names only — NO API keys exposed to browser
-      {
-        name: 'inject-safe-env',
-        transformIndexHtml(html) {
-          const safeEnv: Record<string, string> = {}
-          const safeKeys = ['NVIDIA_MODEL', 'OPENAI_MODEL', 'ANTHROPIC_MODEL', 'PORT']
-          for (const key of safeKeys) {
-            if (env[key]) safeEnv[key] = env[key]
-          }
-          const envScript = `<script>window.__ENV_SERVER=${JSON.stringify(safeEnv)};</script>`
-          return html.replace('</body>', `${envScript}</body>`)
-        },
-      },
     ],
     server: {
       host: '0.0.0.0',
       port: 8080,
       proxy: {
-        '/api/nvidia': {
-          target: 'https://integrate.api.nvidia.com',
+        '/api/chat': {
+          target: `http://localhost:${env.PORT || 3000}`,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/nvidia/, ''),
-          configure: (proxy: any) => {
-            proxy.on('proxyReq', (proxyReq: any) => {
-              if (env.NVIDIA_API_KEY) {
-                proxyReq.setHeader('Authorization', `Bearer ${env.NVIDIA_API_KEY}`)
-              }
-            })
-          },
+        },
+        '/api/auth/login': {
+          target: `http://localhost:${env.PORT || 3000}`,
+          changeOrigin: true,
+        },
+        '/api/auth/status': {
+          target: `http://localhost:${env.PORT || 3000}`,
+          changeOrigin: true,
+        },
+        '/api/summarize': {
+          target: `http://localhost:${env.PORT || 3000}`,
+          changeOrigin: true,
         },
         '/api/openai': {
           target: 'https://api.openai.com',
