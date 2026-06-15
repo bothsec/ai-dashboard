@@ -6,9 +6,11 @@ import { ChatProvider, useChat } from './context/ChatContext';
 import { Sidebar } from './components/Sidebar';
 import { ChatWindow } from './components/ChatWindow';
 import { ChatInput } from './components/ChatInput';
+import { ShortcutsModal } from './components/ShortcutsModal';
 
 const AppInner = memo(function AppInner() {
   const { isStreaming, cancelStream, createNewChat } = useChat();
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -29,10 +31,18 @@ const AppInner = memo(function AppInner() {
         }
         return;
       }
+      // ? — show shortcuts modal (only when not typing in an input)
+      if (e.key === '?' && !isStreaming) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag !== 'TEXTAREA' && tag !== 'INPUT') {
+          setShowShortcuts(prev => !prev);
+        }
+        return;
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isStreaming, cancelStream, createNewChat]);
+  }, [isStreaming, cancelStream, createNewChat, setShowShortcuts]);
 
   return (
     <div className="flex h-dvh md:h-screen overflow-hidden font-sans selection:bg-indigo-500/30">
@@ -60,6 +70,9 @@ const AppInner = memo(function AppInner() {
           <ChatInput />
         </ErrorBoundary>
       </main>
+      {showShortcuts && (
+        <ShortcutsModal onClose={() => setShowShortcuts(false)} />
+      )}
     </div>
   );
 });
