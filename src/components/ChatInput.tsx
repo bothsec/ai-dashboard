@@ -134,6 +134,9 @@ export const ChatInput = memo(() => {
     return () => resizeObserver.disconnect();
   }, [input]);
 
+  const wordCount = input.trim() ? input.trim().split(/\s+/).length : 0;
+  const charCount = input.length;
+
   return (
     <div className={`shrink-0 px-3 md:px-6 lg:px-12 py-2 md:py-3 lg:py-4 ${isDark ? '' : 'bg-white/50'}`}>
       <div className="max-w-3xl lg:max-w-2xl mx-auto">
@@ -167,9 +170,9 @@ export const ChatInput = memo(() => {
         )}
 
         {/* ChatGPT-style input container */}
-        <form 
+        <form
           className={`relative flex items-center gap-2 md:gap-3 rounded-full px-3 md:px-4 py-2.5 md:py-3 transition-all duration-300 ${
-            isFocused 
+            isFocused
               ? isDark
                 ? 'bg-gray-800/90 shadow-2xl shadow-black/40 border border-gray-600/50'
                 : 'bg-white/90 shadow-lg shadow-gray-900/10 border border-gray-300'
@@ -324,6 +327,23 @@ export const ChatInput = memo(() => {
               <Send className="w-4 h-4 md:w-5 md:h-5" aria-hidden="true" />
             )}
           </button>
+
+          {/* Character / word count — visible when input has content */}
+          {input.length > 0 && (
+            <span
+              className={`shrink-0 text-[10px] md:text-[11px] font-mono leading-none ${
+                isDark ? 'text-gray-500' : 'text-gray-400'
+              }`}
+              aria-live="polite"
+              aria-label={`${charCount} characters, ${wordCount} words`}
+            >
+              {charCount >= 9000
+                ? <span className="text-amber-400 font-semibold">{charCount.toLocaleString()}</span>
+                : charCount.toLocaleString()}
+              {charCount > 0 && ' · '}
+              {wordCount > 0 && `${wordCount}w`}
+            </span>
+          )}
         </form>
 
         {/* URL summary error */}
