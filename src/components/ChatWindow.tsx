@@ -478,6 +478,13 @@ export const ChatWindow: React.FC = () => {
     URL.revokeObjectURL(url);
   }, [activeChat]);
 
+  // Handle /export slash command from ChatInput
+  useEffect(() => {
+    const handleTriggerExport = () => handleExportChat();
+    window.addEventListener('chat:trigger-export', handleTriggerExport);
+    return () => window.removeEventListener('chat:trigger-export', handleTriggerExport);
+  }, [handleExportChat]);
+
   // Detect network vs API errors for a more specific message
   const isNetworkError = error && (
     error.toLowerCase().includes('network') ||

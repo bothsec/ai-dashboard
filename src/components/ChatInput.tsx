@@ -16,7 +16,7 @@ export const ChatInput = memo(() => {
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [showPromptEngineer, setShowPromptEngineer] = useState(false);
   const [showPromptLibrary, setShowPromptLibrary] = useState(false);
-  const { sendMessage, isStreaming, cancelStream } = useChat();
+  const { sendMessage, isStreaming, cancelStream, createNewChat, clearMessages } = useChat();
   const { settings } = useSettings();
   const isDark = settings.theme === 'dark';
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -74,9 +74,28 @@ export const ChatInput = memo(() => {
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
+    const trimmed = input.trim();
+
+    // Slash commands — handled before any other logic
+    if (trimmed === '/new') {
+      setInput('');
+      createNewChat();
+      return;
+    }
+    if (trimmed === '/clear') {
+      setInput('');
+      clearMessages();
+      return;
+    }
+    if (trimmed === '/export') {
+      setInput('');
+      window.dispatchEvent(new CustomEvent('chat:trigger-export'));
+      return;
+    }
+
     if (!canSubmit) return;
 
-    let messageContent = input.trim();
+    let messageContent = trimmed;
     
     if (selectedFiles.length > 0) {
       const fileNames = selectedFiles.map(file => file.name);
