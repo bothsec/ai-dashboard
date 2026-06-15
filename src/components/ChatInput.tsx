@@ -8,8 +8,12 @@ import { PromptLibrary } from './PromptLibrary';
 // Regex to detect a standalone URL in input
 const URL_REGEX = /^https?:\/\/[^\s]+$/;
 
+const DRAFT_KEY = 'chat_draft';
+
 export const ChatInput = memo(() => {
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(() => {
+    try { return localStorage.getItem(DRAFT_KEY) ?? ''; } catch { return ''; }
+  });
   const [isFocused, setIsFocused] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
@@ -23,6 +27,13 @@ export const ChatInput = memo(() => {
   const sendButtonRef = useRef<HTMLButtonElement>(null);
 
   const canSubmit = input.trim().length > 0 && !isStreaming;
+
+  // Persist draft to localStorage on every change (except when editing last message)
+  useEffect(() => {
+    if (!isEditing) {
+      try { localStorage.setItem(DRAFT_KEY, input); } catch { /* ignore */ }
+    }
+  }, [input, isEditing]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -78,11 +89,13 @@ export const ChatInput = memo(() => {
     // Slash commands — handled before any other logic
     if (trimmed === '/new') {
       setInput('');
+      try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
       createNewChat();
       return;
     }
     if (trimmed === '/clear') {
       setInput('');
+      try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
       clearMessages();
       return;
     }
@@ -97,6 +110,7 @@ export const ChatInput = memo(() => {
     const messageContent = trimmed;
 
     setInput('');
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
     setIsEditing(false);
 
