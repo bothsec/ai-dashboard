@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -18,6 +18,18 @@ const SUGGESTIONS = [
   { icon: '💡', text: 'Brainstorm ideas' },
   { icon: '🐛', text: 'Debug my code' },
 ];
+
+export type MessageLabel = 'important' | 'question' | 'todo' | 'idea' | 'code' | null;
+
+export const LABEL_OPTIONS: { value: MessageLabel; label: string; color: string; bgClass: string; textClass: string }[] = [
+  { value: 'important', label: 'Important', color: 'text-red-400',   bgClass: 'bg-red-500/20 border-red-500/40',   textClass: 'text-red-400'   },
+  { value: 'question',  label: 'Question', color: 'text-blue-400',   bgClass: 'bg-blue-500/20 border-blue-500/40',   textClass: 'text-blue-400'   },
+  { value: 'todo',      label: 'Todo',      color: 'text-green-400',  bgClass: 'bg-green-500/20 border-green-500/40', textClass: 'text-green-400'  },
+  { value: 'idea',      label: 'Idea',      color: 'text-purple-400', bgClass: 'bg-purple-500/20 border-purple-500/40', textClass: 'text-purple-400' },
+  { value: 'code',      label: 'Code',      color: 'text-orange-400', bgClass: 'bg-orange-500/20 border-orange-500/40', textClass: 'text-orange-400' },
+];
+
+const LABEL_STORAGE_KEY = 'message_labels';
 
 interface MessageItemProps {
   msg: Message;
@@ -55,6 +67,19 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
     return null;
   });
 
+  const [messageLabel, setMessageLabel] = useState<MessageLabel>(() => {
+    try {
+      const stored = localStorage.getItem(LABEL_STORAGE_KEY);
+      if (stored) {
+        const labels = JSON.parse(stored) as Record<string, MessageLabel>;
+        return labels[msg.id] ?? null;
+      }
+    } catch { /* ignore */ }
+    return null;
+  });
+
+  const [showLabelMenu, setShowLabelMenu] = useState(false);
+
   useEffect(() => {
     try {
       const stored = localStorage.getItem('bookmarked_messages');
@@ -83,6 +108,20 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
       localStorage.setItem('bookmarked_messages', JSON.stringify(bookmarks));
     } catch { /* ignore */ }
   }, [isBookmarked, msg.id, msg.role, msg.content, msg.timestamp, activeChatId]);
+
+  // Persist message label to localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(LABEL_STORAGE_KEY);
+      const labels: Record<string, MessageLabel> = stored ? JSON.parse(stored) : {};
+      if (messageLabel) {
+        labels[msg.id] = messageLabel;
+      } else {
+        delete labels[msg.id];
+      }
+      localStorage.setItem(LABEL_STORAGE_KEY, JSON.stringify(labels));
+    } catch { /* ignore */ }
+  }, [messageLabel, msg.id]);
 
   useEffect(() => {
     try {
@@ -226,6 +265,17 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
         {/* Message bubble */}
         {displayContent && (
           <div className="relative group/bubble">
+            {/* Label badge */}
+            {messageLabel && (() => {
+              const opt = LABEL_OPTIONS.find(o => o.value === messageLabel);
+              if (!opt) return null;
+              return (
+                <div className={`absolute -top-2 right-2 z-10 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold border shadow-sm ${opt.bgClass} ${opt.textClass}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${opt.color.replace('text-', 'bg-')}`} aria-hidden="true" />
+                  {opt.label}
+                </div>
+              );
+            })()}
             <div
               className={`px-5 py-4 rounded-2xl shadow-sm transition-all duration-200 ${
                 msg.role === 'user'
@@ -416,6 +466,44 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                 >
                   <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-current' : ''}`} />
                 </button>
+                {/* Label selector */}
+                <div className="relative">
+                  <button
+                    onClick={() => { setShowLabelMenu(prev => !prev); }}
+                    className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${messageLabel ? 'text-amber-400' : 'text-gray-500'}`}
+                    aria-label={messageLabel ? `Label: ${messageLabel}` : 'Add label'}
+                    title={messageLabel ? `Label: ${messageLabel}` : 'Label message'}
+                  >
+                    <Tag className={`w-3.5 h-3.5 ${messageLabel ? 'fill-current' : ''}`} />
+                  </button>
+                  {showLabelMenu && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setShowLabelMenu(false)}
+                        aria-hidden="true"
+                      />
+                      <div className={`absolute bottom-full left-0 mb-1 z-50 rounded-lg border shadow-xl py-1 min-w-[110px] ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+                        <button
+                          onClick={() => { setMessageLabel(null); setShowLabelMenu(false); }}
+                          className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${isDark ? 'text-gray-400 hover:bg-gray-700 hover:text-gray-200' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
+                        >
+                          No label
+                        </button>
+                        {LABEL_OPTIONS.map(opt => (
+                          <button
+                            key={opt.value!}
+                            onClick={() => { setMessageLabel(opt.value); setShowLabelMenu(false); }}
+                            className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 transition-colors ${isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} ${messageLabel === opt.value ? opt.textClass : isDark ? 'text-gray-300' : 'text-gray-700'}`}
+                          >
+                            <span className={`w-2 h-2 rounded-full ${opt.color.replace('text-', 'bg-')}`} aria-hidden="true" />
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
                 <button
                   onClick={() => {
                     window.dispatchEvent(new CustomEvent('chat:quote', {
