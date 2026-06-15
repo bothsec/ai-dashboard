@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -436,7 +436,7 @@ const MessageSkeleton = memo(() => {
 });
 
 export const ChatWindow: React.FC = () => {
-  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, tokensPerSecond, sendMessage, dismissError, lastSentMessage, lastUserMessage, regenerateLastResponse } = useChat();
+  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, tokensPerSecond, sendMessage, dismissError, lastSentMessage, lastUserMessage, regenerateLastResponse, deleteChat } = useChat();
   const { settings } = useSettings();
   const scrollRef = useRef<HTMLDivElement>(null);
   const emptyStateRef = useRef<HTMLDivElement>(null);
@@ -697,6 +697,23 @@ export const ChatWindow: React.FC = () => {
                 ? <Check className="w-3.5 h-3.5" aria-hidden="true" />
                 : <Copy className="w-3.5 h-3.5" aria-hidden="true" />}
               {chatCopied ? 'Copied!' : 'Copy'}
+            </button>
+            <button
+              onClick={() => {
+                if (window.confirm('Delete this chat? This cannot be undone.')) {
+                  deleteChat(activeChatId ?? '');
+                }
+              }}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                isDark
+                  ? 'text-gray-500 hover:text-red-400 hover:bg-red-500/10'
+                  : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+              }`}
+              aria-label="Delete active chat"
+              title="Delete chat"
+            >
+              <Trash className="w-3.5 h-3.5" aria-hidden="true" />
+              Delete
             </button>
           </div>
         )}
