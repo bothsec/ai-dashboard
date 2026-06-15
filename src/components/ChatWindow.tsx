@@ -246,13 +246,44 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                         </code>
                       );
                     },
-                    pre: ({ children }) => (
-                      <pre className={`rounded-xl p-4 mb-4 overflow-x-auto text-sm border leading-relaxed ${
-                        isDark ? 'bg-gray-900/90 border-gray-700/40' : 'bg-gray-100 border-gray-200'
-                      }`}>
-                        {children}
-                      </pre>
-                    ),
+                    pre: ({ children }) => {
+                      const codeEl = children as React.ReactElement<{ className?: string; children?: string }>;
+                      const langClass = codeEl?.props?.className ?? '';
+                      const langMatch = langClass.match(/language-(\w+)/);
+                      const lang = langMatch ? langMatch[1] : '';
+                      const codeText = codeEl?.props?.children ?? '';
+                      return (
+                        <pre className={`relative rounded-xl p-4 mb-4 overflow-x-auto text-sm border leading-relaxed group/pre ${isDark ? 'bg-gray-900/90 border-gray-700/40' : 'bg-gray-100 border-gray-200'}`}>
+                          {lang && (
+                            <span className={`absolute top-2 left-3 text-[10px] font-mono font-semibold uppercase tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                              {lang}
+                            </span>
+                          )}
+                          {children}
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(typeof codeText === 'string' ? codeText : String(codeText)).then(() => {
+                                const btn = window.event?.target as HTMLElement;
+                                const pre = btn?.closest('pre');
+                                if (pre) pre.setAttribute('data-copied', 'true');
+                                setTimeout(() => {
+                                  const btn2 = window.event?.target as HTMLElement;
+                                  const pre2 = btn2?.closest('pre');
+                                  if (pre2) pre2.removeAttribute('data-copied');
+                                }, 2000);
+                              });
+                            }}
+                            className={`absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover/pre:opacity-100 transition-opacity ${isDark ? 'bg-gray-700/80 hover:bg-gray-600/90 text-gray-400 hover:text-gray-200' : 'bg-gray-200/90 hover:bg-gray-300/90 text-gray-500 hover:text-gray-700'}`}
+                            aria-label="Copy code"
+                            title="Copy code"
+                          >
+                            {((window.event?.target as HTMLElement)?.closest('pre')?.getAttribute('data-copied') === 'true')
+                              ? <Check className="w-3.5 h-3.5" />
+                              : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </pre>
+                      );
+                    },
                     blockquote: ({ children }) => (
                       <blockquote className={`border-l-4 border-indigo-500/50 pl-4 py-1 italic mb-4 rounded-r-lg ${
                         isDark ? 'text-gray-400 bg-gray-800/30' : 'text-gray-600 bg-gray-50'
