@@ -6,29 +6,36 @@ interface AuthGateProps {
   children: React.ReactNode;
 }
 
-interface AuthStatus {
-  authRequired: boolean;
-}
-
 export const AuthGate = memo(function AuthGate({ children }: AuthGateProps) {
   const [authRequired, setAuthRequired] = useState<boolean | null>(null); // null = loading
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Check if auth is required on mount
+  // Check if already authenticated via cookie on mount
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/auth/status');
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
         if (!cancelled) {
-          const data: AuthStatus = await res.json();
-          setAuthRequired(data.authRequired);
+          if (res.ok) {
+            // Already logged in via cookie
+            setAuthRequired(false);
+          } else {
+            // Not logged in — check if auth is required at all
+            const statusRes = await fetch('/api/auth/status');
+            const data = await statusRes.json();
+            setAuthRequired(data.authRequired ?? true);
+          }
         }
       } catch {
-        if (!cancelled) setAuthRequired(false); // fail open (server might be unreachable)
+        if (!cancelled) {
+          // fail open (network error)
+          setAuthRequired(false);
+        }
       }
     })();
     return () => { cancelled = true; };
@@ -36,18 +43,19 @@ export const AuthGate = memo(function AuthGate({ children }: AuthGateProps) {
 
   const handleLogin = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!password.trim()) return;
+    if (!username.trim() || !password.trim()) return;
     setError('');
     setIsLoading(true);
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        credentials: 'include',
+        body: JSON.stringify({ username: username.trim(), password: password.trim() }),
       });
       const data = await res.json();
       if (res.ok && data.ok) {
-        // Store token in memory (not localStorage — security)
+        // Store token in memory for API calls (cookie handles persistence)
         if (data.authEnabled !== false) {
           setAuthToken(password.trim());
         }
@@ -60,7 +68,7 @@ export const AuthGate = memo(function AuthGate({ children }: AuthGateProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [password]);
+  }, [username, password]);
 
   // Still checking auth status
   if (authRequired === null) {
@@ -87,19 +95,32 @@ export const AuthGate = memo(function AuthGate({ children }: AuthGateProps) {
               </div>
               <h1 className="text-xl font-semibold text-white">AI Dashboard</h1>
               <p className="text-gray-400 text-sm mt-1 text-center">
-                Enter your access password to continue
+                Enter your credentials to continue
               </p>
             </div>
 
             {/* Login form */}
             <form onSubmit={handleLogin} className="space-y-4">
+              {/* Username */}
+              <div>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  placeholder="Username"
+                  autoFocus
+                  autoComplete="username"
+                  className="w-full bg-gray-900/80 border border-gray-600 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                />
+              </div>
+
+              {/* Password */}
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="Access password"
-                  autoFocus
+                  placeholder="Password"
                   autoComplete="current-password"
                   className="w-full bg-gray-900/80 border border-gray-600 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent pr-12 transition"
                 />
@@ -124,7 +145,7 @@ export const AuthGate = memo(function AuthGate({ children }: AuthGateProps) {
 
               <button
                 type="submit"
-                disabled={isLoading || !password.trim()}
+                disabled={isLoading || !username.trim() || !password.trim()}
                 className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 disabled:text-indigo-400 text-white font-medium py-3 rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
               >
                 {isLoading ? (
@@ -136,7 +157,7 @@ export const AuthGate = memo(function AuthGate({ children }: AuthGateProps) {
             </form>
 
             <p className="text-gray-600 text-xs text-center mt-5">
-              This server is password-protected
+              This server is protected
             </p>
           </div>
         </div>

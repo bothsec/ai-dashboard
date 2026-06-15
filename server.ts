@@ -83,15 +83,16 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
 }
 
 // --- Auth routes (must be defined BEFORE the auth middleware) ---
-// POST /api/auth/login  { password: string }  →  Set-Cookie + { ok: true }
+// POST /api/auth/login  { username, password }  →  Set-Cookie + { ok: true }
 app.post('/api/auth/login', express.json(), (req, res) => {
   if (!AUTH_SECRET) {
     res.json({ ok: true, authEnabled: false });
     return;
   }
-  const { password } = req.body ?? {};
-  if (!password || password !== AUTH_SECRET) {
-    res.status(401).json({ error: { message: 'Invalid password', type: 'auth_failed' } });
+  const { username, password } = req.body ?? {};
+  const expectedUsername = process.env.AUTH_USERNAME || 'admin';
+  if (!username || !password || username !== expectedUsername || password !== AUTH_SECRET) {
+    res.status(401).json({ error: { message: 'Invalid credentials', type: 'auth_failed' } });
     return;
   }
   res.setHeader('Set-Cookie', `${AUTH_COOKIE_NAME}=${AUTH_SECRET}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${AUTH_COOKIE_MAXAGE}`);
@@ -101,6 +102,22 @@ app.post('/api/auth/login', express.json(), (req, res) => {
 // GET /api/auth/status → { authRequired: boolean } (unauthenticated)
 app.get('/api/auth/status', (_req, res) => {
   res.json({ authRequired: !!AUTH_SECRET });
+});
+
+// GET /api/auth/me → { authenticated: true } or 401 (cookie-validated)
+app.get('/api/auth/me', (req, res) => {
+  if (!AUTH_SECRET) {
+    res.json({ authenticated: true, authEnabled: false });
+    return;
+  }
+  const cookieHeader = req.headers.cookie as string | undefined;
+  const match = cookieHeader ? cookieHeader.match(new RegExp(`${AUTH_COOKIE_NAME}=([^;]+)`)) : null;
+  const token = match ? match[1] : undefined;
+  if (!token || token !== AUTH_SECRET) {
+    res.status(401).json({ error: { message: 'Not authenticated', type: 'auth_required' } });
+    return;
+  }
+  res.json({ authenticated: true, username: process.env.AUTH_USERNAME || 'admin' });
 });
 
 // Mount auth middleware globally for all remaining /api routes
