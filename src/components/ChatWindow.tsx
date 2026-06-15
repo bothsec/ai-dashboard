@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -44,6 +44,17 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
     return false;
   });
 
+  const [reaction, setReaction] = useState<'up' | 'down' | null>(() => {
+    try {
+      const stored = localStorage.getItem('message_reactions');
+      if (stored) {
+        const reactions = JSON.parse(stored) as Record<string, 'up' | 'down'>;
+        return reactions[msg.id] ?? null;
+      }
+    } catch { /* ignore */ }
+    return null;
+  });
+
   useEffect(() => {
     try {
       const stored = localStorage.getItem('bookmarked_messages');
@@ -72,6 +83,20 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
       localStorage.setItem('bookmarked_messages', JSON.stringify(bookmarks));
     } catch { /* ignore */ }
   }, [isBookmarked, msg.id, msg.role, msg.content, msg.timestamp, activeChatId]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('message_reactions');
+      const reactions: Record<string, 'up' | 'down'> = stored ? JSON.parse(stored) : {};
+      if (reaction) {
+        reactions[msg.id] = reaction;
+      } else {
+        delete reactions[msg.id];
+      }
+      localStorage.setItem('message_reactions', JSON.stringify(reactions));
+    } catch { /* ignore */ }
+  }, [reaction, msg.id]);
+
   const isDark = msg.role === 'user' ? true : settings.theme === 'dark';
   const activeChatTheme = chatTheme ?? settings.chatTheme;
 
@@ -359,6 +384,22 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
             {/* Reaction buttons — shown on hover for AI messages */}
             {msg.role === 'assistant' && !isStreaming && (
               <div className="absolute -bottom-8 left-0 flex items-center gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
+                <button
+                  onClick={() => setReaction(prev => prev === 'up' ? null : 'up')}
+                  className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${reaction === 'up' ? 'text-green-400' : 'text-gray-500'}`}
+                  aria-label={reaction === 'up' ? 'Remove thumbs up' : 'Thumbs up'}
+                  title={reaction === 'up' ? 'Remove' : 'Helpful'}
+                >
+                  <ThumbsUp className={`w-3.5 h-3.5 ${reaction === 'up' ? 'fill-current' : ''}`} />
+                </button>
+                <button
+                  onClick={() => setReaction(prev => prev === 'down' ? null : 'down')}
+                  className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${reaction === 'down' ? 'text-red-400' : 'text-gray-500'}`}
+                  aria-label={reaction === 'down' ? 'Remove thumbs down' : 'Thumbs down'}
+                  title={reaction === 'down' ? 'Remove' : 'Not helpful'}
+                >
+                  <ThumbsDown className={`w-3.5 h-3.5 ${reaction === 'down' ? 'fill-current' : ''}`} />
+                </button>
                 <button
                   onClick={() => setIsBookmarked(prev => !prev)}
                   className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${isBookmarked ? 'text-amber-400' : 'text-gray-500'}`}
