@@ -452,6 +452,7 @@ export const ChatWindow: React.FC = () => {
   // Show regenerate button briefly after a response completes
   const [showRegenerate, setShowRegenerate] = useState(false);
   const [showBookmarksPanel, setShowBookmarksPanel] = useState(false);
+  const [chatCopied, setChatCopied] = useState(false);
 
   // Show regenerate briefly when streaming ends with a successful response
   useEffect(() => {
@@ -552,6 +553,27 @@ export const ChatWindow: React.FC = () => {
     a.download = `chat-${new Date().toISOString().slice(0, 10)}.md`;
     a.click();
     URL.revokeObjectURL(url);
+  }, [activeChat]);
+
+  const handleCopyChat = useCallback(async () => {
+    if (!activeChat || activeChat.messages.length === 0) return;
+    const lines: string[] = [
+      `# ${activeChat.title || 'Chat Export'}`,
+      `*Exported on ${new Date().toLocaleString()}*\n`,
+    ];
+    for (const msg of activeChat.messages) {
+      const ts = new Date(msg.timestamp).toLocaleString();
+      lines.push(`## ${msg.role === 'user' ? 'You' : 'Assistant'} — ${ts}`);
+      lines.push(msg.content || '');
+      lines.push('\n---\n');
+    }
+    try {
+      await navigator.clipboard.writeText(lines.join('\n'));
+      setChatCopied(true);
+      setTimeout(() => setChatCopied(false), 2000);
+    } catch {
+      // clipboard unavailable silently ignored
+    }
   }, [activeChat]);
 
   // Handle /export slash command from ChatInput
@@ -664,6 +686,25 @@ export const ChatWindow: React.FC = () => {
             >
               <Download className="w-3.5 h-3.5" aria-hidden="true" />
               Export
+            </button>
+            <button
+              onClick={handleCopyChat}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                chatCopied
+                  ? isDark
+                    ? 'text-green-400 bg-green-500/10'
+                    : 'text-green-600 bg-green-50'
+                  : isDark
+                    ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
+                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+              }`}
+              aria-label={chatCopied ? 'Copied!' : 'Copy chat as Markdown'}
+              title="Copy as Markdown"
+            >
+              {chatCopied
+                ? <Check className="w-3.5 h-3.5" aria-hidden="true" />
+                : <Copy className="w-3.5 h-3.5" aria-hidden="true" />}
+              {chatCopied ? 'Copied!' : 'Copy'}
             </button>
           </div>
         )}
