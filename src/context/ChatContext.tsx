@@ -381,7 +381,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearMessages,
       cancelStream,
       dismissError,
-    }), [state, streamingMessageId, streamingContent, tokensPerSecond, lastSentMessage, lastUserMessage, regenerateLastResponse, editLastMessage, sendMessage, createNewChat, switchChat, deleteChat, clearMessages, cancelStream, dismissError]);
+      togglePinChat,
+    }), [state, streamingMessageId, streamingContent, tokensPerSecond, lastSentMessage, lastUserMessage, regenerateLastResponse, editLastMessage, sendMessage, createNewChat, switchChat, deleteChat, clearMessages, cancelStream, dismissError, togglePinChat]);
 
   return (
     <ChatContext.Provider value={contextValue}>
