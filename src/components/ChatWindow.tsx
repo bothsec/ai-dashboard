@@ -32,16 +32,6 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
   const { settings } = useSettings();
   const [speaking, setSpeaking] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [activeReaction, setActiveReaction] = useState<string | null>(() => {
-    try {
-      const stored = localStorage.getItem('msg_reactions');
-      if (stored) {
-        const reactionsMap: Record<string, string> = JSON.parse(stored);
-        return reactionsMap[msg.id] || null;
-      }
-    } catch { /* ignore */ }
-    return null;
-  });
 
   const [isBookmarked, setIsBookmarked] = useState<boolean>(() => {
     try {
@@ -54,21 +44,6 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
     return false;
   });
 
-  // Persist reaction to localStorage
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('msg_reactions');
-      const reactionsMap: Record<string, string> = stored ? JSON.parse(stored) : {};
-      if (activeReaction) {
-        reactionsMap[msg.id] = activeReaction;
-      } else {
-        delete reactionsMap[msg.id];
-      }
-      localStorage.setItem('msg_reactions', JSON.stringify(reactionsMap));
-    } catch { /* ignore */ }
-  }, [activeReaction, msg.id]);
-
-  // Persist bookmark to localStorage
   useEffect(() => {
     try {
       const stored = localStorage.getItem('bookmarked_messages');
@@ -97,7 +72,6 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
       localStorage.setItem('bookmarked_messages', JSON.stringify(bookmarks));
     } catch { /* ignore */ }
   }, [isBookmarked, msg.id, msg.role, msg.content, msg.timestamp, activeChatId]);
-  const reactions = ['👍', '❤️', '😄', '😮'];
   const isDark = msg.role === 'user' ? true : settings.theme === 'dark';
   const activeChatTheme = chatTheme ?? settings.chatTheme;
 
@@ -362,19 +336,6 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                 >
                   <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-current' : ''}`} />
                 </button>
-                {reactions.map(emoji => (
-                  <button
-                    key={emoji}
-                    onClick={() => setActiveReaction(prev => prev === emoji ? null : emoji)}
-                    className={`text-sm px-1 py-0.5 rounded hover:bg-gray-700/50 transition-colors ${
-                      activeReaction === emoji ? 'scale-125' : 'scale-100'
-                    }`}
-                    aria-label={`React with ${emoji}`}
-                    title={emoji}
-                  >
-                    {emoji}
-                  </button>
-                ))}
               </div>
             )}
           </div>
