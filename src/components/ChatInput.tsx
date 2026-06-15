@@ -1,39 +1,15 @@
 import React, { useState, useRef, useEffect, memo } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
-import { Send, Loader2, Paperclip, X, Link, Sparkles, Bookmark, Edit2, RefreshCw } from 'lucide-react';
+import { Send, Loader2, Link, Sparkles, Bookmark, Edit2, RefreshCw } from 'lucide-react';
 import PromptEngineer from './PromptEngineer';
 import { PromptLibrary } from './PromptLibrary';
 
 // Regex to detect a standalone URL in input
 const URL_REGEX = /^https?:\/\/[^\s]+$/;
 
-// Read file content: text files → plain text, images/other → base64 data URL
-function readFileContent(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const isText = file.type.startsWith('text/') ||
-      file.type === 'application/json' ||
-      file.type === 'application/javascript' ||
-      file.type === 'application/xml' ||
-      file.name.match(/\.(txt|md|json|js|ts|html|css|xml|yaml|yml|csv|py|sh|bash|zsh|sql|jsx|tsx)$/i);
-
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error(`Failed to read file: ${file.name}`));
-
-    if (isText) {
-      reader.readAsText(file);
-    } else {
-      // Images, PDFs, etc. → base64
-      reader.readAsDataURL(file);
-    }
-  });
-}
-
 export const ChatInput = memo(() => {
   const [input, setInput] = useState('');
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [fileContents, setFileContents] = useState<Record<string, string>>({});
   const [isFocused, setIsFocused] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
@@ -44,10 +20,9 @@ export const ChatInput = memo(() => {
   const { settings } = useSettings();
   const isDark = settings.theme === 'dark';
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const sendButtonRef = useRef<HTMLButtonElement>(null);
 
-  const canSubmit = (input.trim().length > 0 || selectedFiles.length > 0) && !isStreaming;
+  const canSubmit = input.trim().length > 0 && !isStreaming;
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -119,37 +94,10 @@ export const ChatInput = memo(() => {
 
     if (!canSubmit) return;
 
-    let messageContent = trimmed;
-
-    if (selectedFiles.length > 0) {
-      const lines: string[] = [];
-      for (const file of selectedFiles) {
-        const content = fileContents[file.name];
-        if (!content) continue;
-
-        const isDataUrl = content.startsWith('data:');
-        const sizeKB = (file.size / 1024).toFixed(1);
-
-        if (isDataUrl) {
-          // Image or binary — send as base64 inline
-          lines.push(`[Attached file: ${file.name}] (${file.type || 'file'}, ${sizeKB}KB)\n\`\`\`\n${content}\n\`\`\``);
-        } else {
-          // Text file — show filename + content
-          const preview = content.length > 8000 ? content.slice(0, 8000) + '\n... (truncated)' : content;
-          lines.push(`[Attached file: ${file.name}] (${file.type || 'text/plain'}, ${sizeKB}KB)\n\`\`\`\n${preview}\n\`\`\``);
-        }
-      }
-      const filesText = lines.join('\n\n');
-      messageContent = messageContent
-        ? `${messageContent}\n\n${filesText}`
-        : filesText;
-    }
+    const messageContent = trimmed;
 
     setInput('');
-    setSelectedFiles([]);
-    setFileContents({});
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
-    if (fileInputRef.current) fileInputRef.current.value = '';
     setIsEditing(false);
 
     if (isEditing) {
@@ -171,34 +119,6 @@ export const ChatInput = memo(() => {
       e.preventDefault();
       handleSubmit();
     }
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const target = e.target as HTMLInputElement | null;
-    if (target?.files && target.files.length > 0) {
-      const files = Array.from(target.files);
-      setSelectedFiles(files);
-      // Read content for each file in parallel
-      try {
-        const contents = await Promise.all(files.map(async (file) => {
-          const content = await readFileContent(file);
-          return [file.name, content] as [string, string];
-        }));
-        setFileContents(Object.fromEntries(contents));
-      } catch (err) {
-        console.error('Failed to read file:', err);
-        setFileContents({});
-      }
-    }
-  };
-
-  const removeFile = (file: File) => {
-    setSelectedFiles(prev => prev.filter(f => f !== file));
-    setFileContents(prev => {
-      const next = { ...prev };
-      delete next[file.name];
-      return next;
-    });
   };
 
   // Auto-resize textarea - with cleanup
@@ -269,25 +189,6 @@ export const ChatInput = memo(() => {
           onSubmit={handleSubmit}
           aria-label="Message input form"
         >
-          {/* Paperclip button */}
-          <label
-            htmlFor="file-input"
-            className={`cursor-pointer transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
-            aria-label="Attach files"
-          >
-            <Paperclip className="w-4 h-4 md:w-5 md:h-5" />
-          </label>
-          <input
-            type="file"
-            id="file-input"
-            ref={fileInputRef}
-            multiple
-            accept="text/*,application/json,application/javascript,application/xml,.txt,.md,.json,.js,.ts,.html,.css,.xml,.yaml,.yml,.csv,.py,.sh,.bash,.sql,.jsx,.tsx,.png,.jpg,.jpeg,.gif,.webp,.pdf"
-            onChange={handleFileChange}
-            className="hidden"
-            aria-label="File input"
-          />
-
           {/* Prompt Engineer button */}
           <button
             type="button"
@@ -345,34 +246,6 @@ export const ChatInput = memo(() => {
               aria-multiline="true"
             />
           </div>
-
-          {/* File previews inline */}
-          {selectedFiles.length > 0 && (
-            <div className="flex items-center gap-2 mr-2" role="list" aria-label="Attached files">
-              {selectedFiles.map((file) => {
-                  const sizeKB = (file.size / 1024).toFixed(1);
-                  return (
-                <div
-                  key={file.name}
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs ${isDark ? 'bg-gray-700/60 text-gray-300' : 'bg-gray-100 text-gray-700'}`}
-                  role="listitem"
-                >
-                  <Paperclip className="w-3 h-3 shrink-0" aria-hidden="true" />
-                  <span className="max-w-[100px] truncate" title={`${file.name} (${sizeKB}KB)`}>{file.name}</span>
-                  <span className="text-[10px] opacity-60">{sizeKB}KB</span>
-                  <button
-                    type="button"
-                    onClick={() => removeFile(file)}
-                    className={`transition-colors duration-200 ml-1 ${isDark ? 'text-gray-400 hover:text-red-400' : 'text-gray-400 hover:text-red-500'}`}
-                    aria-label={`Remove ${file.name}`}
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              );
-              })}
-            </div>
-          )}
 
           {/* Summarize URL button — shown when input is a standalone URL */}
           {URL_REGEX.test(input.trim()) && !isStreaming && (
