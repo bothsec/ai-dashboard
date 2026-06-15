@@ -1,18 +1,18 @@
 # AI Dashboard
 
-A modern, multi-provider AI chat dashboard built with React, TypeScript, and Vite. Supports **OpenAI**, **Anthropic**, and **NVIDIA** (including Kimi models).
+A modern AI chat dashboard built with React, TypeScript, and Vite. Supports multiple model providers with a beautiful dark-themed UI and markdown rendering.
 
 ![AI Dashboard](https://via.placeholder.com/800x400?text=AI+Dashboard)
 
 ## Features
 
-- 🤖 **Multi-Provider Support**: OpenAI, Anthropic, NVIDIA
+- 🤖 **Multi-Provider Support**: OpenAI, Anthropic, and any OpenAI-compatible API
 - 🔒 **Secure**: API keys never exposed to browser; all requests proxy through server
 - 🎨 **Beautiful UI**: Dark theme with markdown rendering and syntax highlighting
 - 🔄 **Retry Logic**: Automatic retry with exponential backoff on failures
 - ⚛️ **React 19**: Built with the latest React features
 - 📦 **Code Splitting**: Optimized bundle with vendor and markdown chunks
-- 🧪 **Tested**: Unit tests with Vitest
+- 🔗 **URL Summarizer**: Instantly summarize any web page — just paste a URL and hit summarize
 
 ## Getting Started
 
@@ -51,15 +51,12 @@ npm run preview
 Create a `.env` file in the root directory:
 
 ```env
-# Model Configuration (optional - defaults provided)
-VITE_OPENAI_MODEL=gpt-4o
-VITE_ANTHROPIC_MODEL=claude-3-5-sonnet-20240620
-VITE_NVIDIA_MODEL=minimaxai/minimax-m2.7
+# Model Configuration
+VITE_API_MODEL=minimaxai/minimax-m2.7
 
-# API Keys (server-side only - NOT exposed to browser)
-NVIDIA_API_KEY=your-nvidia-api-key
-OPENAI_API_KEY=your-openai-api-key
-ANTHROPIC_API_KEY=your-anthropic-api-key
+# API Keys (server-side only — NOT exposed to browser)
+AUTH_SECRET_TOKEN=your-secret-token
+ALLOWED_ORIGINS=https://your-domain.com
 ```
 
 ### Security
@@ -82,9 +79,7 @@ src/
 │   ├── ChatContext.tsx   # Chat state management
 │   └── SettingsContext.tsx # Settings & provider config
 ├── services/         # API services
-│   ├── openaiService.ts
-│   ├── anthropicService.ts
-│   ├── nvidiaService.ts
+│   ├── chatService.ts    # Core chat service
 │   └── retry.ts          # Retry logic
 ├── types/
 │   └── chat.ts           # TypeScript types
@@ -101,36 +96,6 @@ src/
 | `npm run lint` | Run ESLint |
 | `npm test` | Run tests |
 | `npm run test:watch` | Run tests in watch mode |
-
-## Supported Providers
-
-### OpenAI
-- Models: `gpt-4o`, `gpt-4-turbo`, `gpt-3.5-turbo`
-- Endpoint: `/api/openai`
-
-### Anthropic
-- Models: `claude-3-5-sonnet-20240620`, `claude-3-opus-20240229`
-- Endpoint: `/api/anthropic`
-
-### NVIDIA
-- Models: `minimaxai/minimax-m2.7`, `nvidia/llama-3.1-nemotron-70b-instruct`
-- Endpoint: `/api/nvidia`
-
-## Development
-
-### Project Structure
-
-The project uses Vite with React 19, TypeScript, and Tailwind CSS 4. The build is optimized with code splitting for better performance.
-
-### Testing
-
-```bash
-# Run tests once
-npm test
-
-# Run tests in watch mode
-npm run test:watch
-```
 
 ## License
 
