@@ -23,6 +23,7 @@ interface ChatContextType extends ChatState {
   clearMessages: () => void;
   cancelStream: () => void;
   dismissError: () => void;
+  togglePinChat: (chatId: string) => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -136,6 +137,15 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const dismissError = useCallback(() => {
     setState(prev => ({ ...prev, error: null }));
+  }, []);
+
+  const togglePinChat = useCallback((chatId: string) => {
+    setState(prev => ({
+      ...prev,
+      chats: prev.chats.map(c =>
+        c.id === chatId ? { ...c, pinned: !c.pinned } : c
+      ),
+    }));
   }, []);
 
   const clearMessages = useCallback(() => {

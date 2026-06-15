@@ -13,6 +13,7 @@ export interface Chat {
   messages: Message[];
   createdAt: number;
   provider: AIProvider;
+  pinned?: boolean;
 }
 
 export type Theme = 'dark' | 'light'
