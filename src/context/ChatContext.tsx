@@ -39,6 +39,19 @@ const generateId = () => {
   });
 };
 
+// Strip markdown syntax and clean whitespace for readable chat titles
+const generateTitle = (content: string): string => {
+  return content
+    .replace(/```[\s\S]*?```/g, '[code]')       // remove code blocks
+    .replace(/`[^`]+`/g, '[code]')                // remove inline code
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')     // [text](url) → text
+    .replace(/[#*_~>]/g, '')                      // remove md symbols
+    .replace(/\s+/g, ' ')                         // collapse whitespace
+    .trim()
+    .slice(0, 40)
+    || 'New Chat';
+};
+
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { settings } = useSettings();
 
@@ -188,7 +201,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!currentChatId) {
       const newChat: Chat = {
         id: generateId(),
-        title: content.slice(0, 40) + (content.length > 40 ? '...' : ''),
+        title: generateTitle(content),
         messages: [],
         createdAt: Date.now(),
         provider: 'api',
@@ -221,7 +234,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const isFirstMessage = chat.messages.length === 0;
           return {
             ...chat,
-            title: isFirstMessage ? content.slice(0, 40) + (content.length > 40 ? '...' : '') : chat.title,
+            title: isFirstMessage ? generateTitle(content) : chat.title,
             messages: [...chat.messages, userMessage, assistantMessage],
           };
         }
