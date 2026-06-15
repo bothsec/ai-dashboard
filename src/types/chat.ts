@@ -14,6 +14,7 @@ export interface Chat {
   createdAt: number;
   provider: AIProvider;
   pinned?: boolean;
+  totalTokens?: number;
 }
 
 export type Theme = 'dark' | 'light'
