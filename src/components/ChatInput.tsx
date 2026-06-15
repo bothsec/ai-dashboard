@@ -4,6 +4,7 @@ import { useSettings } from '../context/SettingsContext';
 import { Send, Loader2, Link, Sparkles, Bookmark, Edit2, RefreshCw, MessageSquare, X } from 'lucide-react';
 import PromptEngineer from './PromptEngineer';
 import { PromptLibrary } from './PromptLibrary';
+import { StreamingHUD } from './StreamingHUD';
 
 // Regex to detect a standalone URL in input
 const URL_REGEX = /^https?:\/\/[^\s]+$/;
@@ -416,6 +417,9 @@ export const ChatInput = memo(() => {
             </span>
           )}
         </form>
+
+        {/* Streaming stats HUD — shown while AI is responding */}
+        <StreamingHUD />
 
         {/* URL summary error */}
         {summaryError && (
