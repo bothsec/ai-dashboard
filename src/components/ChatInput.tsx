@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, memo } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
-import { Send, Loader2, Paperclip, X, Link, Sparkles, Bookmark, Edit2 } from 'lucide-react';
+import { Send, Loader2, Paperclip, X, Link, Sparkles, Bookmark, Edit2, RefreshCw } from 'lucide-react';
 import PromptEngineer from './PromptEngineer';
 import { PromptLibrary } from './PromptLibrary';
 
@@ -17,7 +17,7 @@ export const ChatInput = memo(() => {
   const [showPromptEngineer, setShowPromptEngineer] = useState(false);
   const [showPromptLibrary, setShowPromptLibrary] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const { sendMessage, isStreaming, cancelStream, createNewChat, clearMessages, editLastMessage, lastSentMessage } = useChat();
+  const { sendMessage, isStreaming, cancelStream, createNewChat, clearMessages, editLastMessage, lastSentMessage, error, retryLastMessage } = useChat();
   const { settings } = useSettings();
   const isDark = settings.theme === 'dark';
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -372,6 +372,19 @@ export const ChatInput = memo(() => {
               title="Edit your last message"
             >
               <Edit2 className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Retry button — shown when a message failed and user hasn't typed new content */}
+          {error && lastSentMessage && !isEditing && (
+            <button
+              type="button"
+              onClick={retryLastMessage}
+              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${isDark ? 'text-red-400 hover:text-red-300 hover:bg-red-900/30' : 'text-red-600 hover:text-red-700 hover:bg-red-50'}`}
+              aria-label="Retry failed message"
+              title="Retry failed message"
+            >
+              <RefreshCw className="w-4 h-4" />
             </button>
           )}
 

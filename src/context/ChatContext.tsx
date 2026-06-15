@@ -15,6 +15,7 @@ interface ChatContextType extends ChatState {
   lastSentMessage: string | null;
   lastUserMessage: string | null;
   regenerateLastResponse: () => void;
+  retryLastMessage: () => void;
   editLastMessage: (newContent: string) => void;
   sendMessage: (content: string) => Promise<void>;
   createNewChat: () => void;
@@ -378,6 +379,36 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setTimeout(() => sendMessage(newContent), 0);
   }, [state.activeChatId, sendMessage]);
 
+  // Retry the last failed message: remove failed assistant response and resend the same user content
+  const retryLastMessage = useCallback(() => {
+    const msgToResend = lastSentMessage;
+    if (!msgToResend) return;
+    const currentChatId = state.activeChatId;
+    if (!currentChatId) return;
+
+    // Remove the trailing failed assistant message (if any) from the active chat
+    setState(prev => ({
+      ...prev,
+      chats: prev.chats.map(chat => {
+        if (chat.id !== currentChatId) return chat;
+        const msgs = [...chat.messages];
+        // Remove trailing empty assistant messages (the failed ones)
+        while (msgs.length > 0 && msgs[msgs.length - 1].role === 'assistant' && !msgs[msgs.length - 1].content) {
+          msgs.pop();
+        }
+        return { ...chat, messages: msgs };
+      }),
+    }));
+
+    // Clear streaming state
+    setStreamingMessageId(null);
+    setStreamingContent('');
+    setTokensPerSecond(0);
+
+    // Re-send after micro-task to let state settle
+    setTimeout(() => sendMessage(msgToResend), 0);
+  }, [lastSentMessage, state.activeChatId, sendMessage]);
+
   const contextValue = useMemo(() => ({
       ...state,
       streamingMessageId,
@@ -386,6 +417,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       lastSentMessage,
       lastUserMessage,
       regenerateLastResponse,
+      retryLastMessage,
       editLastMessage,
       sendMessage,
       createNewChat,
@@ -395,7 +427,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       cancelStream,
       dismissError,
       togglePinChat,
-    }), [state, streamingMessageId, streamingContent, tokensPerSecond, lastSentMessage, lastUserMessage, regenerateLastResponse, editLastMessage, sendMessage, createNewChat, switchChat, deleteChat, clearMessages, cancelStream, dismissError, togglePinChat]);
+    }), [state, streamingMessageId, streamingContent, tokensPerSecond, lastSentMessage, lastUserMessage, regenerateLastResponse, retryLastMessage, editLastMessage, sendMessage, createNewChat, switchChat, deleteChat, clearMessages, cancelStream, dismissError, togglePinChat]);
 
   return (
     <ChatContext.Provider value={contextValue}>
