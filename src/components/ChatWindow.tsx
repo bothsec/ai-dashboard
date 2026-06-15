@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -415,6 +415,18 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                   title={isBookmarked ? 'Remove bookmark' : 'Bookmark'}
                 >
                   <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-current' : ''}`} />
+                </button>
+                <button
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('chat:quote', {
+                      detail: { id: msg.id, content: msg.content, role: msg.role },
+                    }));
+                  }}
+                  className={`p-1 rounded hover:bg-gray-700/50 transition-colors text-gray-500`}
+                  aria-label="Quote this message"
+                  title="Quote in reply"
+                >
+                  <Quote className="w-3.5 h-3.5" />
                 </button>
               </div>
             )}

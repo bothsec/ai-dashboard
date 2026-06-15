@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect, memo } from 'react';
+import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
-import { Send, Loader2, Link, Sparkles, Bookmark, Edit2, RefreshCw } from 'lucide-react';
+import { Send, Loader2, Link, Sparkles, Bookmark, Edit2, RefreshCw, MessageSquare, X } from 'lucide-react';
 import PromptEngineer from './PromptEngineer';
 import { PromptLibrary } from './PromptLibrary';
 
@@ -9,6 +9,26 @@ import { PromptLibrary } from './PromptLibrary';
 const URL_REGEX = /^https?:\/\/[^\s]+$/;
 
 const DRAFT_KEY = 'chat_draft';
+
+// Strip markdown syntax for quoted text preview (safe to use in UI)
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, '')         // remove code blocks
+    .replace(/`[^`]+`/g, (m) => m.slice(1, -1)) // inline code → text
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')   // images: ![alt](url) → alt
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')    // links: [text](url) → text
+    .replace(/^#{1,6}\s+/gm, '')              // headings
+    .replace(/[*_~`>]/g, '')               // bold, italic, strikethrough, blockquote
+    .replace(/\n{2,}/g, ' ')               // collapse blank lines
+    .replace(/\s{2,}/g, ' ')               // collapse spaces
+    .trim();
+}
+
+interface QuotedMessage {
+  id: string;
+  content: string;
+  role: string;
+}
 
 export const ChatInput = memo(() => {
   const [input, setInput] = useState(() => {
@@ -20,6 +40,7 @@ export const ChatInput = memo(() => {
   const [showPromptEngineer, setShowPromptEngineer] = useState(false);
   const [showPromptLibrary, setShowPromptLibrary] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [quotedMessage, setQuotedMessage] = useState<QuotedMessage | null>(null);
   const { sendMessage, isStreaming, cancelStream, createNewChat, clearMessages, editLastMessage, lastSentMessage, error, retryLastMessage } = useChat();
   const { settings } = useSettings();
   const isDark = settings.theme === 'dark';
@@ -61,6 +82,20 @@ export const ChatInput = memo(() => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStreaming, cancelStream]);
+
+  // Listen for quote events from ChatWindow message bubbles
+  useEffect(() => {
+    const handleQuote = (e: Event) => {
+      const { id, content, role } = (e as CustomEvent<QuotedMessage>).detail;
+      setQuotedMessage({ id, content: stripMarkdown(content), role });
+    };
+    window.addEventListener('chat:quote', handleQuote);
+    return () => window.removeEventListener('chat:quote', handleQuote);
+  }, []);
+
+  const handleClearQuote = useCallback(() => {
+    setQuotedMessage(null);
+  }, []);
 
   // --- URL Summarizer ---
   const handleSummarize = async () => {
@@ -107,9 +142,13 @@ export const ChatInput = memo(() => {
 
     if (!canSubmit) return;
 
-    const messageContent = trimmed;
+    const quotedPrefix = quotedMessage
+      ? `> ${quotedMessage.content.slice(0, 200)}\n\n`
+      : '';
+    const messageContent = quotedPrefix + trimmed;
 
     setInput('');
+    setQuotedMessage(null);
     try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
     setIsEditing(false);
@@ -186,6 +225,30 @@ export const ChatInput = memo(() => {
               }}
               onClose={() => setShowPromptLibrary(false)}
             />
+          </div>
+        )}
+
+        {/* Quoted message preview — shown when user clicked Quote on a message */}
+        {quotedMessage && (
+          <div className="mb-2 flex items-start gap-2 px-3 py-2 rounded-xl border border-indigo-500/30 bg-indigo-500/10">
+            <MessageSquare className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} aria-hidden="true" />
+            <div className="flex-1 min-w-0">
+              <p className={`text-[11px] font-medium mb-0.5 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>
+                {quotedMessage.role === 'user' ? 'You' : 'Assistant'}
+              </p>
+              <p className={`text-xs leading-relaxed line-clamp-3 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                {quotedMessage.content}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleClearQuote}
+              className={`shrink-0 p-1 rounded-lg transition-colors ${isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200'}`}
+              aria-label="Remove quoted message"
+              title="Remove quote"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
         )}
 
