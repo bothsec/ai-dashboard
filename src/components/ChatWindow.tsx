@@ -29,7 +29,30 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
   const { settings } = useSettings();
   const [speaking, setSpeaking] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [activeReaction, setActiveReaction] = useState<string | null>(null);
+  const [activeReaction, setActiveReaction] = useState<string | null>(() => {
+    try {
+      const stored = localStorage.getItem('msg_reactions');
+      if (stored) {
+        const reactionsMap: Record<string, string> = JSON.parse(stored);
+        return reactionsMap[msg.id] || null;
+      }
+    } catch { /* ignore */ }
+    return null;
+  });
+
+  // Persist reaction to localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('msg_reactions');
+      const reactionsMap: Record<string, string> = stored ? JSON.parse(stored) : {};
+      if (activeReaction) {
+        reactionsMap[msg.id] = activeReaction;
+      } else {
+        delete reactionsMap[msg.id];
+      }
+      localStorage.setItem('msg_reactions', JSON.stringify(reactionsMap));
+    } catch { /* ignore */ }
+  }, [activeReaction, msg.id]);
   const reactions = ['👍', '❤️', '😄', '😮'];
   const isDark = msg.role === 'user' ? true : settings.theme === 'dark';
   const activeChatTheme = chatTheme ?? settings.chatTheme;
