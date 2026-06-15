@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -584,6 +584,55 @@ const MessageSkeleton = memo(() => {
   );
 });
 
+// Context window usage indicator — estimates how much of the 128k NVIDIA context is used
+const CONTEXT_WINDOW_TOKENS = 128_000;
+
+const ContextWindowBar = memo(({ totalTokens }: { totalTokens: number }) => {
+  const { settings } = useSettings();
+  const isDark = settings.theme === 'dark';
+
+  // totalTokens is already in token units (approx chars/4 from server). We also need
+  // to account for the tokens that will be sent as part of the next request
+  // (system prompt + history). Use a conservative 500-token overhead estimate.
+  const estimatedTokens = totalTokens + 500;
+  const pct = Math.min((estimatedTokens / CONTEXT_WINDOW_TOKENS) * 100, 100);
+
+  // Color coding: green < 60%, amber 60-85%, red > 85%
+  const barColor = pct >= 85
+    ? 'bg-red-500'
+    : pct >= 60
+      ? 'bg-amber-500'
+      : 'bg-emerald-500';
+
+  const textColor = pct >= 85
+    ? 'text-red-400'
+    : pct >= 60
+      ? 'text-amber-400'
+      : 'text-emerald-400';
+
+  // Format large numbers
+  const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+
+  return (
+    <div
+      className={`max-w-4xl mx-auto flex items-center gap-3 px-1 mb-2`}
+      title={`Estimated context usage: ~${fmt(estimatedTokens)} / 128k tokens`}
+      aria-label={`Context window: ${fmt(estimatedTokens)} of 128k tokens used`}
+    >
+      <Gauge className={`w-3.5 h-3.5 shrink-0 ${textColor}`} aria-hidden="true" />
+      <div className={`flex-1 h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`} role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className={`text-[10px] font-mono font-medium ${textColor}`}>
+        {fmt(estimatedTokens)} / 128k
+      </span>
+    </div>
+  );
+});
+
 export const ChatWindow: React.FC = () => {
   const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, tokensPerSecond, sendMessage, dismissError, lastSentMessage, lastUserMessage, regenerateLastResponse, deleteChat } = useChat();
   const { settings } = useSettings();
@@ -796,6 +845,11 @@ export const ChatWindow: React.FC = () => {
         aria-live="polite"
         aria-label="Chat messages"
       >
+        {/* Context window usage indicator */}
+        {activeChat && (activeChat.totalTokens ?? 0) > 0 && (
+          <ContextWindowBar totalTokens={activeChat.totalTokens!} />
+        )}
+
         {/* Export button — only shown when chat has messages */}
         {activeChat && activeChat.messages.length > 0 && (
           <div className="max-w-4xl mx-auto flex justify-end gap-2 mb-2">
