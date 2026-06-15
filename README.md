@@ -1,101 +1,74 @@
 # AI Dashboard
 
-A modern AI chat dashboard built with React, TypeScript, and Vite. Supports multiple model providers with a beautiful dark-themed UI and markdown rendering.
+A clean, modern AI chat dashboard. Paste a URL to summarize it, chat with any OpenAI-compatible model, and manage conversations — all in a dark-themed UI.
 
-![AI Dashboard](https://via.placeholder.com/800x400?text=AI+Dashboard)
+Built with React 19 + TypeScript + Vite on the frontend, Express on the backend. API keys stay on the server.
 
 ## Features
 
-- 🤖 **Multi-Provider Support**: OpenAI, Anthropic, and any OpenAI-compatible API
-- 🔒 **Secure**: API keys never exposed to browser; all requests proxy through server
-- 🎨 **Beautiful UI**: Dark theme with markdown rendering and syntax highlighting
-- 🔄 **Retry Logic**: Automatic retry with exponential backoff on failures
-- ⚛️ **React 19**: Built with the latest React features
-- 📦 **Code Splitting**: Optimized bundle with vendor and markdown chunks
-- 🔗 **URL Summarizer**: Instantly summarize any web page — just paste a URL and hit summarize
+- **Chat** — Streamed responses with markdown rendering and per-block copy buttons
+- **URL Summarizer** — Paste any URL and hit summarize for an instant AI summary
+- **Dark theme** — Violet accents, smooth animations, mobile-friendly
+- **Secure** — All API keys are server-side only; nothing exposed to the browser
+- **Persistent chats** — Conversations saved to localStorage
+- **Retry logic** — Exponential backoff on transient failures
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- npm or pnpm
-
-### Installation
+## Quick Start
 
 ```bash
-# Clone the repository
-git clone <your-repo-url>
-cd ai-dashboard
-
-# Install dependencies
 npm install
-
-# Start development server
-npm run dev
+npm run dev        # http://localhost:8080
 ```
 
-The app will be available at `http://localhost:8080`
-
-### Production Build
+## Production
 
 ```bash
 npm run build
-npm run preview
+pm2 start ecosystem.config.cjs
 ```
 
-## Configuration
+## Environment
 
-### Environment Variables
-
-Create a `.env` file in the root directory:
+Create a `.env` in the project root:
 
 ```env
-# Model Configuration
-VITE_API_MODEL=minimaxai/minimax-m2.7
-
-# API Keys (server-side only — NOT exposed to browser)
 AUTH_SECRET_TOKEN=your-secret-token
 ALLOWED_ORIGINS=https://your-domain.com
 ```
 
-### Security
+The dashboard itself requires no API key — it proxies requests to your configured backend models server-side.
 
-- API keys are **never** sent to the browser
-- All API requests go through server-side proxies that inject keys
-- Security headers (CSP, X-Frame-Options, etc.) are enabled
-- Rate limiting protects against abuse
-
-## Architecture
+## Project Structure
 
 ```
 src/
-├── components/       # React components
-│   ├── ChatWindow.tsx    # Main chat display
-│   ├── ChatInput.tsx     # Message input
-│   ├── Sidebar.tsx       # Chat list sidebar
-│   └── ErrorBoundary.tsx # Error handling
-├── context/          # React context
-│   ├── ChatContext.tsx   # Chat state management
-│   └── SettingsContext.tsx # Settings & provider config
-├── services/         # API services
-│   ├── chatService.ts    # Core chat service
-│   └── retry.ts          # Retry logic
-├── types/
-│   └── chat.ts           # TypeScript types
-└── App.tsx           # Root component
+├── components/
+│   ├── ChatWindow.tsx      # Message list + streaming
+│   ├── ChatInput.tsx        # Text input + URL summarize
+│   ├── Sidebar.tsx          # Chat history
+│   ├── PromptEngineer.tsx   # Prompt tuning helper
+│   └── PromptLibrary.tsx    # Saved prompt templates
+├── context/
+│   ├── ChatContext.tsx      # Chat state
+│   └── SettingsContext.tsx  # Theme + provider settings
+└── services/
+    ├── chatService.ts       # API proxy client
+    └── retry.ts             # Retry with backoff
+
+server/
+├── index.js                 # Express server
+├── routes/chat.js           # /api/chat, /api/summarize
+└── services/
+    └── chatService.js       # Server-side model calls
 ```
 
-## Available Scripts
+## API Endpoints
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start development server |
-| `npm run build` | Build for production |
-| `npm run preview` | Preview production build |
-| `npm run lint` | Run ESLint |
-| `npm test` | Run tests |
-| `npm run test:watch` | Run tests in watch mode |
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/chat` | Send a message, stream the response |
+| POST | `/api/summarize` | Summarize a URL |
+| GET | `/api/models` | List available models |
 
 ## License
 
