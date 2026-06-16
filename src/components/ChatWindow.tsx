@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -634,7 +634,7 @@ const ContextWindowBar = memo(({ totalTokens }: { totalTokens: number }) => {
 });
 
 export const ChatWindow: React.FC = () => {
-  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, tokensPerSecond, sendMessage, dismissError, lastSentMessage, lastUserMessage, regenerateLastResponse, deleteChat } = useChat();
+  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, tokensPerSecond, sendMessage, dismissError, lastSentMessage, lastUserMessage, regenerateLastResponse, deleteChat, branchChat } = useChat();
   const { settings } = useSettings();
   const scrollRef = useRef<HTMLDivElement>(null);
   const emptyStateRef = useRef<HTMLDivElement>(null);
@@ -868,6 +868,23 @@ export const ChatWindow: React.FC = () => {
             >
               <Bookmark className={`w-3.5 h-3.5 ${showBookmarksPanel ? 'fill-current' : ''}`} />
               Bookmarks
+            </button>
+            <button
+              onClick={() => {
+                if (activeChatId) {
+                  branchChat(activeChatId);
+                }
+              }}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                isDark
+                  ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
+                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+              }`}
+              aria-label="Branch conversation"
+              title="Create a branch copy of this conversation"
+            >
+              <GitBranch className="w-3.5 h-3.5" aria-hidden="true" />
+              Branch
             </button>
             <button
               onClick={handleExportChat}

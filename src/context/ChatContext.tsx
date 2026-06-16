@@ -26,6 +26,7 @@ interface ChatContextType extends ChatState {
   cancelStream: () => void;
   dismissError: () => void;
   togglePinChat: (chatId: string) => void;
+  branchChat: (chatId: string) => string;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -162,6 +163,28 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         c.id === chatId ? { ...c, pinned: !c.pinned } : c
       ),
     }));
+  }, []);
+
+  const branchChat = useCallback((chatId: string): string => {
+    const newChatId = generateId();
+    setState(prev => {
+      const sourceChat = prev.chats.find(c => c.id === chatId);
+      if (!sourceChat) return prev;
+      const branchChat: Chat = {
+        ...sourceChat,
+        id: newChatId,
+        title: `${sourceChat.title || 'Chat'} (branch)`,
+        messages: sourceChat.messages.map(m => ({ ...m, id: generateId() })),
+        createdAt: Date.now(),
+        pinned: false,
+      };
+      return {
+        ...prev,
+        chats: [branchChat, ...prev.chats],
+        activeChatId: newChatId,
+      };
+    });
+    return newChatId;
   }, []);
 
   const renameChat = useCallback((chatId: string, title: string) => {
@@ -443,7 +466,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       cancelStream,
       dismissError,
       togglePinChat,
-    }), [state, streamingMessageId, streamingContent, tokensPerSecond, lastSentMessage, lastUserMessage, regenerateLastResponse, retryLastMessage, editLastMessage, sendMessage, createNewChat, switchChat, deleteChat, renameChat, clearMessages, cancelStream, dismissError, togglePinChat]);
+      branchChat,
+    }), [state, streamingMessageId, streamingContent, tokensPerSecond, lastSentMessage, lastUserMessage, regenerateLastResponse, retryLastMessage, editLastMessage, sendMessage, createNewChat, switchChat, deleteChat, renameChat, clearMessages, cancelStream, dismissError, togglePinChat, branchChat]);
 
   return (
     <ChatContext.Provider value={contextValue}>
