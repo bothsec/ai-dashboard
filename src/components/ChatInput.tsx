@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
-import { Send, Loader2, Link, Sparkles, Bookmark, Edit2, RefreshCw, MessageSquare, X } from 'lucide-react';
+import { Send, Loader2, Link, Sparkles, Bookmark, Edit2, RefreshCw, MessageSquare, X, Minimize2, Maximize2 } from 'lucide-react';
 import PromptEngineer from './PromptEngineer';
 import { PromptLibrary } from './PromptLibrary';
 import { StreamingHUD } from './StreamingHUD';
@@ -10,6 +10,7 @@ import { StreamingHUD } from './StreamingHUD';
 const URL_REGEX = /^https?:\/\/[^\s]+$/;
 
 const DRAFT_KEY = 'chat_draft';
+const COMPACT_KEY = 'chat_input_compact';
 
 // Strip markdown syntax for quoted text preview (safe to use in UI)
 function stripMarkdown(text: string): string {
@@ -42,6 +43,9 @@ export const ChatInput = memo(() => {
   const [showPromptLibrary, setShowPromptLibrary] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [quotedMessage, setQuotedMessage] = useState<QuotedMessage | null>(null);
+  const [isCompact, setIsCompact] = useState(() => {
+    try { return localStorage.getItem(COMPACT_KEY) === 'true'; } catch { return false; }
+  });
   const { sendMessage, isStreaming, cancelStream, createNewChat, clearMessages, editLastMessage, lastSentMessage, error, retryLastMessage } = useChat();
   const { settings } = useSettings();
   const isDark = settings.theme === 'dark';
@@ -56,6 +60,11 @@ export const ChatInput = memo(() => {
       try { localStorage.setItem(DRAFT_KEY, input); } catch { /* ignore */ }
     }
   }, [input, isEditing]);
+
+  // Persist compact mode preference
+  useEffect(() => {
+    try { localStorage.setItem(COMPACT_KEY, String(isCompact)); } catch { /* ignore */ }
+  }, [isCompact]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -198,7 +207,7 @@ export const ChatInput = memo(() => {
   const charCount = input.length;
 
   return (
-    <div className={`shrink-0 px-3 md:px-6 lg:px-12 py-2 md:py-3 lg:py-4 ${isDark ? '' : 'bg-white/50'}`}>
+    <div className={`shrink-0 px-3 md:px-6 lg:px-12 ${isCompact ? 'py-1 md:py-1.5 lg:py-2' : 'py-2 md:py-3 lg:py-4'} ${isDark ? '' : 'bg-white/50'}`}>
       <div className="max-w-3xl lg:max-w-2xl mx-auto">
         {/* Prompt Engineer panel */}
         {showPromptEngineer && (
@@ -255,7 +264,7 @@ export const ChatInput = memo(() => {
 
         {/* ChatGPT-style input container */}
         <form
-          className={`relative flex items-center gap-2 md:gap-3 rounded-full px-3 md:px-4 py-2.5 md:py-3 transition-all duration-300 ${
+          className={`relative flex items-center gap-1.5 md:gap-2 rounded-full px-2 md:px-3 py-1.5 md:py-2 transition-all duration-300 ${isCompact ? '!py-1' : ''} ${
             isFocused || isEditing
               ? isDark
                 ? 'bg-gray-800/90 shadow-2xl shadow-black/40 border border-gray-600/50'
@@ -399,6 +408,19 @@ export const ChatInput = memo(() => {
               <RefreshCw className="w-4 h-4" />
             </button>
           )}
+
+          {/* Compact mode toggle */}
+          <button
+            type="button"
+            onClick={() => setIsCompact(prev => !prev)}
+            className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200'}`}
+            aria-label={isCompact ? 'Expand input area' : 'Compact input area'}
+            title={isCompact ? 'Expand input area' : 'Compact input — more room for messages'}
+          >
+            {isCompact
+              ? <Maximize2 className="w-3.5 h-3.5" />
+              : <Minimize2 className="w-3.5 h-3.5" />}
+          </button>
 
           {/* Character / word count — visible when input has content */}
           {input.length > 0 && (
