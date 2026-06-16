@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play, Link } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -90,6 +90,14 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
   });
 
   const [showLabelMenu, setShowLabelMenu] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  // Auto-clear link-copied indicator
+  useEffect(() => {
+    if (!linkCopied) return;
+    const t = setTimeout(() => setLinkCopied(false), 2000);
+    return () => clearTimeout(t);
+  }, [linkCopied]);
 
   useEffect(() => {
     try {
@@ -492,6 +500,18 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                 >
                   <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-current' : ''}`} />
                 </button>
+                {/* Copy link to message */}
+                <button
+                  onClick={() => {
+                    const url = `${window.location.origin}${window.location.pathname}#${msg.id}`;
+                    navigator.clipboard.writeText(url).then(() => setLinkCopied(true));
+                  }}
+                  className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${linkCopied ? 'text-indigo-400' : 'text-gray-500'}`}
+                  aria-label={linkCopied ? 'Link copied!' : 'Copy link to message'}
+                  title={linkCopied ? 'Link copied!' : 'Copy link to message'}
+                >
+                  {linkCopied ? <Check className="w-3.5 h-3.5" /> : <Link className="w-3.5 h-3.5" />}
+                </button>
                 {/* Label selector */}
                 <div className="relative">
                   <button
@@ -734,11 +754,9 @@ export const ChatWindow: React.FC = () => {
     }
   }, [activeChat]);
 
-  // Handle "scroll to message" events from ChatSearchModal
+  // Handle "scroll to message" events from ChatSearchModal and initial URL hash
   useEffect(() => {
-    const handleScrollToMessage = (e: Event) => {
-      const { messageId } = (e as CustomEvent).detail;
-      // Wait for render, then scroll
+    const scrollToMessage = (messageId: string) => {
       requestAnimationFrame(() => {
         const el = scrollRef.current?.querySelector(`[data-message-id="${messageId}"]`);
         el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -747,7 +765,21 @@ export const ChatWindow: React.FC = () => {
         setTimeout(() => el?.classList.remove('ring-2', 'ring-indigo-500/50'), 1500);
       });
     };
+
+    const handleScrollToMessage = (e: Event) => {
+      const { messageId } = (e as CustomEvent).detail;
+      scrollToMessage(messageId);
+    };
+
     window.addEventListener('chat:scroll-to-message', handleScrollToMessage);
+
+    // Handle initial URL hash (e.g., navigating to #<messageId>)
+    const hash = window.location.hash.slice(1);
+    if (hash) {
+      // Wait for messages to render, then scroll
+      setTimeout(() => scrollToMessage(hash), 100);
+    }
+
     return () => window.removeEventListener('chat:scroll-to-message', handleScrollToMessage);
   }, []);
 

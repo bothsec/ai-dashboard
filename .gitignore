@@ -31,3 +31,4 @@ ecosystem.config.cjs
 
 # Dev output
 nohup.out
+data/
