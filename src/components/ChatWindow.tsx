@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, ChevronUp, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -55,6 +55,44 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
   const { settings } = useSettings();
   const [speaking, setSpeaking] = useState(false);
   const [copied, setCopied] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [isExpanded, setIsExpanded] = useState(true);
+  const [isTall, setIsTall] = useState(false); // true when content exceeds collapse threshold
+
+  // Measure content height after mount to decide if it should be collapsible
+  useEffect(() => {
+    if (msg.role === 'assistant' && !isStreaming && contentRef.current) {
+      const height = contentRef.current.scrollHeight;
+      if (height > 320) {
+        setIsTall(true);
+        // Restore collapsed preference from localStorage
+        try {
+          const stored = localStorage.getItem('collapsed_messages');
+          if (stored) {
+            const collapsed: Record<string, boolean> = JSON.parse(stored);
+            if (collapsed[msg.id]) setIsExpanded(false);
+          }
+        } catch { /* ignore */ }
+      }
+    }
+  }, [msg.id, msg.role, msg.content, isStreaming]);
+
+  const toggleExpanded = () => {
+    setIsExpanded(prev => {
+      const next = !prev;
+      try {
+        const stored = localStorage.getItem('collapsed_messages');
+        const collapsed: Record<string, boolean> = stored ? JSON.parse(stored) : {};
+        if (next) {
+          delete collapsed[msg.id];
+        } else {
+          collapsed[msg.id] = true;
+        }
+        localStorage.setItem('collapsed_messages', JSON.stringify(collapsed));
+      } catch { /* ignore */ }
+      return next;
+    });
+  };
 
   const [isBookmarked, setIsBookmarked] = useState<boolean>(() => {
     try {
@@ -303,15 +341,17 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
               );
             })()}
             <div
-              className={`px-5 py-4 rounded-2xl shadow-sm transition-all duration-200 ${
-                msg.role === 'user'
+              ref={contentRef}
+              className={`px-5 py-4 rounded-2xl shadow-sm transition-all duration-200 ${msg.role === 'user'
                   ? `bg-gradient-to-br ${userAccent.bubble} text-white rounded-tr-md`
                   : aiBubbleClass + ' text-gray-100 rounded-tl-md shadow-xl shadow-black/30'
-              }`}
+              }${isTall && !isExpanded ? ' max-h-80 overflow-hidden' : ''}`}
             >
-              <div className={`text-[15px] md:text-[15px] leading-[1.75] ${
-                msg.role === 'user' ? '' : 'prose prose-invert dark:prose-invert max-w-none'
-              }`}>
+              {/* Gradient fade when collapsed */}
+              {isTall && !isExpanded && (
+                <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/60 to-transparent pointer-events-none rounded-b-2xl" aria-hidden="true" />
+              )}
+              <div className={`text-[15px] md:text-[15px] leading-[1.75] ${msg.role === 'user' ? '' : 'prose prose-invert dark:prose-invert max-w-none'}`}>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeSanitize, rehypeHighlight]}
@@ -573,6 +613,17 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
             title={speaking ? 'Stop' : 'Read aloud'}
           >
             {speaking ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+          </button>
+        )}
+        {/* Show more / Show less toggle — for tall AI messages */}
+        {msg.role === 'assistant' && hasContent && isTall && (
+          <button
+            onClick={toggleExpanded}
+            className={`text-xs px-1 transition-colors ${isDark ? 'text-gray-500 hover:text-indigo-400' : 'text-gray-400 hover:text-indigo-600'}`}
+            aria-label={isExpanded ? 'Show less' : 'Show more'}
+            title={isExpanded ? 'Show less' : 'Show more'}
+          >
+            {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
           </button>
         )}
       </div>
