@@ -547,10 +547,20 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
           </div>
         )}
 
-        {/* Timestamp + TTS for AI messages */}
+        {/* Timestamp for all messages, read-time + TTS for AI messages */}
         <span className={`text-xs px-1 ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>
           {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
+        {msg.role === 'assistant' && hasContent && !isStreaming && (() => {
+          const words = (displayContent || '').trim().split(/\s+/).filter(Boolean).length;
+          if (words < 50) return null;
+          const minutes = Math.ceil(words / 200);
+          return (
+            <span className={`text-xs px-1 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} aria-label={`Estimated read time: ${minutes} minute${minutes !== 1 ? 's' : ''}`}>
+              {minutes} min read
+            </span>
+          );
+        })()}
         {msg.role === 'assistant' && hasContent && !isStreaming && (
           <button
             onClick={() => {
