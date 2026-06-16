@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, Quote, Tag, Gauge, GitBranch, Play } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -19,12 +19,25 @@ const SUGGESTIONS = [
   { icon: '🐛', text: 'Debug my code' },
 ];
 
+// Extended reaction types
+export type MessageReaction = 'up' | 'down' | 'laugh' | 'love' | 'surprised' | 'sad' | 'lightbulb' | null;
+
+export const REACTION_OPTIONS: { value: MessageReaction; emoji: string; label: string; color: string }[] = [
+  { value: 'up',        emoji: '👍', label: 'Helpful',     color: 'text-green-400'   },
+  { value: 'down',      emoji: '👎', label: 'Not helpful', color: 'text-red-400'     },
+  { value: 'laugh',     emoji: '😄', label: 'Funny',       color: 'text-yellow-400'  },
+  { value: 'love',      emoji: '❤️', label: 'Love it',    color: 'text-pink-400'    },
+  { value: 'surprised', emoji: '😮', label: 'Surprised',   color: 'text-purple-400'  },
+  { value: 'sad',       emoji: '😢', label: 'Sad',         color: 'text-blue-400'    },
+  { value: 'lightbulb', emoji: '💡', label: 'Insightful',  color: 'text-amber-400'  },
+];
+
 export type MessageLabel = 'important' | 'question' | 'todo' | 'idea' | 'code' | null;
 
 export const LABEL_OPTIONS: { value: MessageLabel; label: string; color: string; bgClass: string; textClass: string }[] = [
-  { value: 'important', label: 'Important', color: 'text-red-400',   bgClass: 'bg-red-500/20 border-red-500/40',   textClass: 'text-red-400'   },
-  { value: 'question',  label: 'Question', color: 'text-blue-400',   bgClass: 'bg-blue-500/20 border-blue-500/40',   textClass: 'text-blue-400'   },
-  { value: 'todo',      label: 'Todo',      color: 'text-green-400',  bgClass: 'bg-green-500/20 border-green-500/40', textClass: 'text-green-400'  },
+  { value: 'important', label: 'Important', color: 'text-red-400',    bgClass: 'bg-red-500/20 border-red-500/40',    textClass: 'text-red-400'    },
+  { value: 'question',  label: 'Question',  color: 'text-blue-400',   bgClass: 'bg-blue-500/20 border-blue-500/40',   textClass: 'text-blue-400'   },
+  { value: 'todo',      label: 'Todo',      color: 'text-green-400',   bgClass: 'bg-green-500/20 border-green-500/40',  textClass: 'text-green-400'  },
   { value: 'idea',      label: 'Idea',      color: 'text-purple-400', bgClass: 'bg-purple-500/20 border-purple-500/40', textClass: 'text-purple-400' },
   { value: 'code',      label: 'Code',      color: 'text-orange-400', bgClass: 'bg-orange-500/20 border-orange-500/40', textClass: 'text-orange-400' },
 ];
@@ -67,11 +80,11 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
     return false;
   });
 
-  const [reaction, setReaction] = useState<'up' | 'down' | null>(() => {
+  const [reaction, setReaction] = useState<MessageReaction>(() => {
     try {
       const stored = localStorage.getItem('message_reactions');
       if (stored) {
-        const reactions = JSON.parse(stored) as Record<string, 'up' | 'down'>;
+        const reactions = JSON.parse(stored) as Record<string, MessageReaction>;
         return reactions[msg.id] ?? null;
       }
     } catch { /* ignore */ }
@@ -90,6 +103,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
   });
 
   const [showLabelMenu, setShowLabelMenu] = useState(false);
+  const [showReactionMenu, setShowReactionMenu] = useState(false);
 
   useEffect(() => {
     try {
@@ -137,7 +151,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
   useEffect(() => {
     try {
       const stored = localStorage.getItem('message_reactions');
-      const reactions: Record<string, 'up' | 'down'> = stored ? JSON.parse(stored) : {};
+      const reactions: Record<string, MessageReaction> = stored ? JSON.parse(stored) : {};
       if (reaction) {
         reactions[msg.id] = reaction;
       } else {
@@ -468,22 +482,48 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
             {/* Reaction buttons — shown on hover for AI messages */}
             {msg.role === 'assistant' && !isStreaming && (
               <div className="absolute -bottom-8 left-0 flex items-center gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
-                <button
-                  onClick={() => setReaction(prev => prev === 'up' ? null : 'up')}
-                  className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${reaction === 'up' ? 'text-green-400' : 'text-gray-500'}`}
-                  aria-label={reaction === 'up' ? 'Remove thumbs up' : 'Thumbs up'}
-                  title={reaction === 'up' ? 'Remove' : 'Helpful'}
-                >
-                  <ThumbsUp className={`w-3.5 h-3.5 ${reaction === 'up' ? 'fill-current' : ''}`} />
-                </button>
-                <button
-                  onClick={() => setReaction(prev => prev === 'down' ? null : 'down')}
-                  className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${reaction === 'down' ? 'text-red-400' : 'text-gray-500'}`}
-                  aria-label={reaction === 'down' ? 'Remove thumbs down' : 'Thumbs down'}
-                  title={reaction === 'down' ? 'Remove' : 'Not helpful'}
-                >
-                  <ThumbsDown className={`w-3.5 h-3.5 ${reaction === 'down' ? 'fill-current' : ''}`} />
-                </button>
+                {/* Emoji reaction picker */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowReactionMenu(prev => !prev)}
+                    className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${reaction ? 'text-amber-400' : 'text-gray-500'}`}
+                    aria-label={reaction ? `Reaction: ${reaction}` : 'Add reaction'}
+                    title={reaction ? `Reaction: ${reaction}` : 'React'}
+                  >
+                    {reaction
+                      ? (() => {
+                          const opt = REACTION_OPTIONS.find(o => o.value === reaction);
+                          return <span className="text-base" aria-hidden="true">{opt?.emoji ?? '👍'}</span>;
+                        })()
+                      : <ThumbsUp className="w-3.5 h-3.5" />
+                    }
+                  </button>
+                  {showReactionMenu && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setShowReactionMenu(false)}
+                        aria-hidden="true"
+                      />
+                      <div className={`absolute bottom-full left-0 mb-1 z-50 rounded-xl border shadow-xl p-2 flex gap-1 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+                        {REACTION_OPTIONS.map(opt => (
+                          <button
+                            key={opt.value!}
+                            onClick={() => { setReaction(prev => prev === opt.value ? null : opt.value); setShowReactionMenu(false); }}
+                            className={`p-1.5 rounded-lg hover:bg-gray-700/60 transition-all text-lg relative group/emoji ${reaction === opt.value ? 'bg-gray-700/80 scale-110' : ''}`}
+                            aria-label={opt.label}
+                            title={opt.label}
+                          >
+                            <span aria-hidden="true">{opt.emoji}</span>
+                            <span className={`absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-medium px-1.5 py-0.5 rounded opacity-0 group-hover/emoji:opacity-100 transition-opacity pointer-events-none whitespace-nowrap ${isDark ? 'bg-gray-700 text-gray-200' : 'bg-gray-800 text-white'}`}>
+                              {opt.label}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
                 <button
                   onClick={() => setIsBookmarked(prev => !prev)}
                   className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${isBookmarked ? 'text-amber-400' : 'text-gray-500'}`}
