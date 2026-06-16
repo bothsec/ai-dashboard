@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -30,6 +30,17 @@ export const LABEL_OPTIONS: { value: MessageLabel; label: string; color: string;
 ];
 
 const LABEL_STORAGE_KEY = 'message_labels';
+
+// Detect if a message likely got cut off mid-sentence
+function looksTruncated(content: string): boolean {
+  if (!content || content.trim().length < 30) return false;
+  const trimmed = content.trim();
+  // Ends with no terminal punctuation (., !, ?, —, |) or ellipsis
+  if (!/[.!?\—|]$/.test(trimmed)) return true;
+  // Trailing incomplete indicator
+  if (/[\[\(}\{]$/.test(trimmed)) return true;
+  return false;
+}
 
 interface MessageItemProps {
   msg: Message;
@@ -634,7 +645,7 @@ const ContextWindowBar = memo(({ totalTokens }: { totalTokens: number }) => {
 });
 
 export const ChatWindow: React.FC = () => {
-  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, tokensPerSecond, sendMessage, dismissError, lastSentMessage, lastUserMessage, regenerateLastResponse, deleteChat, branchChat } = useChat();
+  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, tokensPerSecond, sendMessage, dismissError, lastSentMessage, lastUserMessage, regenerateLastResponse, deleteChat, branchChat, continueResponse } = useChat();
   const { settings } = useSettings();
   const scrollRef = useRef<HTMLDivElement>(null);
   const emptyStateRef = useRef<HTMLDivElement>(null);
@@ -667,10 +678,22 @@ export const ChatWindow: React.FC = () => {
   const isSunset = chatTheme === 'sunset';
   const isMinimal = chatTheme === 'minimal';
 
-  const activeChat = useMemo(() => 
+  const activeChat = useMemo(() =>
     chats.find(c => c.id === activeChatId),
     [chats, activeChatId]
   );
+
+  // Check if the last assistant message looks truncated (ends mid-sentence)
+  const lastAssistantLooksTruncated = useMemo(() => {
+    if (!activeChat || activeChat.messages.length === 0) return false;
+    const msgs = activeChat.messages;
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === 'assistant' && msgs[i].content) {
+        return looksTruncated(msgs[i].content);
+      }
+    }
+    return false;
+  }, [activeChat]);
 
   // Track if user manually scrolled up (unpinned)
   const handleScroll = useCallback(() => {
@@ -1051,27 +1074,42 @@ export const ChatWindow: React.FC = () => {
         </div>
       )}
 
-      {/* Regenerate button — shown briefly after a successful response */}
-      {showRegenerate && !isStreaming && activeChat && activeChat.messages.length > 0 && (
+      {/* Regenerate / Continue Reading bar — shown briefly after a successful response */}
+      {((showRegenerate && !isStreaming) || (lastAssistantLooksTruncated && !isStreaming)) && activeChat && activeChat.messages.length > 0 && (
         <div
           className={`absolute bottom-0 left-0 right-0 flex items-center justify-center py-3 gap-3 ${isDark ? 'bg-gradient-to-t from-gray-950 to-transparent' : 'bg-gradient-to-t from-white to-transparent'}`}
         >
-          <button
-            onClick={() => regenerateLastResponse()}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-500/30 transition-colors text-sm font-medium"
-            aria-label="Regenerate last response"
-            title="Generate a new response to your last message"
-          >
-            <RotateCw className="w-4 h-4" aria-hidden="true" />
-            Regenerate
-          </button>
-          <button
-            onClick={() => setShowRegenerate(false)}
-            className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs transition-colors ${isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-800' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
-            aria-label="Dismiss"
-          >
-            <X className="w-3.5 h-3.5" aria-hidden="true" />
-          </button>
+          {lastAssistantLooksTruncated && (
+            <button
+              onClick={() => continueResponse()}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/30 transition-colors text-sm font-medium"
+              aria-label="Continue reading"
+              title="Continue the response from where it was cut off"
+            >
+              <Play className="w-4 h-4" aria-hidden="true" />
+              Continue reading
+            </button>
+          )}
+          {showRegenerate && (
+            <>
+              <button
+                onClick={() => regenerateLastResponse()}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-500/30 transition-colors text-sm font-medium"
+                aria-label="Regenerate last response"
+                title="Generate a new response to your last message"
+              >
+                <RotateCw className="w-4 h-4" aria-hidden="true" />
+                Regenerate
+              </button>
+              <button
+                onClick={() => setShowRegenerate(false)}
+                className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs transition-colors ${isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-800' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
+                aria-label="Dismiss"
+              >
+                <X className="w-3.5 h-3.5" aria-hidden="true" />
+              </button>
+            </>
+          )}
         </div>
       )}
 

@@ -27,6 +27,7 @@ interface ChatContextType extends ChatState {
   dismissError: () => void;
   togglePinChat: (chatId: string) => void;
   branchChat: (chatId: string) => string;
+  continueResponse: () => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -447,6 +448,86 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setTimeout(() => sendMessage(msgToResend), 0);
   }, [lastSentMessage, state.activeChatId, sendMessage]);
 
+  // Continue Reading: append more content to the last assistant message
+  const continueResponse = useCallback(() => {
+    const currentChatId = state.activeChatId;
+    if (!currentChatId) return;
+    const chat = state.chats.find(c => c.id === currentChatId);
+    if (!chat || chat.messages.length === 0) return;
+
+    // Find the last assistant message
+    let lastAssistantMsg: Message | undefined;
+    for (let i = chat.messages.length - 1; i >= 0; i--) {
+      if (chat.messages[i].role === 'assistant' && chat.messages[i].content) {
+        lastAssistantMsg = chat.messages[i];
+        break;
+      }
+    }
+    if (!lastAssistantMsg) return;
+
+    setTokensPerSecond(0);
+    streamingStartRef.current = Date.now();
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    const continuationPrompt = `Continue from where you left off. Only write the next part — do not repeat what was already written.\n\nPreviously written:\n${lastAssistantMsg.content}`;
+
+    // Build history: all messages up to and including the last user message
+    const history: Message[] = chat.messages
+      .filter(m => m.role !== 'assistant' || m.id === lastAssistantMsg!.id)
+      .concat([{
+        id: generateId(),
+        role: 'user' as const,
+        content: continuationPrompt,
+        timestamp: Date.now(),
+      }]);
+
+    setState(prev => ({ ...prev, isStreaming: true, error: null }));
+
+    // Ref to accumulate continuation content for token speed calculation
+    let continuationAcc = '';
+    service.generateStream(
+      history,
+      settings,
+      {
+        onChunk: (chunk) => {
+          continuationAcc += chunk;
+          const elapsed = (Date.now() - streamingStartRef.current) / 1000;
+          if (elapsed > 0.5) {
+            const approxTokens = continuationAcc.length / 4;
+            const tps = Math.round(approxTokens / elapsed * 10) / 10;
+            setTokensPerSecond(tps);
+          }
+        },
+        onComplete: (fullContent) => {
+          setState(prev => ({
+            ...prev,
+            isStreaming: false,
+            chats: prev.chats.map(c => {
+              if (c.id !== currentChatId) return c;
+              return {
+                ...c,
+                totalTokens: (c.totalTokens || 0) + Math.round(fullContent.length / 4),
+                messages: c.messages.map(m =>
+                  m.id === lastAssistantMsg!.id
+                    ? { ...m, content: m.content + fullContent }
+                    : m
+                ),
+              };
+            }),
+          }));
+          setTokensPerSecond(0);
+        },
+        onError: (err) => {
+          setState(prev => ({ ...prev, isStreaming: false, error: err.message }));
+          setTokensPerSecond(0);
+        },
+      },
+      controller.signal
+    );
+  }, [state.activeChatId, state.chats, service, settings]);
+
   const contextValue = useMemo(() => ({
       ...state,
       streamingMessageId,
@@ -467,6 +548,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       dismissError,
       togglePinChat,
       branchChat,
+      continueResponse,
     }), [state, streamingMessageId, streamingContent, tokensPerSecond, lastSentMessage, lastUserMessage, regenerateLastResponse, retryLastMessage, editLastMessage, sendMessage, createNewChat, switchChat, deleteChat, renameChat, clearMessages, cancelStream, dismissError, togglePinChat, branchChat]);
 
   return (

@@ -158,7 +158,10 @@ app.use(cors({
   },
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
+  // Note: do NOT set credentials:true — with a function origin, cors 2.8.x
+  // misbehaves for null/undefined origins (sets ACAO:false regardless of callback).
+  // Cookie transmission is browser-managed via credentials:'include' and HttpOnly;
+  // no Access-Control-Allow-Credentials header needed for cookie receipt.
 }));
 
 // Parse JSON body with size limit (chat conversations can grow large)
