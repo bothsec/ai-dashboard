@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, memo } from 'react';
 import { Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { setAuthToken } from '../services/chatService';
+import { setAuthUser } from '../context/AuthContext';
 
 interface AuthGateProps {
-  children: React.ReactNode;
+  children: React.ReactNode
 }
 
 export const AuthGate = memo(function AuthGate({ children }: AuthGateProps) {
@@ -21,8 +22,13 @@ export const AuthGate = memo(function AuthGate({ children }: AuthGateProps) {
       try {
         const res = await fetch('/api/auth/me', { credentials: 'include' });
         if (res.ok) {
-          // Already logged in via cookie
-          if (!cancelled) setAuthRequired(false);
+          const data = await res.json();
+          if (!cancelled) {
+            if (data.authenticated) {
+              setAuthUser({ role: data.role, username: data.username });
+            }
+            setAuthRequired(false);
+          }
         } else if (res.status === 401) {
           // Not authenticated — check if auth is required at all
           const statusRes = await fetch('/api/auth/status');
@@ -63,9 +69,10 @@ export const AuthGate = memo(function AuthGate({ children }: AuthGateProps) {
       });
       const data = await res.json();
       if (res.ok && data.ok) {
-        // Store token in memory for API calls (cookie handles persistence)
-        if (data.authEnabled !== false) {
-          setAuthToken(password.trim());
+        // Store token from server response (JWT for users, raw secret for admin)
+        if (data.authEnabled !== false && data.token) {
+          setAuthToken(data.token);
+          setAuthUser({ role: data.role, username: data.username });
         }
         setAuthRequired(false);
       } else {

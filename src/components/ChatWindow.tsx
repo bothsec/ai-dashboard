@@ -1,11 +1,11 @@
-import { useRef, useEffect, memo, useMemo, useCallback, useState } from 'react';
+import React, { useRef, useEffect, memo, useMemo, useCallback, useState } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play, Star } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -30,6 +30,7 @@ export const LABEL_OPTIONS: { value: MessageLabel; label: string; color: string;
 ];
 
 const LABEL_STORAGE_KEY = 'message_labels';
+const STARRED_STORAGE_KEY = 'message_starred';
 
 // Detect if a message likely got cut off mid-sentence
 function looksTruncated(content: string): boolean {
@@ -76,6 +77,17 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
       }
     } catch { /* ignore */ }
     return null;
+  });
+
+  const [isStarred, setIsStarred] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem(STARRED_STORAGE_KEY);
+      if (stored) {
+        const starred = JSON.parse(stored) as string[];
+        return starred.includes(msg.id);
+      }
+    } catch { /* ignore */ }
+    return false;
   });
 
   const [messageLabel, setMessageLabel] = useState<MessageLabel>(() => {
@@ -146,6 +158,20 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
       localStorage.setItem('message_reactions', JSON.stringify(reactions));
     } catch { /* ignore */ }
   }, [reaction, msg.id]);
+
+  // Persist starred state to localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STARRED_STORAGE_KEY);
+      let starred: string[] = stored ? JSON.parse(stored) : [];
+      if (isStarred && !starred.includes(msg.id)) {
+        starred = [...starred, msg.id];
+      } else if (!isStarred) {
+        starred = starred.filter(id => id !== msg.id);
+      }
+      localStorage.setItem(STARRED_STORAGE_KEY, JSON.stringify(starred));
+    } catch { /* ignore */ }
+  }, [isStarred, msg.id]);
 
   // Auto-clear reaction after 5 seconds (satisfies noUnusedParameters)
   useEffect(() => {
@@ -337,9 +363,36 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                     ol: ({ children }) => (
                       <ol className={`list-decimal list-inside mb-4 space-y-1.5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{children}</ol>
                     ),
-                    li: ({ children }) => (
-                      <li className={isDark ? 'text-gray-300' : 'text-gray-600'}>{children}</li>
-                    ),
+                    li: ({ children }) => {
+                      // Detect GFM task list checkboxes
+                      const childArr = Array.isArray(children) ? children : [children];
+                      const checkboxEl = childArr.find(
+                        (child): child is React.ReactElement =>
+                          React.isValidElement(child) &&
+                          (child.type === 'input') &&
+                          (child.props as {type?: string}).type === 'checkbox'
+                      );
+                      const isChecked = checkboxEl && (checkboxEl.props as {checked?: boolean}).checked;
+
+                      if (checkboxEl) {
+                        // Task list item with styled checkbox
+                        return (
+                          <li className={`list-none flex items-start gap-2.5 mb-2 ${isChecked ? (isDark ? 'text-gray-500 line-through' : 'text-gray-400 line-through') : (isDark ? 'text-gray-300' : 'text-gray-600')}`}>
+                            <div className="flex-shrink-0 mt-0.5">
+                              <div className={`w-4 h-4 rounded border flex items-center justify-center ${isChecked ? 'bg-indigo-500 border-indigo-500' : (isDark ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-300')}`}>
+                                {isChecked && (
+                                  <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </div>
+                            </div>
+                            <span className={isChecked ? 'opacity-60' : ''}>{children}</span>
+                          </li>
+                        );
+                      }
+                      return <li className={isDark ? 'text-gray-300' : 'text-gray-600'}>{children}</li>;
+                    },
                     code: ({ className, children }) => {
                       const isInline = !className;
                       if (isInline) {
@@ -361,14 +414,23 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                       const langMatch = langClass.match(/language-(\w+)/);
                       const lang = langMatch ? langMatch[1] : '';
                       const codeText = codeEl?.props?.children ?? '';
+                      // Show line numbers for multi-line code blocks (3+ lines)
+                      const lines = String(codeText).split('\n');
+                      const showLineNumbers = lines.length > 2;
+                      const leftPad = showLineNumbers ? 'pl-10' : '';
                       return (
-                        <pre className={`relative rounded-xl p-4 mb-4 overflow-x-auto text-sm border leading-relaxed group/pre ${isDark ? 'bg-gray-900/90 border-gray-700/40' : 'bg-gray-100 border-gray-200'}`}>
+                        <pre className={`relative rounded-xl px-4 pt-4 pb-4 mb-4 overflow-x-auto text-sm border leading-relaxed group/pre ${isDark ? 'bg-gray-900/90 border-gray-700/40' : 'bg-gray-100 border-gray-200'}`}>
                           {lang && (
-                            <span className={`absolute top-2 left-3 text-[10px] font-mono font-semibold uppercase tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                            <span className={`absolute top-2 ${showLineNumbers ? 'left-10' : 'left-3'} text-[10px] font-mono font-semibold uppercase tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                               {lang}
                             </span>
                           )}
-                          {children}
+                          {showLineNumbers && (
+                            <div className={`absolute left-0 top-4 bottom-4 flex flex-col text-right pr-3 pl-3 select-none font-mono text-xs leading-6 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} aria-hidden="true">
+                              {lines.map((_, i) => <span key={i} className="block">{i + 1}</span>)}
+                            </div>
+                          )}
+                          <div className={leftPad}>{children}</div>
                           <button
                             onClick={() => {
                               navigator.clipboard.writeText(typeof codeText === 'string' ? codeText : String(codeText)).then(() => {
@@ -404,9 +466,15 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                       const isSafe = href && /^(https?:|mailto:|tel:)/.test(href);
                       if (!isSafe) return null;
                       return (
-                        <a href={href} target="_blank" rel="noopener noreferrer" className={`underline underline-offset-2 ${
-                          isDark ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'
-                        }`}>
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={href}
+                          className={`underline underline-offset-2 transition-colors group/link ${
+                            isDark ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'
+                          }`}
+                        >
                           {children}
                         </a>
                       );
@@ -492,6 +560,14 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                 >
                   <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-current' : ''}`} />
                 </button>
+                <button
+                  onClick={() => setIsStarred(prev => !prev)}
+                  className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${isStarred ? 'text-yellow-400' : 'text-gray-500'}`}
+                  aria-label={isStarred ? 'Unstar' : 'Star message'}
+                  title={isStarred ? 'Unstar' : 'Star'}
+                >
+                  <Star className={`w-3.5 h-3.5 ${isStarred ? 'fill-current' : ''}`} />
+                </button>
                 {/* Label selector */}
                 <div className="relative">
                   <button
@@ -575,6 +651,17 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
             {speaking ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
           </button>
         )}
+        {/* Read time estimate for long AI messages */}
+        {msg.role === 'assistant' && hasContent && !isStreaming && (() => {
+          const words = displayContent.trim().split(/\s+/).length;
+          const minutes = Math.ceil(words / 200);
+          if (minutes < 1) return null;
+          return (
+            <span className={`text-xs px-1 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} title={`~${words} words`}>
+              {minutes < 60 ? `~${minutes} min read` : `~${Math.ceil(minutes / 60)} hr read`}
+            </span>
+          );
+        })()}
       </div>
     </div>
   );
@@ -1095,6 +1182,13 @@ export const ChatWindow: React.FC = () => {
               <Zap className="w-4 h-4 text-emerald-400" aria-hidden="true" />
               <span className="text-sm text-emerald-400 font-medium">
                 {tokensPerSecond.toFixed(1)} tok/s
+              </span>
+            </div>
+          )}
+          {streamingContent.length > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-sky-500/10 border border-sky-500/20">
+              <span className="text-sm text-sky-400 font-medium">
+                {streamingContent.length.toLocaleString()} chars
               </span>
             </div>
           )}

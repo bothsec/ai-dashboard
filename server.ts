@@ -4,6 +4,8 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import helmet from 'helmet';
 import cors from 'cors';
+import { SignJWT, jwtVerify } from 'jose';
+import { createHash } from 'crypto';
 import { summarizeUrl } from './src/services/urlSummarizer';
 dotenv.config({ override: true });
 
@@ -27,7 +29,33 @@ function getNextNvidiaApiKey(): string | null {
   return key;
 }
 
-// Per-key rate limit tracking (key -> { count, resetTime })
+// --- User database & JWT ---
+import { createUser, verifyUser, listUsers, deleteUser, getUserById } from './server/db';
+import type { User } from './server/types';
+
+const JWT_SECRET = process.env.JWT_SECRET || process.env.AUTH_SECRET_TOKEN || 'dev-secret-change-me';
+const JWT_EXPIRES = '7d';
+
+function getJwtSecret(): Uint8Array {
+  return createHash('sha256').update(JWT_SECRET).digest();
+}
+
+async function signJwt(payload: object): Promise<string> {
+  return new SignJWT(payload as Record<string, unknown>)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(JWT_EXPIRES)
+    .sign(getJwtSecret());
+}
+
+async function verifyJwt(token: string): Promise<User | null> {
+  try {
+    const { payload } = await jwtVerify(token, getJwtSecret());
+    return payload as unknown as User;
+  } catch {
+    return null;
+  }
+}
 const keyRateLimitStore = new Map<string, { count: number; resetTime: number }>();
 const KEY_RATE_LIMIT_WINDOW = 60000; // 1 minute window
 const KEY_RATE_LIMIT_MAX = 10; // NVIDIA limit per key per minute
@@ -53,55 +81,71 @@ app.use(helmet({
   referrerPolicy: { policy: 'same-origin' }, // strictest — no referrer leaks
 }));
 
+app.use(express.json({ limit: '1mb' }));
+
 // --- Auth: bearer token validation ---
 const AUTH_SECRET = process.env.AUTH_SECRET_TOKEN;
 const AUTH_COOKIE_NAME = 'ai_auth';
 const AUTH_COOKIE_MAXAGE = 86400; // 24 hours in seconds
 
-// Auth middleware — validates bearer token OR HttpOnly cookie
-function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  // Auth middleware — validates bearer token OR HttpOnly cookie
+async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   // Skip if no AUTH_SECRET is configured (auth disabled)
   if (!AUTH_SECRET) return next();
 
-  const bearerToken =
-    req.headers.authorization?.startsWith('Bearer ')
-      ? req.headers.authorization.slice(7)
-      : undefined;
-  const cookieToken: string | undefined = (() => {
-    const cookieHeader = req.headers.cookie as string | undefined;
-    if (!cookieHeader) return undefined;
-    const match = cookieHeader.match(new RegExp(`${AUTH_COOKIE_NAME}=([^;]+)`));
-    return match ? match[1] : undefined;
-  })();
+  const cookieHeader = req.headers.cookie as string | undefined;
+  const match = cookieHeader ? cookieHeader.match(new RegExp(`${AUTH_COOKIE_NAME}=([^;]+)`)) : null;
+  const cookieToken = match ? match[1] : undefined;
 
-  const token = bearerToken || cookieToken;
-  if (!token || token !== AUTH_SECRET) {
-    res.status(401).json({ error: { message: 'Unauthorized', type: 'auth_required' } });
-    return;
+  // Admin cookie
+  if (cookieToken === AUTH_SECRET) return next();
+
+  // Admin Bearer token
+  const bearerToken = req.headers.authorization?.startsWith('Bearer ')
+    ? req.headers.authorization.slice(7)
+    : undefined;
+  if (bearerToken === AUTH_SECRET) return next();
+
+  // User JWT
+  if (bearerToken) {
+    const user = await verifyJwt(bearerToken);
+    if (user) {
+      (req as any).user = user;
+      return next();
+    }
   }
-  next();
+
+  res.status(401).json({ error: { message: 'Unauthorized', type: 'auth_required' } });
 }
 
 // --- Auth routes (must be defined BEFORE the auth middleware) ---
-// POST /api/auth/login  { username, password }  →  Set-Cookie + { ok: true }
-app.post('/api/auth/login', express.json(), (req, res) => {
-  if (!AUTH_SECRET) {
-    res.json({ ok: true, authEnabled: false });
-    return;
-  }
+// POST /api/auth/login — admin cookie OR user JWT
+app.post('/api/auth/login', express.json(), async (req, res) => {
   const { username, password } = req.body ?? {};
+
+  // 1) Try admin login (env-based)
   const expectedUsername = process.env.AUTH_USERNAME || 'admin';
-  if (!username || !password || username !== expectedUsername || password !== AUTH_SECRET) {
-    res.status(401).json({ error: { message: 'Invalid credentials', type: 'auth_failed' } });
+  if (username === expectedUsername && password === AUTH_SECRET) {
+    const forwardedHost = req.headers['x-forwarded-host'] as string | undefined;
+    const cookieHost = forwardedHost ? forwardedHost.split(',')[0].split(':')[0] : undefined;
+    const cookieDomain = cookieHost ? `; Domain=${cookieHost}` : '';
+    res.setHeader('Set-Cookie',
+      `${AUTH_COOKIE_NAME}=${AUTH_SECRET}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${AUTH_COOKIE_MAXAGE}${cookieDomain}`);
+    res.json({ ok: true, authEnabled: true, role: 'admin', username, token: AUTH_SECRET });
     return;
   }
-  // Derive the cookie domain from the real client host (x-forwarded-host → host)
-  const forwardedHost = req.headers['x-forwarded-host'] as string | undefined;
-  const cookieHost = forwardedHost ? forwardedHost.split(',')[0].split(':')[0] : undefined;
-  const cookieDomain = cookieHost ? `; Domain=${cookieHost}` : '';
-  res.setHeader('Set-Cookie',
-    `${AUTH_COOKIE_NAME}=${AUTH_SECRET}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${AUTH_COOKIE_MAXAGE}${cookieDomain}`);
-  res.json({ ok: true, authEnabled: true });
+
+  // 2) Try user login (database)
+  if (AUTH_SECRET) {
+    const user = verifyUser(username, password);
+    if (user) {
+      const token = user.role === 'admin' ? AUTH_SECRET : await signJwt({ id: user.id, username: user.username, role: user.role });
+      res.json({ ok: true, authEnabled: true, role: user.role, username: user.username, token });
+      return;
+    }
+  }
+
+  res.status(401).json({ error: { message: 'Invalid credentials', type: 'auth_failed' } });
 });
 
 // GET /api/auth/status → { authRequired: boolean } (unauthenticated)
@@ -109,20 +153,66 @@ app.get('/api/auth/status', (_req, res) => {
   res.json({ authRequired: !!AUTH_SECRET });
 });
 
-// GET /api/auth/me → { authenticated: true } or 401 (cookie-validated)
-app.get('/api/auth/me', (req, res) => {
-  if (!AUTH_SECRET) {
-    res.json({ authenticated: true, authEnabled: false });
-    return;
+// GET /api/auth/me — admin cookie OR user JWT
+app.get('/api/auth/me', async (req, res) => {
+  // Try admin cookie first
+  if (AUTH_SECRET) {
+    const cookieHeader = req.headers.cookie as string | undefined;
+    const match = cookieHeader ? cookieHeader.match(new RegExp(`${AUTH_COOKIE_NAME}=([^;]+)`)) : null;
+    const token = match ? match[1] : undefined;
+    if (token === AUTH_SECRET) {
+      res.json({ authenticated: true, authEnabled: true, role: 'admin', username: process.env.AUTH_USERNAME || 'admin' });
+      return;
+    }
   }
+
+  // Try Bearer token (user JWT)
+  const authHeader = req.headers.authorization as string | undefined;
+  if (authHeader?.startsWith('Bearer ')) {
+    const user = await verifyJwt(authHeader.slice(7));
+    if (user) {
+      res.json({ authenticated: true, authEnabled: true, role: user.role, username: user.username, id: user.id });
+      return;
+    }
+  }
+
+  res.status(401).json({ error: { message: 'Not authenticated', type: 'auth_required' } });
+});
+
+// --- Admin check helper ---
+function isAdminRequest(req: express.Request): boolean {
   const cookieHeader = req.headers.cookie as string | undefined;
   const match = cookieHeader ? cookieHeader.match(new RegExp(`${AUTH_COOKIE_NAME}=([^;]+)`)) : null;
-  const token = match ? match[1] : undefined;
-  if (!token || token !== AUTH_SECRET) {
-    res.status(401).json({ error: { message: 'Not authenticated', type: 'auth_required' } });
-    return;
+  if (match?.[1] === AUTH_SECRET) return true;
+  const bearer = req.headers.authorization?.startsWith('Bearer ')
+    ? req.headers.authorization.slice(7)
+    : undefined;
+  if (bearer === AUTH_SECRET) return true;
+  return false;
+}
+
+// --- User management (admin-only) ---
+app.post('/api/users', (req, res) => {
+  if (!isAdminRequest(req)) { res.status(403).json({ error: { message: 'Admin only', type: 'forbidden' } }); return; }
+  const { username, password, role = 'user' } = req.body ?? {};
+  if (!username || !password) { res.status(400).json({ error: { message: 'username and password required', type: 'bad_request' } }); return; }
+  try {
+    const user = createUser(username, password, role);
+    res.json({ ok: true, user: { id: user.id, username: user.username, role: user.role, created_at: user.created_at } });
+  } catch (e: any) {
+    res.status(409).json({ error: { message: e.message || 'User already exists', type: 'conflict' } });
   }
-  res.json({ authenticated: true, username: process.env.AUTH_USERNAME || 'admin' });
+});
+
+app.get('/api/users', (req, res) => {
+  if (!isAdminRequest(req)) { res.status(403).json({ error: { message: 'Admin only', type: 'forbidden' } }); return; }
+  res.json({ users: listUsers() });
+});
+
+app.delete('/api/users/:id', (req, res) => {
+  if (!isAdminRequest(req)) { res.status(403).json({ error: { message: 'Admin only', type: 'forbidden' } }); return; }
+  deleteUser(Number(req.params.id));
+  res.json({ ok: true });
 });
 
 // Mount auth middleware globally for all remaining /api routes
@@ -163,9 +253,6 @@ app.use(cors({
   // Cookie transmission is browser-managed via credentials:'include' and HttpOnly;
   // no Access-Control-Allow-Credentials header needed for cookie receipt.
 }));
-
-// Parse JSON body with size limit (chat conversations can grow large)
-app.use(express.json({ limit: '1mb' }));
 
 // Rate limit tracking (simple in-memory, use Redis for production)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();

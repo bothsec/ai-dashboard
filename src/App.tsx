@@ -1,6 +1,7 @@
 import { useState, useCallback, memo, useEffect } from 'react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuthGate } from './components/AuthGate';
+import { AuthProvider } from './context/AuthContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { ChatProvider, useChat } from './context/ChatContext';
 import { Sidebar } from './components/Sidebar';
@@ -44,6 +45,13 @@ const AppInner = memo(function AppInner() {
     return () => window.removeEventListener('keydown', handler);
   }, [isStreaming, cancelStream, createNewChat, setShowShortcuts]);
 
+  // Listen for app:toggle-shortcuts event dispatched by ChatInput slash command
+  useEffect(() => {
+    const handler = () => setShowShortcuts(prev => !prev);
+    window.addEventListener('app:toggle-shortcuts', handler);
+    return () => window.removeEventListener('app:toggle-shortcuts', handler);
+  }, []);
+
   return (
     <div className="flex h-dvh md:h-screen overflow-hidden font-sans selection:bg-indigo-500/30">
       <ErrorBoundary
@@ -83,16 +91,18 @@ const App = memo(function App() {
 
   return (
     <AuthGate>
-      <ErrorBoundary
-        key={errorBoundaryKey}
-        onReset={handleReset}
-      >
-        <SettingsProvider>
-          <ChatProvider>
-            <AppInner />
-          </ChatProvider>
-        </SettingsProvider>
-      </ErrorBoundary>
+      <AuthProvider>
+        <ErrorBoundary
+          key={errorBoundaryKey}
+          onReset={handleReset}
+        >
+          <SettingsProvider>
+            <ChatProvider>
+              <AppInner />
+            </ChatProvider>
+          </SettingsProvider>
+        </ErrorBoundary>
+      </AuthProvider>
     </AuthGate>
   );
 });

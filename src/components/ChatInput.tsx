@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
-import { Send, Loader2, Link, Sparkles, Bookmark, Edit2, RefreshCw, MessageSquare, X, Minimize2, Maximize2, Eye, EyeOff } from 'lucide-react';
+import { Send, Loader2, Link, Sparkles, Bookmark, Edit2, RefreshCw, MessageSquare, X, Minimize2, Maximize2, Eye, EyeOff, Plus, FileDown, Keyboard, Trash2, Zap } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
@@ -35,6 +35,52 @@ interface QuotedMessage {
   role: string;
 }
 
+// Slash commands for the command palette
+const SLASH_COMMANDS = [
+  {
+    name: 'new',
+    icon: Plus,
+    description: 'Start a new chat',
+    action: (createNewChat: () => void, clearDraft: () => void) => {
+      clearDraft();
+      createNewChat();
+    },
+  },
+  {
+    name: 'clear',
+    icon: Trash2,
+    description: 'Clear current chat',
+    action: (_: () => void, clearDraft: () => void, clearMessages: () => void) => {
+      clearDraft();
+      clearMessages();
+    },
+  },
+  {
+    name: 'export',
+    icon: FileDown,
+    description: 'Export chat as markdown',
+    action: () => {
+      window.dispatchEvent(new CustomEvent('chat:trigger-export'));
+    },
+  },
+  {
+    name: 'shortcuts',
+    icon: Keyboard,
+    description: 'Show keyboard shortcuts',
+    action: () => {
+      window.dispatchEvent(new CustomEvent('app:show-shortcuts'));
+    },
+  },
+  {
+    name: 'theme',
+    icon: Zap,
+    description: 'Toggle light/dark theme',
+    action: (_: () => void, __: () => void, ___: () => void, toggleTheme: () => void) => {
+      toggleTheme();
+    },
+  },
+];
+
 export const ChatInput = memo(() => {
   const [input, setInput] = useState(() => {
     try { return localStorage.getItem(DRAFT_KEY) ?? ''; } catch { return ''; }
@@ -50,8 +96,10 @@ export const ChatInput = memo(() => {
     try { return localStorage.getItem(COMPACT_KEY) === 'true'; } catch { return false; }
   });
   const [showPreview, setShowPreview] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [commandPaletteIndex, setCommandPaletteIndex] = useState(0);
   const { sendMessage, isStreaming, cancelStream, createNewChat, clearMessages, editLastMessage, lastSentMessage, error, retryLastMessage } = useChat();
-  const { settings } = useSettings();
+  const { settings, toggleTheme } = useSettings();
   const isDark = settings.theme === 'dark';
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendButtonRef = useRef<HTMLButtonElement>(null);
@@ -111,6 +159,45 @@ export const ChatInput = memo(() => {
     window.addEventListener('chat:quote', handleQuote);
     return () => window.removeEventListener('chat:quote', handleQuote);
   }, []);
+
+  // Listen for app:show-shortcuts event dispatched by slash command
+  useEffect(() => {
+    const handleShowShortcuts = () => {
+      window.dispatchEvent(new CustomEvent('app:toggle-shortcuts'));
+    };
+    window.addEventListener('app:show-shortcuts', handleShowShortcuts);
+    return () => window.removeEventListener('app:show-shortcuts', handleShowShortcuts);
+  }, []);
+
+  // Command palette: show when input starts with /
+  useEffect(() => {
+    const slashMatch = input.match(/^\/(\w*)$/);
+    if (slashMatch) {
+      setShowCommandPalette(true);
+      setCommandPaletteIndex(0);
+    } else {
+      setShowCommandPalette(false);
+    }
+  }, [input]);
+
+  // Filtered commands based on what user typed after /
+  const filteredCommands = SLASH_COMMANDS.filter(cmd =>
+    cmd.name.startsWith(input.slice(1).toLowerCase())
+  );
+
+  const clearDraft = () => {
+    setInput('');
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+  };
+
+  const handleCommandSelect = (cmd: typeof SLASH_COMMANDS[number]) => {
+    setShowCommandPalette(false);
+    setInput('');
+    clearDraft();
+    // Each command's action expects specific args — spread them safely
+    const actionArgs = [createNewChat, clearDraft, clearMessages, toggleTheme];
+    cmd.action(...actionArgs as Parameters<typeof cmd.action>);
+  };
 
   const handleClearQuote = useCallback(() => {
     setQuotedMessage(null);
@@ -182,6 +269,29 @@ export const ChatInput = memo(() => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Command palette keyboard navigation
+    if (showCommandPalette && filteredCommands.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setCommandPaletteIndex(prev => (prev + 1) % filteredCommands.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setCommandPaletteIndex(prev => (prev - 1 + filteredCommands.length) % filteredCommands.length);
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleCommandSelect(filteredCommands[commandPaletteIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowCommandPalette(false);
+        return;
+      }
+    }
     if (e.key === 'Escape' && isEditing) {
       setIsEditing(false);
       setInput('');
@@ -216,7 +326,7 @@ export const ChatInput = memo(() => {
   const charCount = input.length;
 
   return (
-    <div className={`shrink-0 px-3 md:px-6 lg:px-12 ${isCompact ? 'py-1 md:py-1.5 lg:py-2' : 'py-2 md:py-3 lg:py-4'} ${isDark ? '' : 'bg-white/50'}`}>
+    <div className={`shrink-0 px-3 md:px-6 lg:px-12 relative ${isCompact ? 'py-1 md:py-1.5 lg:py-2' : 'py-2 md:py-3 lg:py-4'} ${isDark ? '' : 'bg-white/50'}`}>
       <div className="max-w-3xl lg:max-w-2xl mx-auto">
         {/* Prompt Engineer panel */}
         {showPromptEngineer && (
@@ -505,6 +615,56 @@ export const ChatInput = memo(() => {
             </span>
           )}
         </form>
+
+        {/* Slash command palette — shown when input starts with / */}
+        {showCommandPalette && filteredCommands.length > 0 && (
+          <div
+            className={`absolute z-50 mt-1 w-full max-w-3xl lg:max-w-2xl rounded-xl border shadow-2xl overflow-hidden ${
+              isDark
+                ? 'bg-gray-800 border-gray-700 shadow-black/50'
+                : 'bg-white border-gray-200 shadow-gray-900/10'
+            }`}
+            role="listbox"
+            aria-label="Slash commands"
+          >
+            {filteredCommands.map((cmd, i) => {
+              const Icon = cmd.icon;
+              const isSelected = i === commandPaletteIndex;
+              return (
+                <button
+                  key={cmd.name}
+                  role="option"
+                  aria-selected={isSelected}
+                  onClick={() => handleCommandSelect(cmd)}
+                  onMouseEnter={() => setCommandPaletteIndex(i)}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                    isSelected
+                      ? isDark
+                        ? 'bg-indigo-600/20 text-indigo-300'
+                        : 'bg-indigo-50 text-indigo-700'
+                      : isDark
+                      ? 'text-gray-300 hover:bg-gray-700/60'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className={`shrink-0 flex items-center justify-center w-7 h-7 rounded-lg ${
+                    isSelected
+                      ? 'bg-indigo-500/20 text-indigo-400'
+                      : isDark
+                      ? 'bg-gray-700 text-gray-400'
+                      : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    <Icon className="w-3.5 h-3.5" aria-hidden="true" />
+                  </span>
+                  <span className="flex-1 font-medium text-sm">{cmd.name}</span>
+                  <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                    {cmd.description}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Streaming stats HUD — shown while AI is responding */}
         <StreamingHUD />

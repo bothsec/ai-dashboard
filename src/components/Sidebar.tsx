@@ -1,11 +1,13 @@
 import { useState, memo, useEffect, useCallback } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useChat } from '../context/ChatContext';
-import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles, Search, X as XIcon, Palette, Command, Pin, Pencil, BarChart2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles, Search, X as XIcon, Palette, Command, Pin, Pencil, BarChart2, Shield, LogOut } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { ThemesModal } from './ThemesModal';
 import { ChatSearchModal } from './ChatSearchModal';
 import { ChatStatsModal } from './ChatStatsModal';
+import { AdminPanel } from './AdminPanel';
 
 // Move outside component — pure function, no deps on component scope
 const formatTime = (timestamp: number) => {
@@ -20,14 +22,16 @@ const formatTime = (timestamp: number) => {
   return date.toLocaleDateString();
 };
 
-export const Sidebar = memo(() => {
+export const Sidebar = memo(function Sidebar() {
   const { settings } = useSettings();
   const { chats, activeChatId, createNewChat, switchChat, deleteChat, togglePinChat, renameChat } = useChat();
+  const { user, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showThemesModal, setShowThemesModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [renamingChatId, setRenamingChatId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
 
@@ -335,12 +339,33 @@ export const Sidebar = memo(() => {
               >
                 <BarChart2 className={`w-4 h-4 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
               </button>
+
+            {/* Admin panel button — admins only */}
+            {user?.role === 'admin' && (
+              <button
+                onClick={() => setShowAdminPanel(true)}
+                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors ${isDark ? 'bg-gradient-to-br from-indigo-900/50 to-gray-900 border-indigo-700/50 hover:border-indigo-500/50' : 'bg-indigo-50 border-indigo-200 hover:border-indigo-400'}`}
+                title="Admin Panel"
+              >
+                <Shield className={`w-4 h-4 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
+              </button>
+            )}
+
+            {/* Logout button */}
+            <button
+              onClick={logout}
+              className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors ${isDark ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700/50 hover:border-red-500/50' : 'bg-gray-100 border-gray-200 hover:border-red-400'}`}
+              title="Sign out"
+            >
+              <LogOut className={`w-4 h-4 ${isDark ? 'text-gray-400 hover:text-red-400' : 'text-gray-500 hover:text-red-500'}`} />
+            </button>
           </div>
         </div>
       </aside>
-        {showThemesModal && <ThemesModal onClose={() => setShowThemesModal(false)} />}
-        {showSearchModal && <ChatSearchModal onClose={() => setShowSearchModal(false)} onSelectMessage={handleSearchSelect} />}
-        {showStatsModal && <ChatStatsModal onClose={() => setShowStatsModal(false)} />}
+      {showThemesModal && <ThemesModal onClose={() => setShowThemesModal(false)} />}
+      {showSearchModal && <ChatSearchModal onClose={() => setShowSearchModal(false)} onSelectMessage={handleSearchSelect} />}
+      {showStatsModal && <ChatStatsModal onClose={() => setShowStatsModal(false)} />}
+      {showAdminPanel && <AdminPanel onClose={() => setShowAdminPanel(false)} />}
     </>
   );
 });
