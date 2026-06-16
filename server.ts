@@ -95,7 +95,12 @@ app.post('/api/auth/login', express.json(), (req, res) => {
     res.status(401).json({ error: { message: 'Invalid credentials', type: 'auth_failed' } });
     return;
   }
-  res.setHeader('Set-Cookie', `${AUTH_COOKIE_NAME}=${AUTH_SECRET}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${AUTH_COOKIE_MAXAGE}`);
+  // Derive the cookie domain from the real client host (x-forwarded-host → host)
+  const forwardedHost = req.headers['x-forwarded-host'] as string | undefined;
+  const cookieHost = forwardedHost ? forwardedHost.split(',')[0].split(':')[0] : undefined;
+  const cookieDomain = cookieHost ? `; Domain=${cookieHost}` : '';
+  res.setHeader('Set-Cookie',
+    `${AUTH_COOKIE_NAME}=${AUTH_SECRET}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${AUTH_COOKIE_MAXAGE}${cookieDomain}`);
   res.json({ ok: true, authEnabled: true });
 });
 
