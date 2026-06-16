@@ -200,13 +200,18 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
     'text-indigo-400';
 
   // AI bubble: complete class names per theme + dark/light
-  const aiBubbleClass = isDark
-    ? activeChatTheme === 'midnight' ? 'from-blue-950/90 to-indigo-950/90 border-blue-800/40' :
-      activeChatTheme === 'ocean' ? 'from-cyan-950/90 to-teal-950/90 border-cyan-800/40' :
-      activeChatTheme === 'forest' ? 'from-green-950/90 to-emerald-950/90 border-green-800/40' :
-      activeChatTheme === 'sunset' ? 'from-orange-950/90 to-rose-950/90 border-orange-800/40' :
-      activeChatTheme === 'minimal' ? 'from-neutral-900/95 to-neutral-950/95 border-neutral-700/40' :
-      'from-gray-800/95 to-gray-900/95 border-gray-700/50'
+  const aiBubbleClass = activeChatTheme === 'midnight'
+    ? isDark ? 'from-blue-950/90 to-indigo-950/90 border-blue-800/40' : 'bg-blue-50 border-blue-200 text-blue-900'
+    : activeChatTheme === 'ocean'
+    ? isDark ? 'from-cyan-950/90 to-teal-950/90 border-cyan-800/40' : 'bg-cyan-50 border-cyan-200 text-cyan-900'
+    : activeChatTheme === 'forest'
+    ? isDark ? 'from-green-950/90 to-emerald-950/90 border-green-800/40' : 'bg-green-50 border-green-200 text-green-900'
+    : activeChatTheme === 'sunset'
+    ? isDark ? 'from-orange-950/90 to-rose-950/90 border-orange-800/40' : 'bg-orange-50 border-orange-200 text-orange-900'
+    : activeChatTheme === 'minimal'
+    ? isDark ? 'from-neutral-900/95 to-neutral-950/95 border-neutral-700/40' : 'bg-neutral-100 border-neutral-300 text-neutral-900'
+    : isDark
+    ? 'from-gray-800/95 to-gray-900/95 border-gray-700/50'
     : 'bg-white border-gray-200 text-gray-900';
 
   return (
@@ -224,7 +229,17 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
             ? `bg-gradient-to-br ${userAccent.avatar} text-white`
             : isDark
               ? `bg-gradient-to-br from-gray-800 to-gray-900 ${aiAccentColor} border border-gray-700/50 shadow-lg shadow-black/20`
-              : 'bg-gray-100 text-indigo-600 border border-gray-200 shadow-lg shadow-black/10'
+              : activeChatTheme === 'midnight'
+              ? `bg-gradient-to-br from-blue-100 to-indigo-100 ${aiAccentColor} border border-blue-200 shadow-md`
+              : activeChatTheme === 'ocean'
+              ? `bg-gradient-to-br from-cyan-100 to-teal-100 ${aiAccentColor} border border-cyan-200 shadow-md`
+              : activeChatTheme === 'forest'
+              ? `bg-gradient-to-br from-green-100 to-emerald-100 ${aiAccentColor} border border-green-200 shadow-md`
+              : activeChatTheme === 'sunset'
+              ? `bg-gradient-to-br from-orange-100 to-rose-100 ${aiAccentColor} border border-orange-200 shadow-md`
+              : activeChatTheme === 'minimal'
+              ? `bg-gradient-to-br from-neutral-100 to-neutral-200 ${aiAccentColor} border border-neutral-200 shadow-md`
+              : 'bg-gray-100 text-indigo-600 border border-gray-200 shadow-md shadow-black/10'
         }`}
         aria-hidden="true"
       >
@@ -672,11 +687,6 @@ export const ChatWindow: React.FC = () => {
 
   const isDark = settings.theme === 'dark';
   const chatTheme = settings.chatTheme;
-  const isMidnight = chatTheme === 'midnight';
-  const isOcean = chatTheme === 'ocean';
-  const isForest = chatTheme === 'forest';
-  const isSunset = chatTheme === 'sunset';
-  const isMinimal = chatTheme === 'minimal';
 
   const activeChat = useMemo(() =>
     chats.find(c => c.id === activeChatId),
@@ -849,16 +859,33 @@ export const ChatWindow: React.FC = () => {
     );
   }
 
+  // Theme-aware background — dark mode: rich dark gradients; light mode: clean white/gray
+  const chatBgClass = (() => {
+    const t = chatTheme;
+    const d = isDark;
+    if (t === 'midnight') return d
+      ? 'bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950'
+      : 'bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50';
+    if (t === 'ocean') return d
+      ? 'bg-gradient-to-br from-slate-950 via-cyan-950 to-teal-950'
+      : 'bg-gradient-to-br from-slate-50 via-cyan-50 to-teal-50';
+    if (t === 'forest') return d
+      ? 'bg-gradient-to-br from-slate-950 via-green-950 to-emerald-950'
+      : 'bg-gradient-to-br from-slate-50 via-green-50 to-emerald-50';
+    if (t === 'sunset') return d
+      ? 'bg-gradient-to-br from-slate-950 via-rose-950 to-orange-950'
+      : 'bg-gradient-to-br from-slate-50 via-rose-50 to-orange-50';
+    if (t === 'minimal') return d
+      ? 'bg-neutral-950'
+      : 'bg-neutral-100';
+    return d
+      ? 'bg-gradient-to-br from-gray-950 via-slate-900 to-indigo-950'
+      : 'bg-gradient-to-br from-slate-50 via-gray-50 to-indigo-50';
+  })();
+
   return (
     <div
-      className={`flex-1 flex flex-col h-full min-h-0 overflow-hidden relative ${
-        isMidnight ? 'bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950' :
-        isOcean ? 'bg-gradient-to-br from-slate-950 via-cyan-950 to-teal-950' :
-        isForest ? 'bg-gradient-to-br from-slate-950 via-green-950 to-emerald-950' :
-        isSunset ? 'bg-gradient-to-br from-slate-950 via-rose-950 to-orange-950' :
-        isMinimal ? 'bg-neutral-950' :
-        'bg-gradient-to-br from-gray-950 via-slate-900 to-indigo-950'
-      }`}
+      className={`flex-1 flex flex-col h-full min-h-0 overflow-hidden relative ${chatBgClass}`}
     >
       <div
         ref={scrollRef}

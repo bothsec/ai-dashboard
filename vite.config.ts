@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
   const LOCAL_TARGET = `http://localhost:${env.PORT || 3000}`
 
 // Helper: configure proxy with X-Forwarded-Host so backend can set correct cookie Domain
-function proxyBackend(path: string) {
+function proxyBackend(_path: string) {
   return {
     target: LOCAL_TARGET,
     changeOrigin: true,

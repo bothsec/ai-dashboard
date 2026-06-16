@@ -84,6 +84,7 @@ interface ThemesModalProps {
 export const ThemesModal = memo(function ThemesModal({ onClose }: ThemesModalProps) {
   const { settings, setChatTheme } = useSettings();
   const currentTheme = settings.chatTheme;
+  const isDark = settings.theme === 'dark';
 
   return (
     <div
@@ -99,7 +100,7 @@ export const ThemesModal = memo(function ThemesModal({ onClose }: ThemesModalPro
         aria-hidden="true"
       />
 
-      {/* Modal */}
+      {/* Modal — dark shell always, so it reads as a proper modal in both modes */}
       <div
         className={`relative w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl ${
           currentTheme === 'midnight' ? 'bg-slate-900/95 border border-blue-800/40' :
@@ -111,7 +112,7 @@ export const ThemesModal = memo(function ThemesModal({ onClose }: ThemesModalPro
         }`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+        <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-white/10' : 'border-black/10'}`}>
           <h2 className="text-base font-semibold text-white">Chat Themes</h2>
           <button
             onClick={onClose}
