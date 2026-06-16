@@ -20,21 +20,29 @@ export const AuthGate = memo(function AuthGate({ children }: AuthGateProps) {
     (async () => {
       try {
         const res = await fetch('/api/auth/me', { credentials: 'include' });
-        if (!cancelled) {
-          if (res.ok) {
-            // Already logged in via cookie
-            setAuthRequired(false);
-          } else {
-            // Not logged in — check if auth is required at all
-            const statusRes = await fetch('/api/auth/status');
-            const data = await statusRes.json();
+        if (res.ok) {
+          // Already logged in via cookie
+          if (!cancelled) setAuthRequired(false);
+        } else if (res.status === 401) {
+          // Not authenticated — check if auth is required at all
+          const statusRes = await fetch('/api/auth/status');
+          if (!cancelled) {
+            if (!statusRes.ok) {
+              // Auth status endpoint is down — fail closed for safety
+              setAuthRequired(true);
+              return;
+            }
+            const data = await statusRes.json().catch(() => ({ authRequired: true }));
             setAuthRequired(data.authRequired ?? true);
           }
+        } else {
+          // Unexpected non-OK status — treat as auth required
+          if (!cancelled) setAuthRequired(true);
         }
       } catch {
         if (!cancelled) {
-          // fail open (network error)
-          setAuthRequired(false);
+          // Network error — fail closed (require auth on reconnect)
+          setAuthRequired(true);
         }
       }
     })();
