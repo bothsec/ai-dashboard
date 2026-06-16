@@ -1,7 +1,10 @@
 import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
-import { Send, Loader2, Link, Sparkles, Bookmark, Edit2, RefreshCw, MessageSquare, X, Minimize2, Maximize2 } from 'lucide-react';
+import { Send, Loader2, Link, Sparkles, Bookmark, Edit2, RefreshCw, MessageSquare, X, Minimize2, Maximize2, Eye, EyeOff } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeSanitize from 'rehype-sanitize';
 import PromptEngineer from './PromptEngineer';
 import { PromptLibrary } from './PromptLibrary';
 import { StreamingHUD } from './StreamingHUD';
@@ -46,6 +49,7 @@ export const ChatInput = memo(() => {
   const [isCompact, setIsCompact] = useState(() => {
     try { return localStorage.getItem(COMPACT_KEY) === 'true'; } catch { return false; }
   });
+  const [showPreview, setShowPreview] = useState(false);
   const { sendMessage, isStreaming, cancelStream, createNewChat, clearMessages, editLastMessage, lastSentMessage, error, retryLastMessage } = useChat();
   const { settings } = useSettings();
   const isDark = settings.theme === 'dark';
@@ -73,6 +77,11 @@ export const ChatInput = memo(() => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
         textareaRef.current?.focus();
+      }
+      // Ctrl/Cmd + Shift + P: Toggle markdown preview
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
+        e.preventDefault();
+        setShowPreview(prev => !prev);
       }
       // Escape: Cancel streaming (handled globally in App, but kept here for local focus)
       if (e.key === 'Escape' && isStreaming) {
@@ -314,24 +323,66 @@ export const ChatInput = memo(() => {
             </button>
           )}
 
-          {/* Textarea */}
+          {/* Textarea / Markdown preview */}
           <div className="flex-1 min-w-0 flex items-center">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-              placeholder={isEditing ? 'Edit your message… (Enter to resend, Esc to cancel)' : 'Message AI…'}
-              rows={1}
-              className={`w-full bg-transparent border-none outline-none resize-none leading-relaxed text-sm py-0.5 max-h-32 focus:outline-none focus:ring-0 ${
-                isDark ? 'text-gray-100 placeholder:text-gray-500' : 'text-gray-900 placeholder:text-gray-400'
-              }`}
-              style={{ minHeight: '20px', maxHeight: '128px' }}
-              aria-label="Message input"
-              aria-multiline="true"
-            />
+            {showPreview && input.trim() ? (
+              <div
+                className={`w-full overflow-y-auto max-h-48 rounded-lg px-3 py-2 prose prose-sm max-w-none ${
+                  isDark ? 'text-gray-200 bg-gray-800/50' : 'text-gray-800 bg-gray-50'
+                }`}
+                aria-label="Markdown preview"
+              >
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeSanitize]}
+                  components={{
+                    p: ({ children }) => <p className="mb-1 last:mb-0 leading-relaxed">{children}</p>,
+                    code: ({ className, children }) => {
+                      const isInline = !className;
+                      if (isInline) {
+                        return (
+                          <code className={isDark ? 'bg-gray-700/60 px-1 py-0.5 rounded text-xs font-mono text-indigo-300' : 'bg-gray-100 px-1 py-0.5 rounded text-xs font-mono text-indigo-600'}>
+                            {children}
+                          </code>
+                        );
+                      }
+                      return <code className={className}>{children}</code>;
+                    },
+                    pre: ({ children }) => (
+                      <pre className={`text-xs overflow-x-auto rounded-lg p-2 ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>{children}</pre>
+                    ),
+                    a: ({ href, children }) => {
+                      const isSafe = href && /^(https?:|mailto:|tel:)/.test(href);
+                      if (!isSafe) return <span>{children}</span>;
+                      return <a href={href} target="_blank" rel="noopener noreferrer" className="text-indigo-400 underline underline-offset-2">{children}</a>;
+                    },
+                    strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                    em: ({ children }) => <em className="italic">{children}</em>,
+                    ul: ({ children }) => <ul className="list-disc list-inside space-y-0.5">{children}</ul>,
+                    ol: ({ children }) => <ol className="list-decimal list-inside space-y-0.5">{children}</ol>,
+                  }}
+                >
+                  {input}
+                </ReactMarkdown>
+              </div>
+            ) : (
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                placeholder={isEditing ? 'Edit your message… (Enter to resend, Esc to cancel)' : 'Message AI…'}
+                rows={1}
+                className={`w-full bg-transparent border-none outline-none resize-none leading-relaxed text-sm py-0.5 max-h-32 focus:outline-none focus:ring-0 ${
+                  isDark ? 'text-gray-100 placeholder:text-gray-500' : 'text-gray-900 placeholder:text-gray-400'
+                }`}
+                style={{ minHeight: '20px', maxHeight: '128px' }}
+                aria-label="Message input"
+                aria-multiline="true"
+              />
+            )}
           </div>
 
           {/* Summarize URL button — shown when input is a standalone URL */}
@@ -421,6 +472,21 @@ export const ChatInput = memo(() => {
               ? <Maximize2 className="w-3.5 h-3.5" />
               : <Minimize2 className="w-3.5 h-3.5" />}
           </button>
+
+          {/* Markdown preview toggle */}
+          {input.trim().length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowPreview(prev => !prev)}
+              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showPreview ? (isDark ? 'bg-gray-700/60 text-indigo-400' : 'bg-indigo-100 text-indigo-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200')}`}
+              aria-label={showPreview ? 'Hide markdown preview' : 'Show markdown preview'}
+              title={showPreview ? 'Hide preview (Ctrl+Shift+P)' : 'Preview markdown (Ctrl+Shift+P)'}
+            >
+              {showPreview
+                ? <EyeOff className="w-3.5 h-3.5" />
+                : <Eye className="w-3.5 h-3.5" />}
+            </button>
+          )}
 
           {/* Character / word count — visible when input has content */}
           {input.length > 0 && (
