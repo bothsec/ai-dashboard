@@ -146,15 +146,19 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Require a present, allowlisted origin (blocks curl, null-origin, and spoofed origins)
-    if (origin && allowedOrigins.includes(origin)) {
+    // Allow:
+    //  - null origin (stealth/sandbox browsers, file:// pages)
+    //  - no origin header (native same-origin fetch)
+    //  - any allowlisted origin
+    if (!origin || origin === 'null' || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      if (!origin) return callback(null, false);
+      callback(null, false);
     }
   },
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
 }));
 
 // Parse JSON body with size limit (chat conversations can grow large)
