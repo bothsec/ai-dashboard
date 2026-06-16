@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play, Search } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -290,7 +290,11 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
 
         {/* Message bubble */}
         {displayContent && (
-          <div className="relative group/bubble">
+          <div
+            className="relative group/bubble"
+            data-message-id={msg.id}
+            data-message-role={msg.role}
+          >
             {/* Label badge */}
             {messageLabel && (() => {
               const opt = LABEL_OPTIONS.find(o => o.value === messageLabel);
@@ -659,6 +663,79 @@ const ContextWindowBar = memo(({ totalTokens }: { totalTokens: number }) => {
   );
 });
 
+// ── Floating menu for text selected inside a message ──────────────────────────
+interface SelectionMenuState {
+  text: string;
+  x: number;
+  y: number;
+  messageId: string;
+  messageRole: string;
+}
+
+function SelectionMenu({
+  state,
+  onCopy,
+  onQuote,
+  onSearch,
+  onClose,
+  isDark,
+}: {
+  state: SelectionMenuState;
+  onCopy: () => void;
+  onQuote: () => void;
+  onSearch: () => void;
+  onClose: () => void;
+  isDark: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Clicking the menu should NOT trigger document click hide
+  const handleMouseDown = (e: React.MouseEvent) => e.preventDefault();
+
+  const menuClass = isDark
+    ? 'bg-gray-900 border-gray-700 text-gray-200 shadow-xl'
+    : 'bg-white border-gray-200 text-gray-700 shadow-xl';
+
+  return (
+    <div
+      ref={ref}
+      onMouseDown={handleMouseDown}
+      className={`fixed z-50 flex items-center gap-0.5 px-1.5 py-1.5 rounded-xl border ${menuClass}`}
+      style={{ top: state.y + 8, left: state.x }}
+      role="toolbar"
+      aria-label="Selection actions"
+    >
+      <button
+        onClick={() => { onCopy(); onClose(); }}
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${isDark ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`}
+        title="Copy text"
+        aria-label="Copy text"
+      >
+        <Copy className="w-3.5 h-3.5" aria-hidden="true" />
+        Copy
+      </button>
+      <button
+        onClick={() => { onQuote(); onClose(); }}
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${isDark ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`}
+        title="Quote in reply"
+        aria-label="Quote in reply"
+      >
+        <Quote className="w-3.5 h-3.5" aria-hidden="true" />
+        Quote
+      </button>
+      <button
+        onClick={() => { onSearch(); onClose(); }}
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${isDark ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`}
+        title="Search the web"
+        aria-label="Search the web"
+      >
+        <Search className="w-3.5 h-3.5" aria-hidden="true" />
+        Search
+      </button>
+    </div>
+  );
+}
+
 export const ChatWindow: React.FC = () => {
   const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, tokensPerSecond, sendMessage, dismissError, lastSentMessage, lastUserMessage, regenerateLastResponse, deleteChat, branchChat, continueResponse } = useChat();
   const { settings } = useSettings();
@@ -669,6 +746,7 @@ export const ChatWindow: React.FC = () => {
   const [showRegenerate, setShowRegenerate] = useState(false);
   const [showBookmarksPanel, setShowBookmarksPanel] = useState(false);
   const [chatCopied, setChatCopied] = useState(false);
+  const [selectionMenu, setSelectionMenu] = useState<SelectionMenuState | null>(null);
 
   // Show regenerate briefly when streaming ends with a successful response
   useEffect(() => {
@@ -813,6 +891,80 @@ export const ChatWindow: React.FC = () => {
     error.toLowerCase().includes('offline') ||
     error.toLowerCase().includes('failed to connect')
   );
+
+  // ── Text selection menu ───────────────────────────────────────────────────
+  // Track selection inside message bubbles; show Copy / Quote / Search toolbar
+  useEffect(() => {
+    const handleMouseUp = () => {
+      // Small delay so selection is finalized after mouseup
+      setTimeout(() => {
+        const sel = window.getSelection();
+        if (!sel || sel.isCollapsed || !sel.toString().trim()) {
+          setSelectionMenu(null);
+          return;
+        }
+        // Only activate when selection is inside the chat scroll area
+        const anchor = sel.anchorNode;
+        if (!anchor || !scrollRef.current?.contains(anchor)) {
+          setSelectionMenu(null);
+          return;
+        }
+        const range = sel.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        const text = sel.toString();
+        // Find the message element
+        const msgEl = anchor.parentElement?.closest('[data-message-id]');
+        const messageId = msgEl?.getAttribute('data-message-id') ?? '';
+        const messageRole = msgEl?.getAttribute('data-message-role') ?? '';
+        if (!text) { setSelectionMenu(null); return; }
+        // Clamp so menu doesn't go off-screen
+        const menuWidth = 240;
+        const menuHeight = 44;
+        let x = rect.left + rect.width / 2 - menuWidth / 2;
+        let y = rect.bottom + 8;
+        if (x < 8) x = 8;
+        if (x + menuWidth > window.innerWidth - 8) x = window.innerWidth - menuWidth - 8;
+        if (y + menuHeight > window.innerHeight - 8) y = rect.top - menuHeight - 8;
+        setSelectionMenu({ text, x, y, messageId, messageRole });
+      }, 10);
+    };
+
+    const handleClick = (e: MouseEvent) => {
+      // Don't close if click is inside the selection menu
+      const menu = document.querySelector('[role="toolbar"]');
+      if (menu && menu.contains(e.target as Node)) return;
+      setSelectionMenu(null);
+    };
+
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousedown', handleClick);
+    return () => {
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousedown', handleClick);
+    };
+  }, []);
+
+  const handleSelectionCopy = useCallback(() => {
+    if (!selectionMenu) return;
+    navigator.clipboard.writeText(selectionMenu.text).catch(() => {});
+  }, [selectionMenu]);
+
+  const handleSelectionQuote = useCallback(() => {
+    if (!selectionMenu) return;
+    window.dispatchEvent(new CustomEvent('chat:quote', {
+      detail: {
+        id: selectionMenu.messageId,
+        content: selectionMenu.text,
+        role: selectionMenu.messageRole,
+      },
+    }));
+  }, [selectionMenu]);
+
+  const handleSelectionSearch = useCallback(() => {
+    if (!selectionMenu) return;
+    const q = encodeURIComponent(selectionMenu.text);
+    window.open(`https://www.google.com/search?q=${q}`, '_blank', 'noopener,noreferrer');
+  }, [selectionMenu]);
 
   if (error) {
     return (
@@ -1142,6 +1294,18 @@ export const ChatWindow: React.FC = () => {
 
       {/* Bookmarks panel */}
       {showBookmarksPanel && <BookmarkPanel onClose={() => setShowBookmarksPanel(false)} />}
+
+      {/* Text selection action menu — rendered when user selects text inside a message */}
+      {selectionMenu && (
+        <SelectionMenu
+          state={selectionMenu}
+          onCopy={handleSelectionCopy}
+          onQuote={handleSelectionQuote}
+          onSearch={handleSelectionSearch}
+          onClose={() => setSelectionMenu(null)}
+          isDark={isDark}
+        />
+      )}
     </div>
   );
 };

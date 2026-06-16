@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
-import { Send, Loader2, Link, Sparkles, Bookmark, Edit2, RefreshCw, MessageSquare, X, Minimize2, Maximize2, Eye, EyeOff } from 'lucide-react';
+import { Send, Loader2, Link, Sparkles, Bookmark, Edit2, RefreshCw, MessageSquare, X, Minimize2, Maximize2, Eye, EyeOff, FileText, Trash2, Download, Keyboard, HelpCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
@@ -14,6 +14,77 @@ const URL_REGEX = /^https?:\/\/[^\s]+$/;
 
 const DRAFT_KEY = 'chat_draft';
 const COMPACT_KEY = 'chat_input_compact';
+
+// Slash commands available via / in the input field
+interface SlashCommand {
+  id: string;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+  action: () => void;
+  /** e.g. '/new' — matched literally */
+  trigger: string;
+}
+
+function makeSlashCommands(opts: {
+  createNewChat: () => void;
+  clearMessages: () => void;
+  setShowShortcuts: (v: boolean) => void;
+}): SlashCommand[] {
+  const { createNewChat, clearMessages, setShowShortcuts } = opts;
+  return [
+    {
+      id: 'new',
+      label: 'New Chat',
+      description: 'Start a fresh conversation',
+      icon: <FileText className="w-4 h-4" />,
+      trigger: '/new',
+      action: () => {
+        createNewChat();
+      },
+    },
+    {
+      id: 'clear',
+      label: 'Clear Chat',
+      description: 'Delete all messages in this chat',
+      icon: <Trash2 className="w-4 h-4" />,
+      trigger: '/clear',
+      action: () => {
+        if (window.confirm('Clear all messages in this chat?')) clearMessages();
+      },
+    },
+    {
+      id: 'export',
+      label: 'Export Chat',
+      description: 'Download conversation as Markdown',
+      icon: <Download className="w-4 h-4" />,
+      trigger: '/export',
+      action: () => {
+        window.dispatchEvent(new CustomEvent('chat:trigger-export'));
+      },
+    },
+    {
+      id: 'shortcuts',
+      label: 'Keyboard Shortcuts',
+      description: 'View all available shortcuts',
+      icon: <Keyboard className="w-4 h-4" />,
+      trigger: '/shortcuts',
+      action: () => {
+        setShowShortcuts(true);
+      },
+    },
+    {
+      id: 'help',
+      label: 'Help',
+      description: 'Learn about slash commands',
+      icon: <HelpCircle className="w-4 h-4" />,
+      trigger: '/help',
+      action: () => {
+        setShowShortcuts(true);
+      },
+    },
+  ];
+}
 
 // Strip markdown syntax for quoted text preview (safe to use in UI)
 function stripMarkdown(text: string): string {
@@ -50,6 +121,11 @@ export const ChatInput = memo(() => {
     try { return localStorage.getItem(COMPACT_KEY) === 'true'; } catch { return false; }
   });
   const [showPreview, setShowPreview] = useState(false);
+  // Slash command palette state
+  const [slashOpen, setSlashOpen] = useState(false);
+  const [slashFilter, setSlashFilter] = useState('');
+  const [slashSelected, setSlashSelected] = useState(0);
+  const slashRef = useRef<HTMLDivElement>(null);
   const { sendMessage, isStreaming, cancelStream, createNewChat, clearMessages, editLastMessage, lastSentMessage, error, retryLastMessage } = useChat();
   const { settings } = useSettings();
   const isDark = settings.theme === 'dark';
@@ -214,6 +290,63 @@ export const ChatInput = memo(() => {
 
   const wordCount = input.trim() ? input.trim().split(/\s+/).length : 0;
   const charCount = input.length;
+
+  // Build slash commands with stable identity (avoids stale closures)
+  const slashCommands = makeSlashCommands({ createNewChat, clearMessages, setShowShortcuts: (v: boolean) => window.dispatchEvent(new CustomEvent('chat:show-shortcuts', { detail: v })) });
+
+  // Filtered commands based on slashFilter
+  const filteredCommands = slashCommands.filter(cmd =>
+    cmd.label.toLowerCase().includes(slashFilter.toLowerCase()) ||
+    cmd.trigger.toLowerCase().includes(slashFilter.toLowerCase())
+  );
+
+  // Open / close slash menu when input changes
+  useEffect(() => {
+    if (input === '/') {
+      setSlashOpen(true);
+      setSlashFilter('');
+      setSlashSelected(0);
+    } else if (input.startsWith('/')) {
+      setSlashFilter(input.slice(1));
+      setSlashOpen(true);
+      setSlashSelected(0);
+    } else {
+      setSlashOpen(false);
+      setSlashFilter('');
+    }
+  }, [input]);
+
+  // Keyboard navigation for slash menu
+  useEffect(() => {
+    if (!slashOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSlashSelected(i => Math.min(i + 1, filteredCommands.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSlashSelected(i => Math.max(i - 1, 0));
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (filteredCommands[slashSelected]) {
+          executeSlashCommand(filteredCommands[slashSelected]);
+        }
+      } else if (e.key === 'Escape') {
+        setSlashOpen(false);
+        setSlashFilter('');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [slashOpen, slashSelected, filteredCommands]);
+
+  const executeSlashCommand = (cmd: SlashCommand) => {
+    setSlashOpen(false);
+    setSlashFilter('');
+    setInput('');
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+    cmd.action();
+  };
 
   return (
     <div className={`shrink-0 px-3 md:px-6 lg:px-12 ${isCompact ? 'py-1 md:py-1.5 lg:py-2' : 'py-2 md:py-3 lg:py-4'} ${isDark ? '' : 'bg-white/50'}`}>
@@ -503,6 +636,77 @@ export const ChatInput = memo(() => {
               {charCount > 0 && ' · '}
               {wordCount > 0 && `${wordCount}w`}
             </span>
+          )}
+
+          {/* Slash command palette — shown when user types / at the start */}
+          {slashOpen && (
+            <div
+              ref={slashRef}
+              className={`absolute bottom-full left-0 right-0 mb-2 z-50 rounded-xl border overflow-hidden shadow-2xl ${
+                isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
+              }`}
+              role="listbox"
+              aria-label="Slash commands"
+            >
+              <div className={`px-3 py-2 border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
+                <span className={`text-[10px] font-medium uppercase tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                  Commands
+                </span>
+              </div>
+              {filteredCommands.length === 0 ? (
+                <div className={`px-4 py-6 text-center text-sm ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                  No commands found
+                </div>
+              ) : (
+                <div className="max-h-56 overflow-y-auto py-1">
+                  {filteredCommands.map((cmd, i) => (
+                    <button
+                      key={cmd.id}
+                      role="option"
+                      aria-selected={i === slashSelected}
+                      onClick={() => executeSlashCommand(cmd)}
+                      onMouseEnter={() => setSlashSelected(i)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+                        i === slashSelected
+                          ? isDark ? 'bg-indigo-600/20 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
+                          : isDark ? 'hover:bg-white/5 text-gray-300' : 'hover:bg-gray-50 text-gray-700'
+                      }`}
+                    >
+                      <span className={`shrink-0 ${i === slashSelected ? 'text-indigo-400' : isDark ? 'text-gray-500' : 'text-gray-400'}`}
+                        aria-hidden="true">
+                        {cmd.icon}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-sm font-medium ${i === slashSelected ? 'text-indigo-300' : isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                          {cmd.label}
+                        </div>
+                        <div className={`text-xs truncate ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                          {cmd.description}
+                        </div>
+                      </div>
+                      <kbd className={`shrink-0 px-1.5 py-0.5 text-[10px] font-mono rounded border ${
+                        i === slashSelected
+                          ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/30'
+                          : isDark ? 'bg-gray-800 text-gray-500 border-gray-700' : 'bg-gray-100 text-gray-400 border-gray-200'
+                      }`}>
+                        {cmd.trigger}
+                      </kbd>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className={`px-3 py-1.5 border-t flex items-center gap-3 ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
+                <span className={`text-[10px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>
+                  <kbd className="font-mono">↑↓</kbd> navigate
+                </span>
+                <span className={`text-[10px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>
+                  <kbd className="font-mono">↵</kbd> select
+                </span>
+                <span className={`text-[10px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>
+                  <kbd className="font-mono">esc</kbd> dismiss
+                </span>
+              </div>
+            </div>
           )}
         </form>
 

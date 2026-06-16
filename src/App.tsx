@@ -12,6 +12,13 @@ const AppInner = memo(function AppInner() {
   const { isStreaming, cancelStream, createNewChat } = useChat();
   const [showShortcuts, setShowShortcuts] = useState(false);
 
+  // Listen for chat:show-shortcuts event dispatched by ChatInput slash commands
+  useEffect(() => {
+    const handler = (e: Event) => setShowShortcuts((e as CustomEvent<boolean>).detail ?? true);
+    window.addEventListener('chat:show-shortcuts', handler);
+    return () => window.removeEventListener('chat:show-shortcuts', handler);
+  }, []);
+
   // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
