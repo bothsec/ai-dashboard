@@ -32,6 +32,124 @@ export const Sidebar = memo(() => {
   const [renameValue, setRenameValue] = useState('');
 
   const isDark = settings.theme === 'dark';
+  const chatTheme = settings.chatTheme;
+
+  // Per-theme accent color strings
+  const themeAccent = chatTheme === 'midnight' ? 'blue' :
+    chatTheme === 'ocean' ? 'cyan' :
+    chatTheme === 'forest' ? 'emerald' :
+    chatTheme === 'sunset' ? 'orange' :
+    chatTheme === 'minimal' ? 'neutral' :
+    'indigo';
+
+  // Sidebar background — matches chat area theme
+  const sidebarBgClass = (() => {
+    const t = chatTheme;
+    if (t === 'midnight') return isDark
+      ? 'bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950'
+      : 'bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50';
+    if (t === 'ocean') return isDark
+      ? 'bg-gradient-to-br from-slate-950 via-cyan-950 to-teal-950'
+      : 'bg-gradient-to-br from-slate-50 via-cyan-50 to-teal-50';
+    if (t === 'forest') return isDark
+      ? 'bg-gradient-to-br from-slate-950 via-green-950 to-emerald-950'
+      : 'bg-gradient-to-br from-slate-50 via-green-50 to-emerald-50';
+    if (t === 'sunset') return isDark
+      ? 'bg-gradient-to-br from-slate-950 via-rose-950 to-orange-950'
+      : 'bg-gradient-to-br from-slate-50 via-rose-50 to-orange-50';
+    if (t === 'minimal') return isDark
+      ? 'bg-neutral-950'
+      : 'bg-neutral-100';
+    return isDark
+      ? 'bg-gradient-to-br from-gray-950 via-slate-900 to-indigo-950'
+      : 'bg-gradient-to-br from-slate-50 via-gray-50 to-indigo-50';
+  })();
+
+  const sidebarBorderClass = isDark
+    ? chatTheme === 'midnight' ? 'border-blue-900/50' :
+      chatTheme === 'ocean' ? 'border-cyan-900/50' :
+      chatTheme === 'forest' ? 'border-green-900/50' :
+      chatTheme === 'sunset' ? 'border-orange-900/50' :
+      chatTheme === 'minimal' ? 'border-neutral-800/50' :
+      'border-gray-800/50'
+    : chatTheme === 'midnight' ? 'border-blue-200' :
+      chatTheme === 'ocean' ? 'border-cyan-200' :
+      chatTheme === 'forest' ? 'border-green-200' :
+      chatTheme === 'sunset' ? 'border-orange-200' :
+      chatTheme === 'minimal' ? 'border-neutral-300' :
+      'border-gray-200';
+
+  const sidebarHeaderBorder = isDark
+    ? chatTheme === 'midnight' ? 'border-blue-900/50' :
+      chatTheme === 'ocean' ? 'border-cyan-900/50' :
+      chatTheme === 'forest' ? 'border-green-900/50' :
+      chatTheme === 'sunset' ? 'border-orange-900/50' :
+      chatTheme === 'minimal' ? 'border-neutral-800/50' :
+      'border-gray-800/50'
+    : chatTheme === 'midnight' ? 'border-blue-200' :
+      chatTheme === 'ocean' ? 'border-cyan-200' :
+      chatTheme === 'forest' ? 'border-green-200' :
+      chatTheme === 'sunset' ? 'border-orange-200' :
+      chatTheme === 'minimal' ? 'border-neutral-300' :
+      'border-gray-200';
+
+  // Active chat item colors per theme
+  const activeChatClass = isDark
+    ? chatTheme === 'midnight' ? 'bg-blue-500/10 border-blue-500/30 text-blue-300' :
+      chatTheme === 'ocean' ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300' :
+      chatTheme === 'forest' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' :
+      chatTheme === 'sunset' ? 'bg-orange-500/10 border-orange-500/30 text-orange-300' :
+      chatTheme === 'minimal' ? 'bg-neutral-500/10 border-neutral-500/30 text-neutral-300' :
+      'bg-indigo-500/10 border-indigo-500/30 text-indigo-300'
+    : chatTheme === 'midnight' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+      chatTheme === 'ocean' ? 'bg-cyan-50 border-cyan-200 text-cyan-700' :
+      chatTheme === 'forest' ? 'bg-green-50 border-green-200 text-green-700' :
+      chatTheme === 'sunset' ? 'bg-orange-50 border-orange-200 text-orange-700' :
+      chatTheme === 'minimal' ? 'bg-neutral-100 border-neutral-300 text-neutral-700' :
+      'bg-indigo-50 border-indigo-200 text-indigo-700';
+
+  const activeIconClass = isDark
+    ? chatTheme === 'midnight' ? 'text-blue-400' :
+      chatTheme === 'ocean' ? 'text-cyan-400' :
+      chatTheme === 'forest' ? 'text-emerald-400' :
+      chatTheme === 'sunset' ? 'text-orange-400' :
+      chatTheme === 'minimal' ? 'text-neutral-400' :
+      'text-indigo-500'
+    : chatTheme === 'midnight' ? 'text-blue-600' :
+      chatTheme === 'ocean' ? 'text-cyan-600' :
+      chatTheme === 'forest' ? 'text-green-600' :
+      chatTheme === 'sunset' ? 'text-orange-600' :
+      chatTheme === 'minimal' ? 'text-neutral-600' :
+      'text-indigo-600';
+
+  // Footer icon button style per theme
+  const footerBtnClass = isDark
+    ? chatTheme === 'midnight' ? 'from-blue-900/60 to-indigo-900/60 border-blue-800/40 hover:border-blue-500/50' :
+      chatTheme === 'ocean' ? 'from-cyan-900/60 to-teal-900/60 border-cyan-800/40 hover:border-cyan-500/50' :
+      chatTheme === 'forest' ? 'from-green-900/60 to-emerald-900/60 border-green-800/40 hover:border-green-500/50' :
+      chatTheme === 'sunset' ? 'from-orange-900/60 to-rose-900/60 border-orange-800/40 hover:border-orange-500/50' :
+      chatTheme === 'minimal' ? 'from-neutral-800/60 to-neutral-900/60 border-neutral-700/40 hover:border-neutral-500/50' :
+      'from-indigo-900/60 to-purple-900/60 border-indigo-800/40 hover:border-indigo-500/50'
+    : chatTheme === 'midnight' ? 'bg-blue-50 border-blue-200 hover:border-blue-400' :
+      chatTheme === 'ocean' ? 'bg-cyan-50 border-cyan-200 hover:border-cyan-400' :
+      chatTheme === 'forest' ? 'bg-green-50 border-green-200 hover:border-green-400' :
+      chatTheme === 'sunset' ? 'bg-orange-50 border-orange-200 hover:border-orange-400' :
+      chatTheme === 'minimal' ? 'bg-neutral-100 border-neutral-300 hover:border-neutral-400' :
+      'bg-indigo-50 border-indigo-200 hover:border-indigo-400';
+
+  const footerIconClass = isDark
+    ? chatTheme === 'midnight' ? 'text-blue-400' :
+      chatTheme === 'ocean' ? 'text-cyan-400' :
+      chatTheme === 'forest' ? 'text-emerald-400' :
+      chatTheme === 'sunset' ? 'text-orange-400' :
+      chatTheme === 'minimal' ? 'text-neutral-400' :
+      'text-indigo-400'
+    : chatTheme === 'midnight' ? 'text-blue-600' :
+      chatTheme === 'ocean' ? 'text-cyan-600' :
+      chatTheme === 'forest' ? 'text-green-600' :
+      chatTheme === 'sunset' ? 'text-orange-600' :
+      chatTheme === 'minimal' ? 'text-neutral-600' :
+      'text-indigo-600';
 
   // Filter chats by search query (matches title or message content), pinned first
   const filteredChats = searchQuery.trim()
@@ -149,11 +267,11 @@ export const Sidebar = memo(() => {
         id="sidebar"
         className={`fixed md:relative inset-y-0 left-0 z-40 w-[85vw] sm:w-80 h-screen flex flex-col backdrop-blur-xl transition-all duration-300 ease-out md:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
-        } ${isDark ? 'bg-gray-900/98 border-gray-800/50' : 'bg-white/95 border-gray-200'}`}
+        } ${sidebarBgClass} border-r ${sidebarBorderClass}`}
         aria-label="Chat sidebar"
       >
         {/* Header */}
-        <div className={`p-4 sm:p-5 pt-[calc(1rem+env(safe-area-inset-top,0px))] pl-[calc(1rem+env(safe-area-inset-left,0px))] border-b ${isDark ? 'border-gray-800/50' : 'border-gray-200'}`}>
+        <div className={`p-4 sm:p-5 pt-[calc(1rem+env(safe-area-inset-top,0px))] pl-[calc(1rem+env(safe-area-inset-left,0px))] border-b ${sidebarHeaderBorder}`}>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20" aria-hidden="true">
               <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
@@ -169,7 +287,7 @@ export const Sidebar = memo(() => {
         <div className="p-3 sm:p-4 pl-[calc(0.75rem+env(safe-area-inset-left,0px))]">
           <button
             onClick={handleNewChat}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 sm:py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-xl transition-all duration-200 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 font-medium text-sm sm:text-base active:scale-[0.98] touch-target"
+            className={`w-full flex items-center justify-center gap-2 px-4 py-3 sm:py-3 bg-gradient-to-r from-${themeAccent}-600 to-${themeAccent}-700 hover:from-${themeAccent}-500 hover:to-${themeAccent}-600 text-white rounded-xl transition-all duration-200 shadow-lg shadow-${themeAccent}-500/20 hover:shadow-${themeAccent}-500/30 font-medium text-sm sm:text-base active:scale-[0.98] touch-target`}
             aria-label="Create new chat (Ctrl+N)"
           >
             <Plus className="w-4 h-4" aria-hidden="true" />
@@ -182,22 +300,22 @@ export const Sidebar = memo(() => {
           <div className="px-2 mb-3">
             <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors ${
               isDark
-                ? 'bg-gray-800/50 border-gray-700/50 focus-within:border-indigo-500/50'
-                : 'bg-gray-100 border-gray-200 focus-within:border-indigo-400'
+                ? `bg-${themeAccent}-900/20 border-${themeAccent}-800/40 focus-within:border-${themeAccent}-500/50`
+                : `bg-${themeAccent}-50 border-${themeAccent}-200 focus-within:border-${themeAccent}-400`
             }`}>
-              <Search className={`w-3.5 h-3.5 shrink-0 ${isDark ? 'text-gray-500' : 'text-gray-400'}`} aria-hidden="true" />
+              <Search className={`w-3.5 h-3.5 shrink-0 ${isDark ? `text-${themeAccent}-500/70` : `text-${themeAccent}-400`}`} aria-hidden="true" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search chats…"
-                className={`flex-1 bg-transparent text-xs outline-none placeholder:text-gray-500 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}
+                className={`flex-1 bg-transparent text-xs outline-none placeholder:text-${isDark ? themeAccent + '-400/50' : themeAccent + '-400/70'} ${isDark ? 'text-' + themeAccent + '-300' : 'text-' + themeAccent + '-700'}`}
                 aria-label="Search chat history"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className={`p-0.5 rounded ${isDark ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}
+                  className={`p-0.5 rounded ${isDark ? `text-${themeAccent}-500/70 hover:text-${themeAccent}-400` : `text-${themeAccent}-400 hover:text-${themeAccent}-600`}`}
                   aria-label="Clear search"
                 >
                   <XIcon className="w-3 h-3" />
@@ -220,14 +338,12 @@ export const Sidebar = memo(() => {
             filteredChats.map((chat) => (
               <div
                 key={chat.id}
-                className={`group flex items-center gap-3 px-3 py-2.5 sm:py-2.5 rounded-xl cursor-pointer transition-all duration-200 border touch-target ${
+                className={`group flex items-center gap-3 px-3 py-2.5 sm:py-2.5 rounded-xl cursor-pointer border touch-target ${
                   activeChatId === chat.id
-                    ? isDark
-                      ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300'
-                      : 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                    ? activeChatClass
                     : isDark
-                      ? 'border-transparent hover:bg-gray-800/50 text-gray-400 hover:text-gray-200'
-                      : 'border-transparent hover:bg-gray-100 text-gray-600 hover:text-gray-900'
+                      ? `border-transparent text-${themeAccent}-400/80`
+                      : `border-transparent text-${themeAccent}-600`
                 }`}
                 onClick={() => handleSwitchChat(chat.id)}
                 role="button"
@@ -242,7 +358,7 @@ export const Sidebar = memo(() => {
                 }}
               >
                 <MessageSquare
-                  className={`w-4 h-4 shrink-0 ${activeChatId === chat.id ? 'text-indigo-500' : isDark ? 'text-gray-600 group-hover:text-gray-400' : 'text-gray-400 group-hover:text-gray-600'}`}
+                  className={`w-4 h-4 shrink-0 ${activeChatId === chat.id ? activeIconClass : isDark ? `text-${themeAccent}-600` : `text-${themeAccent}-400`}`}
                   aria-hidden="true"
                 />
                 <div className="flex-1 min-w-0">
@@ -308,32 +424,32 @@ export const Sidebar = memo(() => {
         </div>
 
           {/* Footer */}
-        <div className={`p-3 sm:p-4 pl-[calc(0.75rem+env(safe-area-inset-left,0px))] border-t ${isDark ? 'border-gray-800/50' : 'border-gray-200'}`}>
+        <div className={`p-3 sm:p-4 pl-[calc(0.75rem+env(safe-area-inset-left,0px))] border-t ${sidebarHeaderBorder}`}>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-              <div className={`w-9 h-9 rounded-lg flex items-center justify-center border ${isDark ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700/50' : 'bg-gray-100 border-gray-200'}`} aria-hidden="true">
-                <Cpu className={`w-4 h-4 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center border bg-gradient-to-br ${footerBtnClass}`} aria-hidden="true">
+                <Cpu className={`w-4 h-4 ${footerIconClass}`} />
               </div>
             <button
                 onClick={() => setShowThemesModal(true)}
-                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors ${isDark ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700/50 hover:border-indigo-500/50' : 'bg-gray-100 border-gray-200 hover:border-indigo-400'}`}
+                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
                 title="Chat Themes"
               >
-                <Palette className={`w-4 h-4 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
+                <Palette className={`w-4 h-4 ${footerIconClass}`} />
               </button>
             <button
                 onClick={() => setShowSearchModal(true)}
-                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors ${isDark ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700/50 hover:border-indigo-500/50' : 'bg-gray-100 border-gray-200 hover:border-indigo-400'}`}
+                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
                 title="Search (Ctrl+K)"
               >
-                <Command className={`w-4 h-4 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
+                <Command className={`w-4 h-4 ${footerIconClass}`} />
               </button>
             <button
                 onClick={() => setShowStatsModal(true)}
-                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors ${isDark ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700/50 hover:border-indigo-500/50' : 'bg-gray-100 border-gray-200 hover:border-indigo-400'}`}
+                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
                 title="Chat Statistics"
               >
-                <BarChart2 className={`w-4 h-4 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
+                <BarChart2 className={`w-4 h-4 ${footerIconClass}`} />
               </button>
           </div>
         </div>

@@ -42,6 +42,110 @@ function looksTruncated(content: string): boolean {
   return false;
 }
 
+// Collapsible code block — auto-collapses long blocks, shows "Show more" toggle
+// langClass and codeText are extracted in the pre renderer and passed as props so
+// PreCodeBlock can render children (the highlighted code) directly without re-parsing.
+function PreCodeBlock({
+  children,
+  isDark,
+  langClass,
+  codeText,
+}: {
+  children: React.ReactNode;
+  isDark: boolean;
+  langClass: string;
+  codeText: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const AUTO_COLLAPSE_LINES = 20;
+  const PREVIEW_LINES = 10;
+  const langMatch = langClass.match(/language-(\w+)/);
+  const lang = langMatch ? langMatch[1] : '';
+  const lineCount = codeText.split('\n').length;
+  const shouldAutoCollapse = lineCount > AUTO_COLLAPSE_LINES;
+
+  const [userCollapsed, setUserCollapsed] = useState(shouldAutoCollapse);
+  const isReallyCollapsed = userCollapsed && shouldAutoCollapse;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(codeText).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const toggleCollapse = () => setUserCollapsed(prev => !prev);
+
+  return (
+    <pre
+      className={`relative rounded-xl mb-4 text-sm border leading-relaxed group/pre ${
+        isDark ? 'bg-gray-900/90 border-gray-700/40' : 'bg-gray-100 border-gray-200'
+      } ${isReallyCollapsed ? '' : 'overflow-x-auto'}`}
+    >
+      {/* Header bar with lang badge + action buttons */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-inherit/10">
+        {lang ? (
+          <span className={`text-[10px] font-mono font-semibold uppercase tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+            {lang}
+          </span>
+        ) : <span />}
+        <div className="flex items-center gap-1 ml-auto">
+          {shouldAutoCollapse && (
+            <button
+              onClick={toggleCollapse}
+              className={`p-1 rounded-lg opacity-0 group-hover/pre:opacity-100 transition-opacity ${
+                isDark ? 'bg-gray-700/80 hover:bg-gray-600/90 text-gray-400 hover:text-gray-200' : 'bg-gray-200/90 hover:bg-gray-300/90 text-gray-500 hover:text-gray-700'
+              }`}
+              aria-label={isReallyCollapsed ? 'Expand code block' : 'Collapse code block'}
+              title={isReallyCollapsed ? `Show all ${lineCount} lines` : `Collapse to ${PREVIEW_LINES} lines`}
+            >
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isReallyCollapsed ? '' : 'rotate-180'}`} />
+            </button>
+          )}
+          <button
+            onClick={handleCopy}
+            className={`p-1.5 rounded-lg opacity-0 group-hover/pre:opacity-100 transition-opacity ${
+              isDark ? 'bg-gray-700/80 hover:bg-gray-600/90 text-gray-400 hover:text-gray-200' : 'bg-gray-200/90 hover:bg-gray-300/90 text-gray-500 hover:text-gray-700'
+            }`}
+            aria-label="Copy code"
+            title="Copy code"
+          >
+            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Code content — collapse via max-height */}
+      <div
+        className="relative"
+        style={isReallyCollapsed ? { maxHeight: '10.5rem', overflowY: 'hidden' } : undefined}
+      >
+        {children}
+      </div>
+
+      {/* "Show more" overlay when collapsed */}
+      {isReallyCollapsed && (
+        <div
+          className={`absolute bottom-0 left-0 right-0 h-16 flex items-end justify-center pb-2 pointer-events-none ${
+            isDark ? 'bg-gradient-to-t from-gray-900/95 to-transparent' : 'bg-gradient-to-t from-gray-100/95 to-transparent'
+          }`}
+        >
+          <button
+            onClick={toggleCollapse}
+            className={`pointer-events-auto text-xs px-3 py-1 rounded-full border transition-colors ${
+              isDark
+                ? 'bg-gray-800/90 border-gray-600/50 text-gray-300 hover:bg-gray-700/90'
+                : 'bg-white/90 border-gray-300 text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            Show {lineCount - PREVIEW_LINES} more lines
+          </button>
+        </div>
+      )}
+    </pre>
+  );
+}
+
 interface MessageItemProps {
   msg: Message;
   isStreaming: boolean;
@@ -358,40 +462,8 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                     pre: ({ children }) => {
                       const codeEl = children as React.ReactElement<{ className?: string; children?: string }>;
                       const langClass = codeEl?.props?.className ?? '';
-                      const langMatch = langClass.match(/language-(\w+)/);
-                      const lang = langMatch ? langMatch[1] : '';
-                      const codeText = codeEl?.props?.children ?? '';
-                      return (
-                        <pre className={`relative rounded-xl p-4 mb-4 overflow-x-auto text-sm border leading-relaxed group/pre ${isDark ? 'bg-gray-900/90 border-gray-700/40' : 'bg-gray-100 border-gray-200'}`}>
-                          {lang && (
-                            <span className={`absolute top-2 left-3 text-[10px] font-mono font-semibold uppercase tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                              {lang}
-                            </span>
-                          )}
-                          {children}
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(typeof codeText === 'string' ? codeText : String(codeText)).then(() => {
-                                const btn = window.event?.target as HTMLElement;
-                                const pre = btn?.closest('pre');
-                                if (pre) pre.setAttribute('data-copied', 'true');
-                                setTimeout(() => {
-                                  const btn2 = window.event?.target as HTMLElement;
-                                  const pre2 = btn2?.closest('pre');
-                                  if (pre2) pre2.removeAttribute('data-copied');
-                                }, 2000);
-                              });
-                            }}
-                            className={`absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover/pre:opacity-100 transition-opacity ${isDark ? 'bg-gray-700/80 hover:bg-gray-600/90 text-gray-400 hover:text-gray-200' : 'bg-gray-200/90 hover:bg-gray-300/90 text-gray-500 hover:text-gray-700'}`}
-                            aria-label="Copy code"
-                            title="Copy code"
-                          >
-                            {((window.event?.target as HTMLElement)?.closest('pre')?.getAttribute('data-copied') === 'true')
-                              ? <Check className="w-3.5 h-3.5" />
-                              : <Copy className="w-3.5 h-3.5" />}
-                          </button>
-                        </pre>
-                      );
+                      const codeText = String(codeEl?.props?.children ?? '');
+                      return <PreCodeBlock isDark={isDark} langClass={langClass} codeText={codeText}>{children}</PreCodeBlock>;
                     },
                     blockquote: ({ children }) => (
                       <blockquote className={`border-l-4 border-indigo-500/50 pl-4 py-1 italic mb-4 rounded-r-lg ${

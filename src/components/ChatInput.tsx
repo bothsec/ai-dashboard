@@ -1,12 +1,11 @@
 import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
-import { Send, Loader2, Link, Sparkles, Bookmark, Edit2, RefreshCw, MessageSquare, X, Minimize2, Maximize2, Eye, EyeOff } from 'lucide-react';
+import { Send, Loader2, Link, Sparkles, Edit2, RefreshCw, MessageSquare, X, Minimize2, Maximize2, Eye, EyeOff } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import PromptEngineer from './PromptEngineer';
-import { PromptLibrary } from './PromptLibrary';
 import { StreamingHUD } from './StreamingHUD';
 
 // Regex to detect a standalone URL in input
@@ -43,7 +42,6 @@ export const ChatInput = memo(() => {
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [showPromptEngineer, setShowPromptEngineer] = useState(false);
-  const [showPromptLibrary, setShowPromptLibrary] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [quotedMessage, setQuotedMessage] = useState<QuotedMessage | null>(null);
   const [isCompact, setIsCompact] = useState(() => {
@@ -233,20 +231,6 @@ export const ChatInput = memo(() => {
           </div>
         )}
 
-        {/* Prompt Library panel */}
-        {showPromptLibrary && (
-          <div className="mb-3">
-            <PromptLibrary
-              onUse={(prompt) => {
-                setInput(prompt);
-                setShowPromptLibrary(false);
-                setTimeout(() => textareaRef.current?.focus(), 50);
-              }}
-              onClose={() => setShowPromptLibrary(false)}
-            />
-          </div>
-        )}
-
         {/* Quoted message preview — shown when user clicked Quote on a message */}
         {quotedMessage && (
           <div className="mb-2 flex items-start gap-2 px-3 py-2 rounded-xl border border-indigo-500/30 bg-indigo-500/10">
@@ -288,40 +272,13 @@ export const ChatInput = memo(() => {
           {/* Prompt Engineer button */}
           <button
             type="button"
-            onClick={() => { setShowPromptEngineer(prev => !prev); setShowPromptLibrary(false); }}
+            onClick={() => setShowPromptEngineer(prev => !prev)}
             className={`transition-colors duration-200 p-1 rounded-full flex items-center justify-center shrink-0 ${isDark ? 'text-violet-400 hover:text-violet-300 hover:bg-gray-700/50' : 'text-violet-600 hover:text-violet-700 hover:bg-gray-100'} ${showPromptEngineer ? (isDark ? 'bg-gray-700/60 text-violet-300' : 'bg-violet-100 text-violet-700') : ''}`}
             aria-label="Prompt Engineer"
             title="Prompt Engineer — craft better prompts"
           >
             <Sparkles className="w-4 h-4 md:w-5 md:h-5" />
           </button>
-
-          {/* Prompt Library button */}
-          <button
-            type="button"
-            onClick={() => { setShowPromptLibrary(prev => !prev); setShowPromptEngineer(false); }}
-            className={`transition-colors duration-200 p-1 rounded-full flex items-center justify-center shrink-0 ${isDark ? 'text-amber-400 hover:text-amber-300 hover:bg-gray-700/50' : 'text-amber-600 hover:text-amber-700 hover:bg-gray-100'} ${showPromptLibrary ? (isDark ? 'bg-gray-700/60 text-amber-300' : 'bg-amber-100 text-amber-700') : ''}`}
-            aria-label="Prompt Library"
-            title="Prompt Library — saved prompts"
-          >
-            <Bookmark className="w-4 h-4 md:w-5 md:h-5" />
-          </button>
-
-          {/* Save current input to library */}
-          {input.trim().length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                const w = window as unknown as { __savePrompt?: (text: string) => void };
-                w.__savePrompt?.(input);
-              }}
-              className={`transition-colors duration-200 p-1 rounded-full flex items-center justify-center shrink-0 ${isDark ? 'text-gray-500 hover:text-amber-400 hover:bg-gray-700/50' : 'text-gray-400 hover:text-amber-600 hover:bg-gray-100'}`}
-              aria-label="Save to Prompt Library"
-              title="Save current input to Prompt Library"
-            >
-              <Bookmark className="w-3.5 h-3.5 md:w-4 md:h-4 fill-current" />
-            </button>
-          )}
 
           {/* Textarea / Markdown preview */}
           <div className="flex-1 min-w-0 flex items-center">
