@@ -1,4 +1,4 @@
-import { useState, useCallback, memo, useEffect } from 'react';
+import { useState, useCallback, memo, useEffect, createContext, useContext } from 'react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuthGate } from './components/AuthGate';
 import { SettingsProvider } from './context/SettingsContext';
@@ -8,17 +8,36 @@ import { ChatWindow } from './components/ChatWindow';
 import { ChatInput } from './components/ChatInput';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { MiniMode } from './components/MiniMode';
+import AdminDashboard from './components/AdminDashboard';
 
-const AppInner = memo(function AppInner() {
+interface AuthCtx { isAdmin: boolean; }
+const AuthContext = createContext<AuthCtx>({ isAdmin: false });
+export const useAuth = () => useContext(AuthContext);
+
+const AppInner = memo(function AppInner({ isAdmin }: { isAdmin: boolean }) {
   const { isStreaming, cancelStream, createNewChat } = useChat();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [miniMode, setMiniMode] = useState(() => {
     try { return localStorage.getItem('mini_mode_active') === 'true'; } catch { return false; }
   });
+  const [isAdminView, setIsAdminView] = useState(() => window.location.pathname === '/admin');
 
   useEffect(() => {
     try { localStorage.setItem('mini_mode_active', String(miniMode)); } catch { /* ignore */ }
   }, [miniMode]);
+
+  // Handle browser back/forward
+  useEffect(() => {
+    const onPop = () => setIsAdminView(window.location.pathname === '/admin');
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  // Admin route guard
+  if (isAdminView) {
+    if (!isAdmin) return <div className="h-full flex items-center justify-center text-gray-400">Access denied — admin only</div>;
+    return <AdminDashboard />;
+  }
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -111,21 +130,32 @@ const AppInner = memo(function AppInner() {
 
 const App = memo(function App() {
   const [errorBoundaryKey, setErrorBoundaryKey] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
   const handleReset = useCallback(() => setErrorBoundaryKey(k => k + 1), []);
 
+  // Fetch isAdmin on mount
+  useEffect(() => {
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.isAdmin) setIsAdmin(true); })
+      .catch(() => {});
+  }, []);
+
   return (
-    <AuthGate>
-      <ErrorBoundary
-        key={errorBoundaryKey}
-        onReset={handleReset}
-      >
-        <SettingsProvider>
-          <ChatProvider>
-            <AppInner />
-          </ChatProvider>
-        </SettingsProvider>
-      </ErrorBoundary>
-    </AuthGate>
+    <AuthContext.Provider value={{ isAdmin }}>
+      <AuthGate>
+        <ErrorBoundary
+          key={errorBoundaryKey}
+          onReset={handleReset}
+        >
+          <SettingsProvider>
+            <ChatProvider>
+              <AppInner isAdmin={isAdmin} />
+            </ChatProvider>
+          </SettingsProvider>
+        </ErrorBoundary>
+      </AuthGate>
+    </AuthContext.Provider>
   );
 });
 

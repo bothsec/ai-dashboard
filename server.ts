@@ -10,7 +10,26 @@ dotenv.config({ override: true });
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// NVIDIA API keys rotation
+// Initialize database (users + sessions + feature flags)
+const { initDatabase, registerAdminRoutes, validateSession } = await import('./admin-routes.js');
+await initDatabase();
+
+// Apply database-backed auth routes + admin API (after app is created)
+// Auth middleware (validates DB sessions for /api routes) — defined before app.use('/api', ...)
+async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  // Skip auth for login/logout/status — those are handled by registerAdminRoutes
+  if (req.path === '/auth/login' || req.path === '/auth/logout' || req.path === '/auth/status') {
+    return next();
+  }
+  const cookieHeader = req.headers.cookie as string | undefined;
+  const match = cookieHeader ? cookieHeader.match(/ai_auth=([^;]+)/) : null;
+  const token = match ? match[1] : undefined;
+  if (!token) { res.status(401).json({ error: { message: 'Unauthorized', type: 'auth_required' } }); return; }
+  const user = await validateSession(token);
+  if (!user) { res.status(401).json({ error: { message: 'Session expired' } }); return; }
+  (req as express.Request & { user: { userId: number; username: string; isAdmin: boolean } }).user = user;
+  next();
+}
 const nvidiaApiKeys: string[] = [];
 if (process.env.NVIDIA_API_KEY) nvidiaApiKeys.push(process.env.NVIDIA_API_KEY);
 if (process.env.NVIDIA_API_KEY_1) nvidiaApiKeys.push(process.env.NVIDIA_API_KEY_1);
@@ -33,6 +52,7 @@ const KEY_RATE_LIMIT_WINDOW = 60000; // 1 minute window
 const KEY_RATE_LIMIT_MAX = 10; // NVIDIA limit per key per minute
 
 const app = express();
+registerAdminRoutes(app);
 
 // Security headers — CSP set explicitly via HTTP header (not meta tag) to support nonce
 app.use(helmet({
@@ -52,83 +72,6 @@ app.use(helmet({
   xContentTypeOptions: true,
   referrerPolicy: { policy: 'same-origin' }, // strictest — no referrer leaks
 }));
-
-// --- Auth: bearer token validation ---
-const AUTH_SECRET = process.env.AUTH_SECRET_TOKEN;
-const AUTH_COOKIE_NAME = 'ai_auth';
-const AUTH_COOKIE_MAXAGE = 86400; // 24 hours in seconds
-
-// Auth middleware — validates bearer token OR HttpOnly cookie
-function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-  // Skip if no AUTH_SECRET is configured (auth disabled)
-  if (!AUTH_SECRET) return next();
-
-  const bearerToken =
-    req.headers.authorization?.startsWith('Bearer ')
-      ? req.headers.authorization.slice(7)
-      : undefined;
-  const cookieToken: string | undefined = (() => {
-    const cookieHeader = req.headers.cookie as string | undefined;
-    if (!cookieHeader) return undefined;
-    const match = cookieHeader.match(new RegExp(`${AUTH_COOKIE_NAME}=([^;]+)`));
-    return match ? match[1] : undefined;
-  })();
-
-  const token = bearerToken || cookieToken;
-  if (!token || token !== AUTH_SECRET) {
-    res.status(401).json({ error: { message: 'Unauthorized', type: 'auth_required' } });
-    return;
-  }
-  next();
-}
-
-// --- Auth routes (must be defined BEFORE the auth middleware) ---
-// POST /api/auth/login  { username, password }  →  Set-Cookie + { ok: true }
-app.post('/api/auth/login', express.json(), (req, res) => {
-  if (!AUTH_SECRET) {
-    res.json({ ok: true, authEnabled: false });
-    return;
-  }
-  const { username, password } = req.body ?? {};
-  const expectedUsername = process.env.AUTH_USERNAME || 'admin';
-  if (!username || !password || username !== expectedUsername || password !== AUTH_SECRET) {
-    res.status(401).json({ error: { message: 'Invalid credentials', type: 'auth_failed' } });
-    return;
-  }
-  // Derive the cookie domain from the real client host (x-forwarded-host → host)
-  // Security: X-Forwarded-Host can be an array (type confusion attack) — ensure it's a plain string
-  const forwardedRaw = req.headers['x-forwarded-host'];
-  const forwardedHost = Array.isArray(forwardedRaw) ? forwardedRaw[0] : forwardedRaw;
-  const cookieHost = typeof forwardedHost === 'string' ? forwardedHost.split(',')[0].split(':')[0] : undefined;
-  // Only set Domain if it's a safe, known host — never trust X-Forwarded-Host directly
-  const cookieDomain = (cookieHost && /^(ai\.khmerjob\.tech|khmerjob\.tech|140\.238\.43\.61|localhost)$/.test(cookieHost))
-    ? `; Domain=${cookieHost}`
-    : '';
-  res.setHeader('Set-Cookie',
-    `${AUTH_COOKIE_NAME}=${AUTH_SECRET}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${AUTH_COOKIE_MAXAGE}${cookieDomain}`);
-  res.json({ ok: true, authEnabled: true });
-});
-
-// GET /api/auth/status → { authRequired: boolean } (unauthenticated)
-app.get('/api/auth/status', (_req, res) => {
-  res.json({ authRequired: !!AUTH_SECRET });
-});
-
-// GET /api/auth/me → { authenticated: true } or 401 (cookie-validated)
-app.get('/api/auth/me', (req, res) => {
-  if (!AUTH_SECRET) {
-    res.json({ authenticated: true, authEnabled: false });
-    return;
-  }
-  const cookieHeader = req.headers.cookie as string | undefined;
-  const match = cookieHeader ? cookieHeader.match(new RegExp(`${AUTH_COOKIE_NAME}=([^;]+)`)) : null;
-  const token = match ? match[1] : undefined;
-  if (!token || token !== AUTH_SECRET) {
-    res.status(401).json({ error: { message: 'Not authenticated', type: 'auth_required' } });
-    return;
-  }
-  res.json({ authenticated: true, username: process.env.AUTH_USERNAME || 'admin' });
-});
 
 // Mount auth middleware globally for all remaining /api routes
 app.use('/api', requireAuth);

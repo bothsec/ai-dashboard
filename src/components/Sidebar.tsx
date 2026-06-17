@@ -451,6 +451,13 @@ export const Sidebar = memo(() => {
               >
                 <BarChart2 className={`w-4 h-4 ${footerIconClass}`} />
               </button>
+            <button
+                onClick={() => { window.location.href = '/admin'; }}
+                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
+                title="Admin Panel"
+              >
+                <span className={`w-4 h-4 font-bold text-xs ${footerIconClass}`}>⚙</span>
+              </button>
           </div>
         </div>
       </aside>
