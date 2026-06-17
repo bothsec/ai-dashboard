@@ -912,6 +912,8 @@ export const ChatWindow: React.FC = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const emptyStateRef = useRef<HTMLDivElement>(null);
   const [isPinned, setIsPinned] = useState(true);
+  // Hide header/toolbar when scrolled to bottom (near last message)
+  const [isNearBottom, setIsNearBottom] = useState(true);
   // Show regenerate button briefly after a response completes
   const [showRegenerate, setShowRegenerate] = useState(false);
   const [showBookmarksPanel, setShowBookmarksPanel] = useState(false);
@@ -963,6 +965,8 @@ export const ChatWindow: React.FC = () => {
     } else if (distFromBottom < 20) {
       setIsPinned(true);
     }
+    // Hide toolbar when within 150px of bottom, show when scrolled up
+    setIsNearBottom(distFromBottom < 150);
   }, []);
 
   // Scroll to bottom when new messages arrive (only if pinned)
@@ -1142,13 +1146,13 @@ export const ChatWindow: React.FC = () => {
         aria-live="polite"
         aria-label="Chat messages"
       >
-        {/* Context window usage indicator */}
-        {activeChat && (activeChat.totalTokens ?? 0) > 0 && (
+        {/* Context window usage indicator — hidden when at bottom */}
+        {activeChat && (activeChat.totalTokens ?? 0) > 0 && !isNearBottom && (
           <ContextWindowBar totalTokens={activeChat.totalTokens!} />
         )}
 
-        {/* Export button — only shown when chat has messages */}
-        {activeChat && activeChat.messages.length > 0 && (
+        {/* Export toolbar — hidden when at bottom */}
+        {!isNearBottom && activeChat && activeChat.messages.length > 0 && (
           <div className="max-w-4xl mx-auto flex justify-end gap-2 mb-2">
             <button
               onClick={() => setShowBookmarksPanel(prev => !prev)}
