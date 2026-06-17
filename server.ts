@@ -9,6 +9,7 @@ dotenv.config({ override: true });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const isDev = process.env.NODE_ENV !== 'production';
 
 // NVIDIA API keys rotation
 const nvidiaApiKeys: string[] = [];
