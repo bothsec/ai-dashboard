@@ -1,4 +1,4 @@
-import { useState, useCallback, memo, useEffect, createContext, useContext } from 'react';
+import { useState, useCallback, memo, useEffect } from 'react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuthGate } from './components/AuthGate';
 import { SettingsProvider } from './context/SettingsContext';
@@ -9,10 +9,7 @@ import { ChatInput } from './components/ChatInput';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { MiniMode } from './components/MiniMode';
 import AdminDashboard from './components/AdminDashboard';
-
-interface AuthCtx { isAdmin: boolean; }
-const AuthContext = createContext<AuthCtx>({ isAdmin: false });
-export const useAuth = () => useContext(AuthContext);
+import { AuthContext } from './context/AuthContext';
 
 const AppInner = memo(function AppInner({ isAdmin }: { isAdmin: boolean }) {
   const { isStreaming, cancelStream, createNewChat } = useChat();
@@ -22,34 +19,15 @@ const AppInner = memo(function AppInner({ isAdmin }: { isAdmin: boolean }) {
   });
   const [isAdminView, setIsAdminView] = useState(() => window.location.pathname === '/admin');
 
-  useEffect(() => {
-    try { localStorage.setItem('mini_mode_active', String(miniMode)); } catch { /* ignore */ }
-  }, [miniMode]);
-
-  // Handle browser back/forward
-  useEffect(() => {
-    const onPop = () => setIsAdminView(window.location.pathname === '/admin');
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, []);
-
-  // Admin route guard
-  if (isAdminView) {
-    if (!isAdmin) return <div className="h-full flex items-center justify-center text-gray-400">Access denied — admin only</div>;
-    return <AdminDashboard />;
-  }
-
-  // Global keyboard shortcuts
+  // Global keyboard shortcuts — must stay before any conditional return
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const isMod = e.ctrlKey || e.metaKey;
-      // Ctrl/Cmd+N — new chat
       if (isMod && e.key === 'n') {
         e.preventDefault();
         createNewChat();
         return;
       }
-      // Escape — cancel streaming or close prompt engineer
       if (e.key === 'Escape') {
         if (isStreaming) {
           cancelStream();
@@ -58,7 +36,6 @@ const AppInner = memo(function AppInner({ isAdmin }: { isAdmin: boolean }) {
         }
         return;
       }
-      // ? — show shortcuts modal (only when not typing in an input)
       if (e.key === '?' && !isStreaming) {
         const tag = (e.target as HTMLElement)?.tagName;
         if (tag !== 'TEXTAREA' && tag !== 'INPUT') {
@@ -66,7 +43,6 @@ const AppInner = memo(function AppInner({ isAdmin }: { isAdmin: boolean }) {
         }
         return;
       }
-      // Ctrl/Cmd+M — toggle mini mode
       if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
         e.preventDefault();
         setMiniMode(prev => !prev);
@@ -75,21 +51,37 @@ const AppInner = memo(function AppInner({ isAdmin }: { isAdmin: boolean }) {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isStreaming, cancelStream, createNewChat, setShowShortcuts, setMiniMode]);
+  }, [isStreaming, cancelStream, createNewChat]);
 
-  // When mini mode activates, blur any focused element so keyboard doesn't interfere
+  // Mini mode — blur focused element
   useEffect(() => {
     if (miniMode) {
       (document.activeElement as HTMLElement)?.blur?.();
     }
   }, [miniMode]);
 
-  // Listen for chat:mini-mode event from ChatWindow button
+  // Listen for chat:mini-mode event
   useEffect(() => {
     const handler = () => setMiniMode(prev => !prev);
     window.addEventListener('chat:mini-mode', handler);
     return () => window.removeEventListener('chat:mini-mode', handler);
   }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem('mini_mode_active', String(miniMode)); } catch { /* ignore */ }
+  }, [miniMode]);
+
+  useEffect(() => {
+    const onPop = () => setIsAdminView(window.location.pathname === '/admin');
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  // Admin route guard — after all hooks
+  if (isAdminView) {
+    if (!isAdmin) return <div className="h-full flex items-center justify-center text-gray-400">Access denied — admin only</div>;
+    return <AdminDashboard />;
+  }
 
   if (miniMode) {
     return <MiniMode onExit={() => setMiniMode(false)} />;

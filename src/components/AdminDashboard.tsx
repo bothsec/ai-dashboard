@@ -16,7 +16,8 @@ const CAT_LABELS: Record<string, string> = { input: '✏️ Input', chat: '💬 
 
 // ── API helpers ──────────────────────────────────────────────────────────────
 async function api(path: string, opts?: RequestInit & { noAuth?: boolean }) {
-  const { noAuth: _n, ...fetchOpts } = opts ?? {};
+  const { noAuth: _noAuth, ...fetchOpts } = opts ?? {};
+  void _noAuth;
   const r = await fetch(path, { credentials: 'include', ...fetchOpts });
   if (r.status === 204) return null;
   const j = await r.json().catch(() => ({}));
@@ -62,6 +63,7 @@ function UsersSection() {
     }
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { if (tab === 'list') load(); }, [tab, load]);
 
   async function create(e: React.FormEvent) {
@@ -176,7 +178,7 @@ function FeaturesSection() {
       setUserList(uData.users);
       if (uData.users.length > 0 && !selUser) setSelUser(uData.users[0].id);
     })().finally(() => setLoading(false));
-  }, []);
+  }, [selUser]);
 
   useEffect(() => {
     if (!selUser) return;
