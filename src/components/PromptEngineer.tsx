@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect, memo } from 'react';
+/* eslint-disable react-hooks/set-state-in-effect */
+import { memo, useCallback, useEffect, useState } from 'react';
 import { Sparkles, ArrowRight } from 'lucide-react';
 
 export type TaskType =
@@ -392,9 +393,9 @@ function DynamicFields({ taskType, fields, onChange }: { taskType: TaskType; fie
     case 'summarization':
       return (
         <div className="space-y-2">
-          <Field label="Source Material" placeholder="Paste the article, transcript, or document to summarize…" value={fields.sourceMaterial ?? ''} onChange={v => onChange('sourceMaterial', v)} textarea tall />
-          <Field label="Desired Length" placeholder="e.g. one paragraph, 5 bullet points, 3 sentences…" value={fields.length ?? ''} onChange={v => onChange('length', v)} />
-          <Field label="Focus (optional)" placeholder="e.g. technical details, action items, main argument…" value={fields.focus ?? ''} onChange={v => onChange('focus', v)} />
+          <Field label="Source Material" placeholder="Paste the article, transcript, or document to summarize…" value={fields.sourceMaterial ?? ''} onChange={(v: string) => onChange('sourceMaterial', v)} textarea tall />
+          <Field label="Desired Length" placeholder="e.g. one paragraph, 5 bullet points, 3 sentences…" value={fields.length ?? ''} onChange={(v: string) => onChange('length', v)} />
+          <Field label="Focus (optional)" placeholder="e.g. technical details, action items, main argument…" value={fields.focus ?? ''} onChange={(v: string) => onChange('focus', v)} />
         </div>
       );
 

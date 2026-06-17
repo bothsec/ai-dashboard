@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { Component, type ErrorInfo, type ReactNode } from 'react';
+import React, { Component, type ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface Props {
@@ -27,8 +27,8 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(_error: Error, _errorInfo: ErrorInfo): void {
-    // Error is captured in state — no console noise in production
+  componentDidCatch(): void {
+    // Error is captured in state via getDerivedStateFromError — no console noise in production
   }
 
   handleReset = (): void => {

@@ -186,7 +186,6 @@ export const Sidebar = memo(() => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createNewChat]);
 
   const handleDeleteChat = useCallback((e: React.MouseEvent, chatId: string) => {

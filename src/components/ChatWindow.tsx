@@ -1,3 +1,6 @@
+/* eslint-disable react-refresh/only-export-components */
+/* eslint-disable react-hooks/set-state-in-effect */
+/* eslint-disable react-hooks/preserve-manual-memoization */
 import { useRef, useEffect, memo, useMemo, useCallback, useState } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
@@ -36,9 +39,9 @@ function looksTruncated(content: string): boolean {
   if (!content || content.trim().length < 30) return false;
   const trimmed = content.trim();
   // Ends with no terminal punctuation (., !, ?, —, |) or ellipsis
-  if (!/[.!?\—|]$/.test(trimmed)) return true;
-  // Trailing incomplete indicator
-  if (/[\[\(}\{]$/.test(trimmed)) return true;
+    if (!/[.!?—|]$/.test(trimmed)) return true;
+    // Trailing incomplete indicator
+    if (/[[({]$/.test(trimmed)) return true;
   return false;
 }
 
@@ -565,7 +568,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                 speechSynthesis.cancel();
                 setSpeaking(false);
               } else {
-                const utterance = new SpeechSynthesisUtterance(displayContent.replace(/[#*_`~\[\]]/g, ''));
+                const utterance = new SpeechSynthesisUtterance(displayContent.replace(/[#*_`~[\]]/g, ''));
                 utterance.rate = 1.1;
                 utterance.pitch = 1;
                 utterance.onend = () => setSpeaking(false);
@@ -680,6 +683,14 @@ export const ChatWindow: React.FC = () => {
   const [chatSearchIndex, setChatSearchIndex] = useState(0);
   const chatSearchInputRef = useRef<HTMLInputElement>(null);
 
+  const isDark = settings.theme === 'dark';
+  const chatTheme = settings.chatTheme;
+
+  const activeChat = useMemo(() =>
+    chats.find(c => c.id === activeChatId),
+    [chats, activeChatId]
+  );
+
   // Show regenerate briefly when streaming ends with a successful response
   useEffect(() => {
     if (isStreaming) return;
@@ -688,20 +699,12 @@ export const ChatWindow: React.FC = () => {
       const t = setTimeout(() => setShowRegenerate(false), 8000);
       return () => clearTimeout(t);
     }
-  }, [isStreaming]);
+  }, [isStreaming, lastUserMessage, activeChat?.messages]);
 
   // Hide regenerate when user starts typing a new message
   useEffect(() => {
     if (lastSentMessage) setShowRegenerate(false);
   }, [lastSentMessage]);
-
-  const isDark = settings.theme === 'dark';
-  const chatTheme = settings.chatTheme;
-
-  const activeChat = useMemo(() =>
-    chats.find(c => c.id === activeChatId),
-    [chats, activeChatId]
-  );
 
   // Check if the last assistant message looks truncated (ends mid-sentence)
   const lastAssistantLooksTruncated = useMemo(() => {

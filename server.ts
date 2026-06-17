@@ -136,8 +136,6 @@ app.use('/api', requireAuth);
 
 // Add request ID to every response for traceability (sanitize to prevent log injection)
 app.use((req, res, next) => {
-  const raw = req.headers['x-request-id'] as string | undefined;
-  // Allow only safe characters; UUID format wins, otherwise truncate to 64
   const id = (typeof crypto !== 'undefined' && crypto.randomUUID?.())
     ? crypto.randomUUID() // always generate a fresh UUID — ignore client input
     : `req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -716,6 +714,8 @@ app.get('/api/settings', (_req, res) => {
 // --- Global error handler (must be registered after all routes) ---
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('[error]', err.message);
+  // _next is required by Express error-handler signature but intentionally unused
+  void _next;
   // Sanitised response — never leak stack traces or internal details
   res.status(500).json({
     error: {
@@ -763,7 +763,8 @@ app.use('/api', (_req, res) => {
 const spaRateLimit = new Map<string, { count: number; resetAt: number }>();
 const SPA_RATE_LIMIT = 500; // requests per window
 const SPA_RATE_WINDOW = 60_000; // 1 minute
-const SPA_RATE_LIMIT_MB = 100 * 1024 * 1024; // 100MB limit for static files
+const SPA_RATE_LIMIT_MB = 100 * 1024 * 1024; // 100MB limit for static files — enforced by nginx/proxy in production
+void SPA_RATE_LIMIT_MB; // suppress unused var warning (placeholder for future byte-level limiting)
 
 app.use((req, _res, next) => {
   if (isDev) return next();

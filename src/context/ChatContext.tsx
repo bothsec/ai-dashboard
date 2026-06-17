@@ -557,7 +557,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       togglePinChat,
       branchChat,
       continueResponse,
-    }), [state, streamingMessageId, streamingContent, tokensPerSecond, lastSentMessage, lastUserMessage, regenerateLastResponse, retryLastMessage, editLastMessage, sendMessage, createNewChat, switchChat, deleteChat, renameChat, clearMessages, cancelStream, dismissError, togglePinChat, branchChat]);
+    }), [state, streamingMessageId, streamingContent, tokensPerSecond, lastSentMessage, lastUserMessage, regenerateLastResponse, retryLastMessage, editLastMessage, sendMessage, createNewChat, switchChat, deleteChat, renameChat, clearMessages, cancelStream, dismissError, togglePinChat, branchChat, continueResponse]);
 
   return (
     <ChatContext.Provider value={contextValue}>
