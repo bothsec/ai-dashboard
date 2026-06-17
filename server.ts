@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import helmet from 'helmet';
+console.log("[DEBUG] AUTH_SECRET_TOKEN from env:", process.env.AUTH_SECRET_TOKEN ? "SET (" + process.env.AUTH_SECRET_TOKEN.slice(0,4) + "...)" : "NOT SET");
 import cors from 'cors';
 import { summarizeUrl } from './src/services/urlSummarizer';
 dotenv.config({ override: true });
@@ -83,6 +84,17 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
 }
 
 // --- Auth routes (must be defined BEFORE the auth middleware) ---
+// DEBUG endpoint to check AUTH_SECRET
+app.get('/api/debug/env', (_req, res) => {
+  res.json({
+    AUTH_SECRET_TOKEN_set: !!process.env.AUTH_SECRET_TOKEN,
+    AUTH_SECRET_TOKEN_prefix: process.env.AUTH_SECRET_TOKEN ? process.env.AUTH_SECRET_TOKEN.slice(0,4) : null,
+    AUTH_USERNAME: process.env.AUTH_USERNAME || 'admin',
+    node_env: process.env.NODE_ENV,
+    cwd: process.cwd(),
+  });
+});
+
 // POST /api/auth/login  { username, password }  →  Set-Cookie + { ok: true }
 app.post('/api/auth/login', express.json(), (req, res) => {
   if (!AUTH_SECRET) {

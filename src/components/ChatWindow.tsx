@@ -912,6 +912,7 @@ export const ChatWindow: React.FC = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const emptyStateRef = useRef<HTMLDivElement>(null);
   const [isPinned, setIsPinned] = useState(true);
+  const [scrollProgress, setScrollProgress] = useState(0);
   // Show regenerate button briefly after a response completes
   const [showRegenerate, setShowRegenerate] = useState(false);
   const [showBookmarksPanel, setShowBookmarksPanel] = useState(false);
@@ -952,7 +953,7 @@ export const ChatWindow: React.FC = () => {
     return false;
   }, [activeChat]);
 
-  // Track if user manually scrolled up (unpinned)
+  // Track if user manually scrolled up (unpinned) and reading progress
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -962,6 +963,13 @@ export const ChatWindow: React.FC = () => {
       setIsPinned(false);
     } else if (distFromBottom < 20) {
       setIsPinned(true);
+    }
+    // Update reading progress indicator (0-100)
+    const scrollableHeight = el.scrollHeight - el.clientHeight;
+    if (scrollableHeight > 0) {
+      setScrollProgress(Math.min(100, Math.max(0, (el.scrollTop / scrollableHeight) * 100)));
+    } else {
+      setScrollProgress(100); // No scroll needed, at bottom
     }
   }, []);
 
@@ -1134,6 +1142,16 @@ export const ChatWindow: React.FC = () => {
     <div
       className={`flex-1 flex flex-col h-full min-h-0 overflow-hidden relative ${chatBgClass}`}
     >
+      {/* Reading progress indicator — thin bar at top */}
+      <div
+        className="absolute top-0 left-0 right-0 z-20 h-0.5 bg-black/20 dark:bg-white/10"
+        aria-hidden="true"
+      >
+        <div
+          className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-150 ease-out"
+          style={{ width: `${scrollProgress}%` }}
+        />
+      </div>
       <div
         ref={scrollRef}
         onScroll={handleScroll}
