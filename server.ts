@@ -727,19 +727,25 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 // --- URL Summarizer: fetch any public URL, extract readable text for AI ---
 // GET /api/summarize?url=... → { title, siteName, text, url }
 app.get('/api/summarize', async (req, res) => {
-  const rawUrl = (req.query.url as string | undefined) ?? '';
+  const rawUrl = req.query.url;
+  // Prevent type confusion: Express can return string[] when multiple ?url= params are sent
+  if (Array.isArray(rawUrl)) {
+    res.status(400).json({ error: { message: 'url must be a single value', type: 'invalid_request' } });
+    return;
+  }
+  const urlString = (rawUrl as string | undefined) ?? '';
 
-  if (!rawUrl) {
+  if (!urlString) {
     res.status(400).json({ error: { message: 'url query parameter is required', type: 'invalid_request' } });
     return;
   }
-  if (rawUrl.length > 2000) {
+  if (urlString.length > 2000) {
     res.status(400).json({ error: { message: 'URL is too long (max 2000 chars)', type: 'invalid_request' } });
     return;
   }
 
   try {
-    const result = await summarizeUrl(rawUrl);
+    const result = await summarizeUrl(urlString);
     res.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
