@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, ThumbsUp, Quote, Tag, Gauge, Play, Sparkles, Star, Link, MoreVertical, GitBranch, Trash, Download } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, ThumbsUp, Quote, Tag, Gauge, Play, Sparkles, Star, Link, GitBranch, Trash, Download } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -865,7 +865,6 @@ export const ChatWindow: React.FC = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const emptyStateRef = useRef<HTMLDivElement>(null);
   const [isPinned, setIsPinned] = useState(true);
-  const [showMenu, setShowMenu] = useState(false);
   const [chatCopied, setChatCopied] = useState(false);
   // Show regenerate button briefly after a response completes
   const [showRegenerate, setShowRegenerate] = useState(false);
@@ -1081,83 +1080,58 @@ export const ChatWindow: React.FC = () => {
     <div
       className={`flex-1 flex flex-col h-full min-h-0 overflow-hidden relative ${chatBgClass}`}
     >
-      {/* Three-dot overflow menu bar */}
+      {/* Chat control icon row */}
       {activeChat && activeChat.messages.length > 0 && (
-        <div className="max-w-4xl mx-auto flex justify-end px-4 md:px-8 lg:px-12 pt-4 pb-2">
-          <div className="relative">
-            <button
-              onClick={() => setShowMenu(prev => !prev)}
-              className={`p-2 rounded-lg transition-colors ${
-                isDark ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-gray-100 text-gray-400'
-              }`}
-              aria-label="Chat options"
-              aria-expanded={showMenu}
-            >
-              <MoreVertical className="w-4 h-4" />
-            </button>
-
-            {/* Dropdown menu */}
-            {showMenu && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-                <div className={`absolute right-0 top-full mt-1 z-50 w-44 rounded-xl shadow-xl border py-1 ${
-                  isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
-                }`}>
-                  <button
-                    onClick={() => { setShowBookmarksPanel(p => !p); setShowMenu(false); }}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm ${
-                      isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    <Bookmark className="w-4 h-4" />
-                    Bookmarks
-                  </button>
-                  <button
-                    onClick={() => { branchChat(activeChatId!); setShowMenu(false); }}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm ${
-                      isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    <GitBranch className="w-4 h-4" />
-                    Branch
-                  </button>
-                  <button
-                    onClick={() => { handleExportChat(); setShowMenu(false); }}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm ${
-                      isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    <Download className="w-4 h-4" />
-                    Export
-                  </button>
-                  <button
-                    onClick={() => { handleCopyChat(); setShowMenu(false); }}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm ${
-                      isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {chatCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                    {chatCopied ? 'Copied!' : 'Copy'}
-                  </button>
-                  <div className={`my-1 ${isDark ? 'border-gray-700' : 'border-gray-100'}`} />
-                  <button
-                    onClick={() => {
-                      if (window.confirm('Delete this chat? This cannot be undone.')) {
-                        deleteChat(activeChatId!);
-                        setShowMenu(false);
-                      }
-                    }}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm ${
-                      isDark ? 'text-red-400 hover:bg-red-500/10' : 'text-red-500 hover:bg-red-50'
-                    }`}
-                  >
-                    <Trash className="w-4 h-4" />
-                    Delete
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+        <div className="max-w-4xl mx-auto flex items-center justify-end gap-1 px-4 md:px-8 lg:px-12 pt-4 pb-2">
+          <button
+            onClick={() => setShowBookmarksPanel(p => !p)}
+            className={`p-2 rounded-lg transition-colors ${
+              isDark ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-gray-100 text-gray-400'
+            }`}
+            aria-label="Bookmarks"
+          >
+            <Bookmark className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => branchChat(activeChatId!)}
+            className={`p-2 rounded-lg transition-colors ${
+              isDark ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-gray-100 text-gray-400'
+            }`}
+            aria-label="Branch chat"
+          >
+            <GitBranch className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleExportChat}
+            className={`p-2 rounded-lg transition-colors ${
+              isDark ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-gray-100 text-gray-400'
+            }`}
+            aria-label="Export chat"
+          >
+            <Download className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleCopyChat}
+            className={`p-2 rounded-lg transition-colors ${
+              isDark ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-gray-100 text-gray-400'
+            }`}
+            aria-label={chatCopied ? 'Copied!' : 'Copy chat'}
+          >
+            {chatCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+          </button>
+          <button
+            onClick={() => {
+              if (window.confirm('Delete this chat? This cannot be undone.')) {
+                deleteChat(activeChatId!);
+              }
+            }}
+            className={`p-2 rounded-lg transition-colors ${
+              isDark ? 'hover:bg-red-500/20 text-red-400' : 'hover:bg-red-50 text-red-500'
+            }`}
+            aria-label="Delete chat"
+          >
+            <Trash className="w-4 h-4" />
+          </button>
         </div>
       )}
 
