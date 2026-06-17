@@ -97,7 +97,7 @@ export const ChatInput = memo(() => {
       window.removeEventListener('keydown', handleGlobalKeyDown);
       window.removeEventListener('pe:close', handlePeClose);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [isStreaming, cancelStream]);
 
   // Listen for quote events from ChatWindow message bubbles

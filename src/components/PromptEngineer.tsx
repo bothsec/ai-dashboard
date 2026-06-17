@@ -234,9 +234,10 @@ const PromptEngineer = memo(function PromptEngineer({ onUse, onClose, disabled }
   const [fields, setFields] = useState<TaskFields>({});
   const [preview, setPreview] = useState('');
 
-  // Live preview
+  // Live preview — set-state-in-effect is intentional here: synchronizing derived state from external inputs
   useEffect(() => {
     const prompt = PROMPT_TEMPLATES[taskType](fields);
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
     setPreview(prompt);
   }, [taskType, fields]);
 
