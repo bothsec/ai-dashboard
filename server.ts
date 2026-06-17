@@ -96,9 +96,14 @@ app.post('/api/auth/login', express.json(), (req, res) => {
     return;
   }
   // Derive the cookie domain from the real client host (x-forwarded-host → host)
-  const forwardedHost = req.headers['x-forwarded-host'] as string | undefined;
-  const cookieHost = forwardedHost ? forwardedHost.split(',')[0].split(':')[0] : undefined;
-  const cookieDomain = cookieHost ? `; Domain=${cookieHost}` : '';
+  // Security: X-Forwarded-Host can be an array (type confusion attack) — ensure it's a plain string
+  const forwardedRaw = req.headers['x-forwarded-host'];
+  const forwardedHost = Array.isArray(forwardedRaw) ? forwardedRaw[0] : forwardedRaw;
+  const cookieHost = typeof forwardedHost === 'string' ? forwardedHost.split(',')[0].split(':')[0] : undefined;
+  // Only set Domain if it's a safe, known host — never trust X-Forwarded-Host directly
+  const cookieDomain = (cookieHost && /^(ai\.khmerjob\.tech|khmerjob\.tech|140\.238\.43\.61|localhost)$/.test(cookieHost))
+    ? `; Domain=${cookieHost}`
+    : '';
   res.setHeader('Set-Cookie',
     `${AUTH_COOKIE_NAME}=${AUTH_SECRET}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${AUTH_COOKIE_MAXAGE}${cookieDomain}`);
   res.json({ ok: true, authEnabled: true });
@@ -502,7 +507,7 @@ app.post('/api/chat', async (req, res) => {
     const keyRecord = keyRateLimitStore.get(apiKey);
     if (keyRecord && now < keyRecord.resetTime && keyRecord.count >= KEY_RATE_LIMIT_MAX) {
       // This key is rate limited, try next one
-      console.log(`[NVIDIA] Key rate limited, trying next (${attempt + 1}/${maxRetries})`);
+      console.log(`[NVIDIA] Key rate limited, rotating — attempt ${attempt + 1}/${maxRetries}`);
       continue;
     }
 
@@ -566,7 +571,7 @@ app.post('/api/chat', async (req, res) => {
 
       if (response.status === 429) {
         // Key rate limited, try next key
-        console.log(`[NVIDIA] Got 429, trying next key (${attempt + 1}/${maxRetries})`);
+        console.log(`[NVIDIA] Got 429 from upstream, rotating — attempt ${attempt + 1}/${maxRetries}`);
         continue;
       }
 
@@ -747,8 +752,29 @@ app.use('/api', (_req, res) => {
   res.status(404).json({ error: { message: 'API endpoint not found', type: 'not_found' } });
 });
 
-// --- Serve static files in production ---
-const isDev = process.env.NODE_ENV === 'development';
+// --- SPA fallback: rate-limited catch-all (prevents DoS on res.sendFile) ---
+const spaRateLimit = new Map<string, { count: number; resetAt: number }>();
+const SPA_RATE_LIMIT = 500; // requests per window
+const SPA_RATE_WINDOW = 60_000; // 1 minute
+const SPA_RATE_LIMIT_MB = 100 * 1024 * 1024; // 100MB limit for static files
+
+app.use((req, _res, next) => {
+  if (isDev) return next();
+  const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim()
+    ?? req.socket.remoteAddress ?? 'unknown';
+  const now = Date.now();
+  const record = spaRateLimit.get(ip);
+  if (record && now < record.resetAt && record.count >= SPA_RATE_LIMIT) {
+    _res.status(429).json({ error: { message: 'Too many requests', type: 'rate_limited' } });
+    return;
+  }
+  if (!record || now >= record.resetAt) {
+    spaRateLimit.set(ip, { count: 1, resetAt: now + SPA_RATE_WINDOW });
+  } else {
+    record.count++;
+  }
+  next();
+});
 
 if (!isDev) {
   app.use(express.static(join(__dirname, 'dist')));
