@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown,  RotateCw, Bookmark, Trash, ThumbsUp,  Quote, Tag, Gauge, GitBranch, Play, Sparkles, Star, Link } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, ThumbsUp, Quote, Tag, Gauge, Play, Sparkles, Star, Link } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -857,67 +857,18 @@ const MessageSkeleton = memo(() => {
   );
 });
 
-// Context window usage indicator — estimates how much of the 128k NVIDIA context is used
-const CONTEXT_WINDOW_TOKENS = 128_000;
-
-const ContextWindowBar = memo(({ totalTokens }: { totalTokens: number }) => {
-  const { settings } = useSettings();
-  const isDark = settings.theme === 'dark';
-
-  // totalTokens is already in token units (approx chars/4 from server). We also need
-  // to account for the tokens that will be sent as part of the next request
-  // (system prompt + history). Use a conservative 500-token overhead estimate.
-  const estimatedTokens = totalTokens + 500;
-  const pct = Math.min((estimatedTokens / CONTEXT_WINDOW_TOKENS) * 100, 100);
-
-  // Color coding: green < 60%, amber 60-85%, red > 85%
-  const barColor = pct >= 85
-    ? 'bg-red-500'
-    : pct >= 60
-      ? 'bg-amber-500'
-      : 'bg-emerald-500';
-
-  const textColor = pct >= 85
-    ? 'text-red-400'
-    : pct >= 60
-      ? 'text-amber-400'
-      : 'text-emerald-400';
-
-  // Format large numbers
-  const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
-
-  return (
-    <div
-      className={`max-w-4xl mx-auto flex items-center gap-3 px-1 mb-2`}
-      title={`Estimated context usage: ~${fmt(estimatedTokens)} / 128k tokens`}
-      aria-label={`Context window: ${fmt(estimatedTokens)} of 128k tokens used`}
-    >
-      <Gauge className={`w-3.5 h-3.5 shrink-0 ${textColor}`} aria-hidden="true" />
-      <div className={`flex-1 h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`} role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <span className={`text-[10px] font-mono font-medium ${textColor}`}>
-        {fmt(estimatedTokens)} / 128k
-      </span>
-    </div>
-  );
-});
+// ---- Message types
 
 export const ChatWindow: React.FC = () => {
-  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, tokensPerSecond, sendMessage, dismissError, lastSentMessage, lastUserMessage, regenerateLastResponse, deleteChat, branchChat, continueResponse } = useChat();
+  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, tokensPerSecond, sendMessage, dismissError, lastSentMessage, lastUserMessage, regenerateLastResponse, continueResponse } = useChat();
   const { settings } = useSettings();
   const scrollRef = useRef<HTMLDivElement>(null);
   const emptyStateRef = useRef<HTMLDivElement>(null);
   const [isPinned, setIsPinned] = useState(true);
-  // Hide header/toolbar when scrolled to bottom (near last message)
-  const [isNearBottom, setIsNearBottom] = useState(true);
   // Show regenerate button briefly after a response completes
   const [showRegenerate, setShowRegenerate] = useState(false);
   const [showBookmarksPanel, setShowBookmarksPanel] = useState(false);
-  const [chatCopied, setChatCopied] = useState(false);
+
 
   // Show regenerate briefly when streaming ends with a successful response
   useEffect(() => {
@@ -965,8 +916,6 @@ export const ChatWindow: React.FC = () => {
     } else if (distFromBottom < 20) {
       setIsPinned(true);
     }
-    // Hide toolbar when within 150px of bottom, show when scrolled up
-    setIsNearBottom(distFromBottom < 150);
   }, []);
 
   // Scroll to bottom when new messages arrive (only if pinned)
@@ -1007,55 +956,6 @@ export const ChatWindow: React.FC = () => {
   const handleSuggestionClick = useCallback(async (text: string) => {
     await sendMessage(text);
   }, [sendMessage]);
-
-  const handleExportChat = useCallback(() => {
-    if (!activeChat || activeChat.messages.length === 0) return;
-    const lines: string[] = [
-      `# ${activeChat.title || 'Chat Export'}`,
-      `*Exported on ${new Date().toLocaleString()}*\n`,
-    ];
-    for (const msg of activeChat.messages) {
-      const ts = new Date(msg.timestamp).toLocaleString();
-      lines.push(`## ${msg.role === 'user' ? 'You' : 'Assistant'} — ${ts}`);
-      lines.push(msg.content || '');
-      lines.push('\n---\n');
-    }
-    const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `chat-${new Date().toISOString().slice(0, 10)}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [activeChat]);
-
-  const handleCopyChat = useCallback(async () => {
-    if (!activeChat || activeChat.messages.length === 0) return;
-    const lines: string[] = [
-      `# ${activeChat.title || 'Chat Export'}`,
-      `*Exported on ${new Date().toLocaleString()}*\n`,
-    ];
-    for (const msg of activeChat.messages) {
-      const ts = new Date(msg.timestamp).toLocaleString();
-      lines.push(`## ${msg.role === 'user' ? 'You' : 'Assistant'} — ${ts}`);
-      lines.push(msg.content || '');
-      lines.push('\n---\n');
-    }
-    try {
-      await navigator.clipboard.writeText(lines.join('\n'));
-      setChatCopied(true);
-      setTimeout(() => setChatCopied(false), 2000);
-    } catch {
-      // clipboard unavailable silently ignored
-    }
-  }, [activeChat]);
-
-  // Handle /export slash command from ChatInput
-  useEffect(() => {
-    const handleTriggerExport = () => handleExportChat();
-    window.addEventListener('chat:trigger-export', handleTriggerExport);
-    return () => window.removeEventListener('chat:trigger-export', handleTriggerExport);
-  }, [handleExportChat]);
 
   // Detect network vs API errors for a more specific message
   const isNetworkError = error && (
@@ -1146,98 +1046,7 @@ export const ChatWindow: React.FC = () => {
         aria-live="polite"
         aria-label="Chat messages"
       >
-        {/* Context window usage indicator — hidden when at bottom */}
-        {activeChat && (activeChat.totalTokens ?? 0) > 0 && !isNearBottom && (
-          <ContextWindowBar totalTokens={activeChat.totalTokens!} />
-        )}
-
-        {/* Export toolbar — hidden when at bottom */}
-        {!isNearBottom && activeChat && activeChat.messages.length > 0 && (
-          <div className="max-w-4xl mx-auto flex justify-end gap-2 mb-2">
-            <button
-              onClick={() => setShowBookmarksPanel(prev => !prev)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                showBookmarksPanel
-                  ? isDark ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-amber-50 text-amber-600 border border-amber-200'
-                  : isDark
-                    ? 'text-gray-500 hover:text-amber-400 hover:bg-gray-800'
-                    : 'text-gray-400 hover:text-amber-600 hover:bg-gray-100'
-              }`}
-              aria-label="Toggle bookmarks panel"
-              aria-pressed={showBookmarksPanel}
-              title="Bookmarks"
-            >
-              <Bookmark className={`w-3.5 h-3.5 ${showBookmarksPanel ? 'fill-current' : ''}`} />
-              Bookmarks
-            </button>
-            <button
-              onClick={() => {
-                if (activeChatId) {
-                  branchChat(activeChatId);
-                }
-              }}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                isDark
-                  ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
-                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-              }`}
-              aria-label="Branch conversation"
-              title="Create a branch copy of this conversation"
-            >
-              <GitBranch className="w-3.5 h-3.5" aria-hidden="true" />
-              Branch
-            </button>
-            <button
-              onClick={handleExportChat}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                isDark
-                  ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
-                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-              }`}
-              aria-label="Export chat as Markdown"
-              title="Export as Markdown"
-            >
-              <Download className="w-3.5 h-3.5" aria-hidden="true" />
-              Export
-            </button>
-            <button
-              onClick={handleCopyChat}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                chatCopied
-                  ? isDark
-                    ? 'text-green-400 bg-green-500/10'
-                    : 'text-green-600 bg-green-50'
-                  : isDark
-                    ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
-                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-              }`}
-              aria-label={chatCopied ? 'Copied!' : 'Copy chat as Markdown'}
-              title="Copy as Markdown"
-            >
-              {chatCopied
-                ? <Check className="w-3.5 h-3.5" aria-hidden="true" />
-                : <Copy className="w-3.5 h-3.5" aria-hidden="true" />}
-              {chatCopied ? 'Copied!' : 'Copy'}
-            </button>
-            <button
-              onClick={() => {
-                if (window.confirm('Delete this chat? This cannot be undone.')) {
-                  deleteChat(activeChatId ?? '');
-                }
-              }}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                isDark
-                  ? 'text-gray-500 hover:text-red-400 hover:bg-red-500/10'
-                  : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
-              }`}
-              aria-label="Delete active chat"
-              title="Delete chat"
-            >
-              <Trash className="w-3.5 h-3.5" aria-hidden="true" />
-              Delete
-            </button>
-          </div>
-        )}
+        {/* Messages rendered here */}
         {activeChat && activeChat.messages.length === 0 ? (
           /* Empty state */
           <div 
