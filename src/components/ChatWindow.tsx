@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, ThumbsUp, Quote, Tag, Gauge, Play, Sparkles, Star, Link } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, ThumbsUp, Quote, Tag, Gauge, Play, Sparkles, Star, Link, MoreVertical, GitBranch, Trash, Download } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -860,11 +860,13 @@ const MessageSkeleton = memo(() => {
 // ---- Message types
 
 export const ChatWindow: React.FC = () => {
-  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, tokensPerSecond, sendMessage, dismissError, lastSentMessage, lastUserMessage, regenerateLastResponse, continueResponse } = useChat();
+  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, tokensPerSecond, sendMessage, dismissError, lastSentMessage, lastUserMessage, regenerateLastResponse, deleteChat, branchChat, continueResponse } = useChat();
   const { settings } = useSettings();
   const scrollRef = useRef<HTMLDivElement>(null);
   const emptyStateRef = useRef<HTMLDivElement>(null);
   const [isPinned, setIsPinned] = useState(true);
+  const [showMenu, setShowMenu] = useState(false);
+  const [chatCopied, setChatCopied] = useState(false);
   // Show regenerate button briefly after a response completes
   const [showRegenerate, setShowRegenerate] = useState(false);
   const [showBookmarksPanel, setShowBookmarksPanel] = useState(false);
@@ -957,6 +959,47 @@ export const ChatWindow: React.FC = () => {
     await sendMessage(text);
   }, [sendMessage]);
 
+
+  const handleExportChat = useCallback(() => {
+    if (!activeChat || activeChat.messages.length === 0) return;
+    const lines: string[] = [
+      `# ${activeChat.title || 'Chat Export'}`,
+      `*Exported on ${new Date().toLocaleString()}*\n`,
+    ];
+    for (const msg of activeChat.messages) {
+      const ts = new Date(msg.timestamp).toLocaleString();
+      lines.push(`## ${msg.role === 'user' ? 'You' : 'Assistant'} — ${ts}`);
+      lines.push(msg.content || '');
+      lines.push('\n---\n');
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chat-${new Date().toISOString().slice(0, 10)}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [activeChat]);
+
+  const handleCopyChat = useCallback(async () => {
+    if (!activeChat || activeChat.messages.length === 0) return;
+    const lines: string[] = [
+      `# ${activeChat.title || 'Chat Export'}`,
+      `*Exported on ${new Date().toLocaleString()}*\n`,
+    ];
+    for (const msg of activeChat.messages) {
+      const ts = new Date(msg.timestamp).toLocaleString();
+      lines.push(`## ${msg.role === 'user' ? 'You' : 'Assistant'} — ${ts}`);
+      lines.push(msg.content || '');
+      lines.push('\n---\n');
+    }
+    try {
+      await navigator.clipboard.writeText(lines.join('\n'));
+      setChatCopied(true);
+      setTimeout(() => setChatCopied(false), 2000);
+    } catch { /* ignore */ }
+  }, [activeChat]);
+
   // Detect network vs API errors for a more specific message
   const isNetworkError = error && (
     error.toLowerCase().includes('network') ||
@@ -1038,6 +1081,86 @@ export const ChatWindow: React.FC = () => {
     <div
       className={`flex-1 flex flex-col h-full min-h-0 overflow-hidden relative ${chatBgClass}`}
     >
+      {/* Three-dot overflow menu bar */}
+      {activeChat && activeChat.messages.length > 0 && (
+        <div className="max-w-4xl mx-auto flex justify-end px-4 md:px-8 lg:px-12 pt-4 pb-2">
+          <div className="relative">
+            <button
+              onClick={() => setShowMenu(prev => !prev)}
+              className={`p-2 rounded-lg transition-colors ${
+                isDark ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-gray-100 text-gray-400'
+              }`}
+              aria-label="Chat options"
+              aria-expanded={showMenu}
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+
+            {/* Dropdown menu */}
+            {showMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                <div className={`absolute right-0 top-full mt-1 z-50 w-44 rounded-xl shadow-xl border py-1 ${
+                  isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
+                }`}>
+                  <button
+                    onClick={() => { setShowBookmarksPanel(p => !p); setShowMenu(false); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm ${
+                      isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Bookmark className="w-4 h-4" />
+                    Bookmarks
+                  </button>
+                  <button
+                    onClick={() => { branchChat(activeChatId!); setShowMenu(false); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm ${
+                      isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <GitBranch className="w-4 h-4" />
+                    Branch
+                  </button>
+                  <button
+                    onClick={() => { handleExportChat(); setShowMenu(false); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm ${
+                      isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Download className="w-4 h-4" />
+                    Export
+                  </button>
+                  <button
+                    onClick={() => { handleCopyChat(); setShowMenu(false); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm ${
+                      isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {chatCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                    {chatCopied ? 'Copied!' : 'Copy'}
+                  </button>
+                  <div className={`my-1 ${isDark ? 'border-gray-700' : 'border-gray-100'}`} />
+                  <button
+                    onClick={() => {
+                      if (window.confirm('Delete this chat? This cannot be undone.')) {
+                        deleteChat(activeChatId!);
+                        setShowMenu(false);
+                      }
+                    }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm ${
+                      isDark ? 'text-red-400 hover:bg-red-500/10' : 'text-red-500 hover:bg-red-50'
+                    }`}
+                  >
+                    <Trash className="w-4 h-4" />
+                    Delete
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div
         ref={scrollRef}
         onScroll={handleScroll}
