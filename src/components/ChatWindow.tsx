@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play, Sparkles } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -18,6 +18,55 @@ const SUGGESTIONS = [
   { icon: '💡', text: 'Brainstorm ideas' },
   { icon: '🐛', text: 'Debug my code' },
 ];
+
+// Analyze AI response content and return contextually relevant follow-up prompts
+function getSuggestedFollowups(content: string): string[] {
+  if (!content || content.trim().length < 20) return [];
+
+  const suggestions: string[] = [];
+
+  // Pattern: numbered or bulleted lists (3+ items)
+  const listMatch = content.match(/(?:^|\n)(?:\d+\.|-|\*)\s+.+(?:\n(?:\d+\.|-|\*)\s+.+){2,}/);
+  if (listMatch) {
+    suggestions.push('Tell me more about the first point');
+  }
+
+  // Pattern: code blocks
+  if (content.includes('```') || content.includes('`')) {
+    suggestions.push('Explain this code');
+  }
+
+  // Pattern: ends with a question (explicit question)
+  if (/[.?]$/.test(content.trim())) {
+    suggestions.push('Can you elaborate on that?');
+  }
+
+  // Pattern: comparison or pros/cons
+  const comparisonMatch = content.match(/\b(pros|cons|advantages|disadvantages|benefits?|drawbacks?|vs\.?|versus)\b/i);
+  if (comparisonMatch) {
+    suggestions.push('What are the main pros and cons?');
+    suggestions.push('Can you elaborate on the downsides?');
+  }
+
+  // Pattern: step-by-step instructions
+  const stepsMatch = content.match(/(?:step \d+|first|second|third|finally|then|next)\s/i);
+  if (stepsMatch) {
+    suggestions.push('Can you summarize the key steps?');
+  }
+
+  // Generic fallbacks (never repeat, max 2 from this pool)
+  const generic = [
+    'Can you give me an example?',
+    'What else should I know?',
+    'How does this work under the hood?',
+  ];
+  while (suggestions.length < 2) {
+    const pick = generic[Math.floor(Math.random() * generic.length)];
+    if (!suggestions.includes(pick)) suggestions.push(pick);
+  }
+
+  return suggestions.slice(0, 3);
+}
 
 export type MessageLabel = 'important' | 'question' | 'todo' | 'idea' | 'code' | null;
 
@@ -38,7 +87,7 @@ function looksTruncated(content: string): boolean {
   // Ends with no terminal punctuation (., !, ?, —, |) or ellipsis
   if (!/[.!?\—|]$/.test(trimmed)) return true;
   // Trailing incomplete indicator
-  if (/[\[\(}\{]$/.test(trimmed)) return true;
+  if (/[\[\(}\\{]$/.test(trimmed)) return true;
   return false;
 }
 
@@ -516,6 +565,18 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                 </ReactMarkdown>
               </div>
             </div>
+            {/* Word count badge — shown on hover */}
+            {msg.content.trim() && (() => {
+              const { words, readTime } = getWordStats(msg.content);
+              return (
+                <div className="opacity-0 group-hover/bubble:opacity-100 transition-opacity pt-1 px-1 text-[10px] text-gray-500 flex items-center gap-1">
+                  <Gauge className="w-3 h-3" aria-hidden="true" />
+                  <span>{words}w</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{readTime}</span>
+                </div>
+              );
+            })()}
             {/* Copy button — shown on hover */}
             <button
               onClick={() => {
@@ -1121,7 +1182,42 @@ export const ChatWindow: React.FC = () => {
                 </div>
               );
             })}
-            
+
+            {/* Suggested follow-up prompts — shown after AI finishes responding */}
+            {!isStreaming && activeChat && activeChat.messages.some(m => m.role === 'assistant' && m.content.trim()) && (() => {
+              // Find last assistant message content
+              let lastAssistantContent = '';
+              for (let i = (activeChat.messages.length ?? 0) - 1; i >= 0; i--) {
+                const msg = activeChat.messages[i];
+                if (msg.role === 'assistant' && msg.content.trim()) {
+                  lastAssistantContent = msg.content;
+                  break;
+                }
+              }
+              const followups = getSuggestedFollowups(lastAssistantContent);
+              if (followups.length === 0) return null;
+              return (
+                <div className="flex flex-wrap gap-2 mt-4 mb-2 justify-center" role="list" aria-label="Suggested follow-up prompts">
+                  {followups.map((prompt, i) => (
+                    <button
+                      key={i}
+                      onClick={() => sendMessage(prompt)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 hover:-translate-y-0.5 ${
+                        isDark
+                          ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/30'
+                          : 'bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300'
+                      }`}
+                      role="listitem"
+                      aria-label={`Follow up: ${prompt}`}
+                    >
+                      <Sparkles className="w-3 h-3" aria-hidden="true" />
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
+
             {/* Show skeleton when streaming but no message content yet */}
             {isStreaming && activeChat?.messages.length === 0 && (
               <MessageSkeleton />
