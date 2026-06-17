@@ -763,6 +763,6 @@ const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   const env = isDev ? 'development' : 'production';
-  console.log(`[server] AI Dashboard running in ${env} mode on port ${PORT}`);
+  console.log(`[server] Khmer AI running in ${env} mode on port ${PORT}`);
   console.log('[server] Health check: GET /health');
 });

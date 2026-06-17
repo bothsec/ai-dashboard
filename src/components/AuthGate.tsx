@@ -101,7 +101,7 @@ export const AuthGate = memo(function AuthGate({ children }: AuthGateProps) {
               <div className="w-14 h-14 bg-indigo-600/20 rounded-full flex items-center justify-center mb-4">
                 <Lock className="w-7 h-7 text-indigo-400" />
               </div>
-              <h1 className="text-xl font-semibold text-white">AI Dashboard</h1>
+              <h1 className="text-xl font-semibold text-white">Khmer AI</h1>
               <p className="text-gray-400 text-sm mt-1 text-center">
                 Enter your credentials to continue
               </p>
