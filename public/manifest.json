@@ -1,6 +1,6 @@
 {
-  "name": "AI Dashboard",
-  "short_name": "AI Chat",
+  "name": "Khmer AI",
+  "short_name": "Khmer AI",
   "description": "Multi-provider AI chat interface for OpenAI, Anthropic, and NVIDIA NIM models",
   "start_url": "/",
   "display": "standalone",

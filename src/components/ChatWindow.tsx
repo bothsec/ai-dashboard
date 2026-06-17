@@ -162,6 +162,20 @@ function PreCodeBlock({
           </span>
         ) : <span />}
         <div className="flex items-center gap-1 ml-auto">
+          {/* Always-visible copy button */}
+          <button
+            onClick={handleCopy}
+            className={`p-1.5 rounded-lg transition-opacity flex items-center gap-1.5 ${
+              isDark
+                ? 'bg-gray-700/80 hover:bg-gray-600/90 text-gray-400 hover:text-gray-200'
+                : 'bg-gray-200/90 hover:bg-gray-300/90 text-gray-500 hover:text-gray-700'
+            } ${copied ? '!text-green-400' : ''}`}
+            aria-label={copied ? 'Copied!' : 'Copy code'}
+            title={copied ? 'Copied!' : 'Copy code'}
+          >
+            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+            <span className="text-[11px] font-medium hidden sm:inline">{copied ? 'Copied!' : 'Copy'}</span>
+          </button>
           {shouldAutoCollapse && (
             <button
               onClick={toggleCollapse}
@@ -174,16 +188,6 @@ function PreCodeBlock({
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isReallyCollapsed ? '' : 'rotate-180'}`} />
             </button>
           )}
-          <button
-            onClick={handleCopy}
-            className={`p-1.5 rounded-lg opacity-0 group-hover/pre:opacity-100 transition-opacity ${
-              isDark ? 'bg-gray-700/80 hover:bg-gray-600/90 text-gray-400 hover:text-gray-200' : 'bg-gray-200/90 hover:bg-gray-300/90 text-gray-500 hover:text-gray-700'
-            }`}
-            aria-label="Copy code"
-            title="Copy code"
-          >
-            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-          </button>
         </div>
       </div>
 
@@ -563,8 +567,18 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                     code: ({ className, children }) => {
                       const isInline = !className;
                       if (isInline) {
+                        // children of inline code is typically a string
+                        const codeText = String(children ?? '');
                         return (
-                          <code className={isDark ? 'bg-gray-700/60 px-1.5 py-0.5 rounded text-sm font-mono text-indigo-300' : 'bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-indigo-600'}>
+                          <code
+                            className={`cursor-pointer px-1.5 py-0.5 rounded text-sm font-mono transition-colors hover:bg-indigo-500/20 ${
+                              isDark ? 'bg-gray-700/60 text-indigo-300 hover:text-indigo-200' : 'bg-gray-100 text-indigo-600 hover:bg-indigo-50'
+                            }`}
+                            onClick={() => {
+                              navigator.clipboard.writeText(codeText);
+                            }}
+                            title="Click to copy"
+                          >
                             {children}
                           </code>
                         );
