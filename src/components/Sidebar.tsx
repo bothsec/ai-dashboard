@@ -277,7 +277,7 @@ export const Sidebar = memo(() => {
               <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className={`text-base sm:text-lg font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>AI Dashboard</h1>
+              <h1 className={`text-base sm:text-lg font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Khmer AI</h1>
               <p className={`text-[10px] sm:text-[11px] ${isDark ? 'text-gray-500' : 'text-gray-500'} truncate`}>AI Assistant</p>
             </div>
           </div>

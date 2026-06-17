@@ -7,10 +7,18 @@ import { Sidebar } from './components/Sidebar';
 import { ChatWindow } from './components/ChatWindow';
 import { ChatInput } from './components/ChatInput';
 import { ShortcutsModal } from './components/ShortcutsModal';
+import { MiniMode } from './components/MiniMode';
 
 const AppInner = memo(function AppInner() {
   const { isStreaming, cancelStream, createNewChat } = useChat();
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [miniMode, setMiniMode] = useState(() => {
+    try { return localStorage.getItem('mini_mode_active') === 'true'; } catch { return false; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('mini_mode_active', String(miniMode)); } catch { /* ignore */ }
+  }, [miniMode]);
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -39,10 +47,34 @@ const AppInner = memo(function AppInner() {
         }
         return;
       }
+      // Ctrl/Cmd+M — toggle mini mode
+      if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
+        e.preventDefault();
+        setMiniMode(prev => !prev);
+        return;
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isStreaming, cancelStream, createNewChat, setShowShortcuts]);
+  }, [isStreaming, cancelStream, createNewChat, setShowShortcuts, setMiniMode]);
+
+  // When mini mode activates, blur any focused element so keyboard doesn't interfere
+  useEffect(() => {
+    if (miniMode) {
+      (document.activeElement as HTMLElement)?.blur?.();
+    }
+  }, [miniMode]);
+
+  // Listen for chat:mini-mode event from ChatWindow button
+  useEffect(() => {
+    const handler = () => setMiniMode(prev => !prev);
+    window.addEventListener('chat:mini-mode', handler);
+    return () => window.removeEventListener('chat:mini-mode', handler);
+  }, []);
+
+  if (miniMode) {
+    return <MiniMode onExit={() => setMiniMode(false)} />;
+  }
 
   return (
     <div className="flex h-dvh md:h-screen overflow-hidden font-sans selection:bg-indigo-500/30">

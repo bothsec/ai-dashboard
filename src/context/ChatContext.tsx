@@ -129,6 +129,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }));
   }, []);
 
+  // Auto-create a chat on first load so "How can I help you today?" always shows
+  useEffect(() => {
+    if (state.chats.length === 0) {
+      createNewChat();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // runs once on mount
+
   const switchChat = useCallback((chatId: string) => {
     setState(prev => ({ ...prev, activeChatId: chatId }));
   }, []);
