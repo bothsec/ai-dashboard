@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, ThumbsUp, Quote, Tag, Gauge, Play, Sparkles, Star, Link, GitBranch, Trash, Download } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, ThumbsUp, Quote, Tag, Gauge, Play, Sparkles, Star, Link, GitBranch, Trash, Download, Minimize2 } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -1131,6 +1131,16 @@ export const ChatWindow: React.FC = () => {
             aria-label="Delete chat"
           >
             <Trash className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('chat:mini-mode'))}
+            className={`p-2 rounded-lg transition-colors ${
+              isDark ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-gray-100 text-gray-400'
+            }`}
+            aria-label="Mini mode"
+            title="Enter mini mode (Ctrl+M)"
+          >
+            <Minimize2 className="w-4 h-4" />
           </button>
         </div>
       )}
