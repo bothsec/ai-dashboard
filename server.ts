@@ -17,8 +17,8 @@ await initDatabase();
 // Apply database-backed auth routes + admin API (after app is created)
 // Auth middleware (validates DB sessions for /api routes) — defined before app.use('/api', ...)
 async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-  // Skip auth for login/logout/status — those are handled by registerAdminRoutes
-  if (req.path === '/auth/login' || req.path === '/auth/logout' || req.path === '/auth/status') {
+  // Skip auth for login/logout/status and health checks — those are public
+  if (req.path === '/auth/login' || req.path === '/auth/logout' || req.path === '/auth/status' || req.path.startsWith('/health') || req.path.startsWith('/api/health')) {
     return next();
   }
   const cookieHeader = req.headers.cookie as string | undefined;
@@ -47,7 +47,7 @@ function getNextNvidiaApiKey(): string | null {
 }
 
 // Per-key rate limit tracking (key -> { count, resetTime })
-const keyRateLimitStore = new Map<string, { count: number; resetTime: number }>();
+const keyRateLimitStore = new Map<number, { count: number; resetTime: number }>();
 const KEY_RATE_LIMIT_WINDOW = 60000; // 1 minute window
 const KEY_RATE_LIMIT_MAX = 10; // NVIDIA limit per key per minute
 
@@ -437,15 +437,18 @@ app.post('/api/chat', async (req, res) => {
     if (now > v.resetTime) keyRateLimitStore.delete(k);
   }
 
+  // Track key index for rate limiting (don't store actual API key in Map — CodeQL flags that)
+  const initialKeyIndex = currentKeyIndex;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     const apiKey = getNextNvidiaApiKey();
+    const keyIdx = ((initialKeyIndex + attempt) % nvidiaApiKeys.length + nvidiaApiKeys.length) % nvidiaApiKeys.length;
     if (!apiKey) {
       res.status(500).json({ error: { message: 'No NVIDIA API keys configured', type: 'configuration_error' } });
       return;
     }
 
     // Check per-key rate limit
-    const keyRecord = keyRateLimitStore.get(apiKey);
+    const keyRecord = keyRateLimitStore.get(keyIdx);
     if (keyRecord && now < keyRecord.resetTime && keyRecord.count >= KEY_RATE_LIMIT_MAX) {
       // This key is rate limited, try next one
       console.log(`[NVIDIA] Key rate limited, rotating — attempt ${attempt + 1}/${maxRetries}`);
@@ -503,11 +506,11 @@ app.post('/api/chat', async (req, res) => {
         clearTimeout(timeout);
       }
 
-      // Track per-key usage
-      if (keyRateLimitStore.has(apiKey)) {
-        keyRateLimitStore.get(apiKey)!.count++;
+      // Track per-key usage by index (not by actual key — CodeQL would flag that)
+      if (keyRateLimitStore.has(keyIdx)) {
+        keyRateLimitStore.get(keyIdx)!.count++;
       } else {
-        keyRateLimitStore.set(apiKey, { count: 1, resetTime: now + KEY_RATE_LIMIT_WINDOW });
+        keyRateLimitStore.set(keyIdx, { count: 1, resetTime: now + KEY_RATE_LIMIT_WINDOW });
       }
 
       if (response.status === 429) {
@@ -608,6 +611,13 @@ if (process.env.NVIDIA_API_KEY) {
 //   GET /health/live   → liveness (is the process alive?)  — lightweight, no side-effects
 //   GET /health/ready  → readiness (can it serve traffic?) — checks API keys are configured
 //   GET /health        → full status including the above (backwards-compatible)
+// Health probe routes (public — no auth required, used by load balancers/cron)
+// Exposed at both /health/* and /api/health/* for compatibility
+app.get('/api/health/ready', (_req, res) => {
+  const ready = nvidiaApiKeys.length > 0 || !!process.env.OPENAI_API_KEY || !!process.env.ANTHROPIC_API_KEY;
+  res.status(ready ? 200 : 503).json({ status: ready ? 'ready' : 'not_ready', timestamp: new Date().toISOString() });
+});
+
 app.get('/health/live', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
