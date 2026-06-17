@@ -147,7 +147,7 @@ export async function summarizeUrl(rawUrl: string): Promise<SummarizeResult> {
       redirect: 'follow',
     });
   } catch (err) {
-    throw new Error(`Failed to fetch URL: ${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(`Failed to fetch URL: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
   }
 
   if (!response.ok) {

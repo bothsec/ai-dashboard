@@ -133,12 +133,10 @@ app.get('/api/auth/me', (req, res) => {
 // Mount auth middleware globally for all remaining /api routes
 app.use('/api', requireAuth);
 
-// Add request ID to every response for traceability (sanitize to prevent log injection)
-app.use((req, res, next) => {
-  const raw = req.headers['x-request-id'] as string | undefined;
-  // Allow only safe characters; UUID format wins, otherwise truncate to 64
+// Add request ID to every response for traceability — always generate fresh UUID
+app.use((_req, res, next) => {
   const id = (typeof crypto !== 'undefined' && crypto.randomUUID?.())
-    ? crypto.randomUUID() // always generate a fresh UUID — ignore client input
+    ? crypto.randomUUID()
     : `req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   res.setHeader('X-Request-Id', id);
   next();
@@ -714,6 +712,7 @@ app.get('/api/settings', (_req, res) => {
 
 // --- Global error handler (must be registered after all routes) ---
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  void _next; // required by Express error-handler signature but not used here
   console.error('[error]', err.message);
   // Sanitised response — never leak stack traces or internal details
   res.status(500).json({
@@ -753,10 +752,10 @@ app.use('/api', (_req, res) => {
 });
 
 // --- SPA fallback: rate-limited catch-all (prevents DoS on res.sendFile) ---
+const isDev = process.env.NODE_ENV === 'development';
 const spaRateLimit = new Map<string, { count: number; resetAt: number }>();
 const SPA_RATE_LIMIT = 500; // requests per window
 const SPA_RATE_WINDOW = 60_000; // 1 minute
-const SPA_RATE_LIMIT_MB = 100 * 1024 * 1024; // 100MB limit for static files
 
 app.use((req, _res, next) => {
   if (isDev) return next();

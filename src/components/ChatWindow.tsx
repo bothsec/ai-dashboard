@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, ThumbsUp, Quote, Tag, Gauge, Play, Sparkles, Star, Link, GitBranch, Trash, Download, Minimize2 } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, ThumbsUp, Quote, Tag, Gauge, Play, Sparkles, Star, Link, GitBranch, Trash, Download, Minimize2, Search } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -19,7 +19,23 @@ const SUGGESTIONS = [
   { icon: '🐛', text: 'Debug my code' },
 ];
 
-// Analyze AI response content and return contextually relevant follow-up prompts
+// Highlight search matches in text by wrapping them in <mark> elements
+function highlightText(text: string, query: string): React.ReactNode {
+  if (!query.trim()) return text;
+  const q = query.toLowerCase();
+  const result: React.ReactNode[] = [];
+  let lastIdx = 0;
+  let lower = text.toLowerCase();
+  let idx = lower.indexOf(q);
+  while (idx !== -1) {
+    if (idx > lastIdx) result.push(text.slice(lastIdx, idx));
+    result.push(<mark key={idx} className="bg-yellow-400/40 text-yellow-200 rounded px-0.5">{text.slice(idx, idx + q.length)}</mark>);
+    lastIdx = idx + q.length;
+    idx = lower.indexOf(q, lastIdx);
+  }
+  if (lastIdx < text.length) result.push(text.slice(lastIdx));
+  return result.length > 0 ? result : text;
+}
 function getSuggestedFollowups(content: string): string[] {
   if (!content || content.trim().length < 20) return [];
 
@@ -225,9 +241,11 @@ interface MessageItemProps {
   streamingContent: string;
   chatTheme: ChatTheme;
   activeChatId: string;
+  chatSearchQuery?: string;
+  chatSearchActive?: boolean;
 }
 
-const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatTheme, activeChatId }: MessageItemProps) => {
+const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatTheme, activeChatId, chatSearchQuery, chatSearchActive }: MessageItemProps) => {
   const { settings } = useSettings();
   const [speaking, setSpeaking] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -536,9 +554,14 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeSanitize, rehypeHighlight]}
                   components={{
-                    p: ({ children }) => (
-                      <p className={`mb-4 last:mb-0 leading-relaxed ${isDark ? 'text-gray-100' : 'text-gray-800'}`}>{children}</p>
-                    ),
+                    p: ({ children }) => {
+                      const textContent = String(children ?? '');
+                      return (
+                        <p className={`mb-4 last:mb-0 leading-relaxed ${isDark ? 'text-gray-100' : 'text-gray-800'}`}>
+                          {chatSearchActive && chatSearchQuery ? highlightText(textContent, chatSearchQuery) : children}
+                        </p>
+                      );
+                    },
                     h1: ({ children }) => (
                       <h1 className={`text-xl font-bold mb-3 mt-6 first:mt-0 ${isDark ? 'text-white' : 'text-gray-900'}`}>{children}</h1>
                     ),
@@ -870,8 +893,11 @@ export const ChatWindow: React.FC = () => {
   const [showRegenerate, setShowRegenerate] = useState(false);
   const [showBookmarksPanel, setShowBookmarksPanel] = useState(false);
 
-
-  // Show regenerate briefly when streaming ends with a successful response
+  // In-chat Ctrl+F search state — useMemo and effects defined after activeChat
+  const [chatSearchVisible, setChatSearchVisible] = useState(false);
+  const [chatSearchQuery, setChatSearchQuery] = useState('');
+  const [chatSearchMatchIndex, setChatSearchMatchIndex] = useState(0);
+  const chatSearchInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (isStreaming) return;
     if (lastUserMessage && activeChat?.messages.some(m => m.role === 'assistant')) {
@@ -893,6 +919,75 @@ export const ChatWindow: React.FC = () => {
     chats.find(c => c.id === activeChatId),
     [chats, activeChatId]
   );
+
+  // Collect all search match message IDs for the current chat
+  const chatSearchMatches = useMemo(() => {
+    if (!chatSearchQuery.trim() || !activeChat) return [];
+    const q = chatSearchQuery.toLowerCase();
+    const matches: { msgId: string; idx: number }[] = [];
+    for (const msg of activeChat.messages) {
+      if (msg.content.toLowerCase().includes(q)) {
+        let idx = 0;
+        const lower = msg.content.toLowerCase();
+        while ((idx = lower.indexOf(q, idx)) !== -1) {
+          matches.push({ msgId: msg.id, idx });
+          idx += q.length;
+        }
+      }
+    }
+    return matches;
+  }, [chatSearchQuery, activeChat]);
+
+  // Global Ctrl+F to open in-chat search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        setChatSearchVisible(v => !v);
+        if (!chatSearchVisible) {
+          setChatSearchQuery('');
+          setChatSearchMatchIndex(0);
+          setTimeout(() => chatSearchInputRef.current?.focus(), 50);
+        }
+      }
+      if (e.key === 'Escape' && chatSearchVisible) {
+        setChatSearchVisible(false);
+        setChatSearchQuery('');
+      }
+      // Navigate matches with Enter in search mode
+      if (chatSearchVisible && chatSearchMatches.length > 0 && e.key === 'Enter') {
+        e.preventDefault();
+        const match = chatSearchMatches[chatSearchMatchIndex];
+        if (match) {
+          const el = scrollRef.current?.querySelector(`[data-message-id="${match.msgId}"]`);
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el?.classList.add('ring-2', 'ring-yellow-500/60');
+          setTimeout(() => el?.classList.remove('ring-2', 'ring-yellow-500/60'), 1200);
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [chatSearchVisible, chatSearchMatchIndex, chatSearchMatches]);
+
+  // Navigate between matches
+  const navigateSearchMatch = useCallback((dir: 1 | -1) => {
+    setChatSearchMatchIndex(i => {
+      const next = i + dir;
+      if (next < 0) return chatSearchMatches.length - 1;
+      if (next >= chatSearchMatches.length) return 0;
+      return next;
+    });
+  }, [chatSearchMatches.length]);
+
+  // Scroll to current match when index changes
+  useEffect(() => {
+    if (!chatSearchVisible || chatSearchMatches.length === 0) return;
+    const match = chatSearchMatches[chatSearchMatchIndex];
+    if (!match) return;
+    const el = scrollRef.current?.querySelector(`[data-message-id="${match.msgId}"]`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [chatSearchMatchIndex, chatSearchVisible, chatSearchMatches]);
 
   // Check if the last assistant message looks truncated (ends mid-sentence)
   const lastAssistantLooksTruncated = useMemo(() => {
@@ -1212,10 +1307,50 @@ export const ChatWindow: React.FC = () => {
                   streamingContent={isMessageStreaming ? streamingContent : ''}
                   chatTheme={chatTheme}
                   activeChatId={activeChatId ?? ''}
+                  chatSearchQuery={chatSearchQuery}
+                  chatSearchActive={chatSearchVisible}
                 />
                 </div>
               );
             })}
+
+            {/* In-chat search bar */}
+            {chatSearchVisible && (
+              <div className={`sticky top-0 z-20 flex items-center gap-2 px-3 py-2 mb-3 rounded-xl border backdrop-blur-md ${
+                isDark ? 'bg-gray-900/90 border-gray-700/60' : 'bg-white/90 border-gray-200'
+              }`}>
+                <Search className={`w-4 h-4 shrink-0 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} aria-hidden="true" />
+                <input
+                  ref={chatSearchInputRef}
+                  type="text"
+                  value={chatSearchQuery}
+                  onChange={e => { setChatSearchQuery(e.target.value); setChatSearchMatchIndex(0); }}
+                  onKeyDown={e => {
+                    if (e.key === 'ArrowDown' || e.key === 'F3') { e.preventDefault(); navigateSearchMatch(1); }
+                    if (e.key === 'ArrowUp') { e.preventDefault(); navigateSearchMatch(-1); }
+                    if (e.key === 'Escape') { setChatSearchVisible(false); setChatSearchQuery(''); }
+                  }}
+                  placeholder="Search current chat…"
+                  className={`flex-1 text-sm outline-none bg-transparent ${isDark ? 'text-white placeholder:text-gray-500' : 'text-gray-900 placeholder:text-gray-400'}`}
+                  aria-label="Search in current chat"
+                />
+                {chatSearchQuery.trim() && chatSearchMatches.length > 0 && (
+                  <span className={`text-xs font-medium shrink-0 ${isDark ? 'text-yellow-400' : 'text-amber-600'}`}>
+                    {chatSearchMatchIndex + 1}/{chatSearchMatches.length}
+                  </span>
+                )}
+                {chatSearchQuery.trim() && chatSearchMatches.length === 0 && (
+                  <span className={`text-xs shrink-0 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>No results</span>
+                )}
+                <button
+                  onClick={() => { setChatSearchVisible(false); setChatSearchQuery(''); }}
+                  className={`p-1 rounded hover:bg-gray-700/50 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}
+                  aria-label="Close search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
 
             {/* Suggested follow-up prompts — shown after AI finishes responding */}
             {!isStreaming && activeChat && activeChat.messages.some(m => m.role === 'assistant' && m.content.trim()) && (() => {
