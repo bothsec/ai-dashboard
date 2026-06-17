@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, ThumbsUp, Quote, Tag, Gauge, Play, Sparkles, Star, Link, GitBranch, Trash, Download, Minimize2 } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play, Search } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -19,67 +19,8 @@ const SUGGESTIONS = [
   { icon: '🐛', text: 'Debug my code' },
 ];
 
-// Analyze AI response content and return contextually relevant follow-up prompts
-function getSuggestedFollowups(content: string): string[] {
-  if (!content || content.trim().length < 20) return [];
-
-  const suggestions: string[] = [];
-
-  // Pattern: numbered or bulleted lists (3+ items)
-  const listMatch = content.match(/(?:^|\n)(?:\d+\.|-|\*)\s+.+(?:\n(?:\d+\.|-|\*)\s+.+){2,}/);
-  if (listMatch) {
-    suggestions.push('Tell me more about the first point');
-  }
-
-  // Pattern: code blocks
-  if (content.includes('```') || content.includes('`')) {
-    suggestions.push('Explain this code');
-  }
-
-  // Pattern: ends with a question (explicit question)
-  if (/[.?]$/.test(content.trim())) {
-    suggestions.push('Can you elaborate on that?');
-  }
-
-  // Pattern: comparison or pros/cons
-  const comparisonMatch = content.match(/\b(pros|cons|advantages|disadvantages|benefits?|drawbacks?|vs\.?|versus)\b/i);
-  if (comparisonMatch) {
-    suggestions.push('What are the main pros and cons?');
-    suggestions.push('Can you elaborate on the downsides?');
-  }
-
-  // Pattern: step-by-step instructions
-  const stepsMatch = content.match(/(?:step \d+|first|second|third|finally|then|next)\s/i);
-  if (stepsMatch) {
-    suggestions.push('Can you summarize the key steps?');
-  }
-
-  // Generic fallbacks (never repeat, max 2 from this pool)
-  const generic = [
-    'Can you give me an example?',
-    'What else should I know?',
-    'How does this work under the hood?',
-  ];
-  while (suggestions.length < 2) {
-    const pick = generic[Math.floor(Math.random() * generic.length)];
-    if (!suggestions.includes(pick)) suggestions.push(pick);
-  }
-
-  return suggestions.slice(0, 3);
-}
-
 export type MessageLabel = 'important' | 'question' | 'todo' | 'idea' | 'code' | null;
 
-export type MessageReaction = 'up' | 'down' | 'laugh' | 'love' | 'surprised' | 'sad' | 'lightbulb' | null;
-export const REACTION_OPTIONS: { value: MessageReaction; emoji: string; label: string }[] = [
-  { value: 'up', emoji: '👍', label: 'Helpful'    },
-  { value: 'down', emoji: '👎', label: 'Not helpful' },
-  { value: 'laugh', emoji: '😄', label: 'Funny'       },
-  { value: 'love', emoji: '❤️', label: 'Love it'    },
-  { value: 'surprised', emoji: '😮', label: 'Surprised'  },
-  { value: 'sad', emoji: '😢', label: 'Sad'         },
-  { value: 'lightbulb', emoji: '💡', label: 'Insightful'  },
-];
 export const LABEL_OPTIONS: { value: MessageLabel; label: string; color: string; bgClass: string; textClass: string }[] = [
   { value: 'important', label: 'Important', color: 'text-red-400',   bgClass: 'bg-red-500/20 border-red-500/40',   textClass: 'text-red-400'   },
   { value: 'question',  label: 'Question', color: 'text-blue-400',   bgClass: 'bg-blue-500/20 border-blue-500/40',   textClass: 'text-blue-400'   },
@@ -89,135 +30,25 @@ export const LABEL_OPTIONS: { value: MessageLabel; label: string; color: string;
 ];
 
 const LABEL_STORAGE_KEY = 'message_labels';
-const STARRED_STORAGE_KEY = 'message_starred';
-const COLLAPSED_STORAGE_KEY = 'collapsed_messages';
 
 // Detect if a message likely got cut off mid-sentence
-// Word count and estimated read time
-function getWordStats(content: string): { words: number; readTime: string } {
-  const text = content.trim();
-  if (!text) return { words: 0, readTime: '0s' };
-  const words = text.split(/\s+/).filter(w => w.length > 0).length;
-  // ~200 wpm average reading speed
-  const minutes = words / 200;
-  const readTime = minutes < 1 ? '\<1m' : `${Math.round(minutes)}m`;
-  return { words, readTime };
-}
-
 function looksTruncated(content: string): boolean {
   if (!content || content.trim().length < 30) return false;
   const trimmed = content.trim();
   // Ends with no terminal punctuation (., !, ?, —, |) or ellipsis
   if (!/[.!?\—|]$/.test(trimmed)) return true;
   // Trailing incomplete indicator
-  if (/[\[\(}\\{]$/.test(trimmed)) return true;
+  if (/[\[\(}\{]$/.test(trimmed)) return true;
   return false;
 }
 
-// Collapsible code block — auto-collapses long blocks, shows "Show more" toggle
-// langClass and codeText are extracted in the pre renderer and passed as props so
-// PreCodeBlock can render children (the highlighted code) directly without re-parsing.
-function PreCodeBlock({
-  children,
-  isDark,
-  langClass,
-  codeText,
-}: {
-  children: React.ReactNode;
-  isDark: boolean;
-  langClass: string;
-  codeText: string;
-}) {
-  const [copied, setCopied] = useState(false);
-  const AUTO_COLLAPSE_LINES = 20;
-  const PREVIEW_LINES = 10;
-  const langMatch = langClass.match(/language-(\w+)/);
-  const lang = langMatch ? langMatch[1] : '';
-  const lineCount = codeText.split('\n').length;
-  const shouldAutoCollapse = lineCount > AUTO_COLLAPSE_LINES;
 
-  const [userCollapsed, setUserCollapsed] = useState(shouldAutoCollapse);
-  const isReallyCollapsed = userCollapsed && shouldAutoCollapse;
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(codeText).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
-
-  const toggleCollapse = () => setUserCollapsed(prev => !prev);
-
-  return (
-    <pre
-      className={`relative rounded-xl mb-4 text-sm border leading-relaxed group/pre ${
-        isDark ? 'bg-gray-900/90 border-gray-700/40' : 'bg-gray-100 border-gray-200'
-      } ${isReallyCollapsed ? '' : 'overflow-x-auto'}`}
-    >
-      {/* Header bar with lang badge + action buttons */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-inherit/10">
-        {lang ? (
-          <span className={`text-[10px] font-mono font-semibold uppercase tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-            {lang}
-          </span>
-        ) : <span />}
-        <div className="flex items-center gap-1 ml-auto">
-          {shouldAutoCollapse && (
-            <button
-              onClick={toggleCollapse}
-              className={`p-1 rounded-lg opacity-0 group-hover/pre:opacity-100 transition-opacity ${
-                isDark ? 'bg-gray-700/80 hover:bg-gray-600/90 text-gray-400 hover:text-gray-200' : 'bg-gray-200/90 hover:bg-gray-300/90 text-gray-500 hover:text-gray-700'
-              }`}
-              aria-label={isReallyCollapsed ? 'Expand code block' : 'Collapse code block'}
-              title={isReallyCollapsed ? `Show all ${lineCount} lines` : `Collapse to ${PREVIEW_LINES} lines`}
-            >
-              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isReallyCollapsed ? '' : 'rotate-180'}`} />
-            </button>
-          )}
-          <button
-            onClick={handleCopy}
-            className={`p-1.5 rounded-lg opacity-0 group-hover/pre:opacity-100 transition-opacity ${
-              isDark ? 'bg-gray-700/80 hover:bg-gray-600/90 text-gray-400 hover:text-gray-200' : 'bg-gray-200/90 hover:bg-gray-300/90 text-gray-500 hover:text-gray-700'
-            }`}
-            aria-label="Copy code"
-            title="Copy code"
-          >
-            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-          </button>
-        </div>
-      </div>
-
-      {/* Code content — collapse via max-height */}
-      <div
-        className="relative"
-        style={isReallyCollapsed ? { maxHeight: '10.5rem', overflowY: 'hidden' } : undefined}
-      >
-        {children}
-      </div>
-
-      {/* "Show more" overlay when collapsed */}
-      {isReallyCollapsed && (
-        <div
-          className={`absolute bottom-0 left-0 right-0 h-16 flex items-end justify-center pb-2 pointer-events-none ${
-            isDark ? 'bg-gradient-to-t from-gray-900/95 to-transparent' : 'bg-gradient-to-t from-gray-100/95 to-transparent'
-          }`}
-        >
-          <button
-            onClick={toggleCollapse}
-            className={`pointer-events-auto text-xs px-3 py-1 rounded-full border transition-colors ${
-              isDark
-                ? 'bg-gray-800/90 border-gray-600/50 text-gray-300 hover:bg-gray-700/90'
-                : 'bg-white/90 border-gray-300 text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            Show {lineCount - PREVIEW_LINES} more lines
-          </button>
-        </div>
-      )}
-    </pre>
-  );
+// In-chat search: find messages whose content contains the query
+function getChatSearchResults(messages: Message[], query: string): Message[] {
+  if (!query.trim()) return [];
+  const q = query.toLowerCase();
+  return messages.filter(m => m.content.toLowerCase().includes(q));
 }
-
 interface MessageItemProps {
   msg: Message;
   isStreaming: boolean;
@@ -243,24 +74,11 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
     return false;
   });
 
-  const [isStarred, setIsStarred] = useState<boolean>(() => {
-    try {
-      const stored = localStorage.getItem(STARRED_STORAGE_KEY);
-      if (stored) return JSON.parse(stored).includes(msg.id);
-    } catch { /* ignore */ }
-    return false;
-  });
-
-  const [showReactionMenu, setShowReactionMenu] = useState(false);
-
-  const [linkCopied, setLinkCopied] = useState(false);
-  useEffect(() => { if (linkCopied) { const t = setTimeout(() => setLinkCopied(false), 2000); return () => clearTimeout(t); } }, [linkCopied]);
-
-  const [reaction, setReaction] = useState<MessageReaction>(() => {
+  const [reaction, setReaction] = useState<'up' | 'down' | null>(() => {
     try {
       const stored = localStorage.getItem('message_reactions');
       if (stored) {
-        const reactions = JSON.parse(stored) as Record<string, MessageReaction>;
+        const reactions = JSON.parse(stored) as Record<string, 'up' | 'down'>;
         return reactions[msg.id] ?? null;
       }
     } catch { /* ignore */ }
@@ -326,7 +144,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
   useEffect(() => {
     try {
       const stored = localStorage.getItem('message_reactions');
-      const reactions: Record<string, MessageReaction> = stored ? JSON.parse(stored) : {};
+      const reactions: Record<string, 'up' | 'down'> = stored ? JSON.parse(stored) : {};
       if (reaction) {
         reactions[msg.id] = reaction;
       } else {
@@ -343,37 +161,6 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
       return () => clearTimeout(timer);
     }
   }, [reaction, setReaction]);
-
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [isTall, setIsTall] = useState(false);
-
-  useEffect(() => {
-    if (msg.role === 'assistant' && !isStreaming && contentRef.current) {
-      const height = contentRef.current.scrollHeight;
-      if (height > 320) {
-        setIsTall(true);
-        try {
-          const stored = localStorage.getItem(COLLAPSED_STORAGE_KEY);
-          if (stored && JSON.parse(stored)[msg.id]) setIsExpanded(false);
-        } catch { /* ignore */ }
-      }
-    }
-  }, [msg.id, msg.content, isStreaming]);
-
-  const toggleExpanded = () => {
-    setIsExpanded(prev => {
-      const next = !prev;
-      try {
-        const stored = localStorage.getItem(COLLAPSED_STORAGE_KEY);
-        const collapsed: Record<string, boolean> = stored ? JSON.parse(stored) : {};
-        if (next) delete collapsed[msg.id];
-        else collapsed[msg.id] = true;
-        localStorage.setItem(COLLAPSED_STORAGE_KEY, JSON.stringify(collapsed));
-      } catch { /* ignore */ }
-      return next;
-    });
-  };
 
   const isDark = msg.role === 'user' ? true : settings.theme === 'dark';
   const activeChatTheme = chatTheme ?? settings.chatTheme;
@@ -578,8 +365,40 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                     pre: ({ children }) => {
                       const codeEl = children as React.ReactElement<{ className?: string; children?: string }>;
                       const langClass = codeEl?.props?.className ?? '';
-                      const codeText = String(codeEl?.props?.children ?? '');
-                      return <PreCodeBlock isDark={isDark} langClass={langClass} codeText={codeText}>{children}</PreCodeBlock>;
+                      const langMatch = langClass.match(/language-(\w+)/);
+                      const lang = langMatch ? langMatch[1] : '';
+                      const codeText = codeEl?.props?.children ?? '';
+                      return (
+                        <pre className={`relative rounded-xl p-4 mb-4 overflow-x-auto text-sm border leading-relaxed group/pre ${isDark ? 'bg-gray-900/90 border-gray-700/40' : 'bg-gray-100 border-gray-200'}`}>
+                          {lang && (
+                            <span className={`absolute top-2 left-3 text-[10px] font-mono font-semibold uppercase tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                              {lang}
+                            </span>
+                          )}
+                          {children}
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(typeof codeText === 'string' ? codeText : String(codeText)).then(() => {
+                                const btn = window.event?.target as HTMLElement;
+                                const pre = btn?.closest('pre');
+                                if (pre) pre.setAttribute('data-copied', 'true');
+                                setTimeout(() => {
+                                  const btn2 = window.event?.target as HTMLElement;
+                                  const pre2 = btn2?.closest('pre');
+                                  if (pre2) pre2.removeAttribute('data-copied');
+                                }, 2000);
+                              });
+                            }}
+                            className={`absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover/pre:opacity-100 transition-opacity ${isDark ? 'bg-gray-700/80 hover:bg-gray-600/90 text-gray-400 hover:text-gray-200' : 'bg-gray-200/90 hover:bg-gray-300/90 text-gray-500 hover:text-gray-700'}`}
+                            aria-label="Copy code"
+                            title="Copy code"
+                          >
+                            {((window.event?.target as HTMLElement)?.closest('pre')?.getAttribute('data-copied') === 'true')
+                              ? <Check className="w-3.5 h-3.5" />
+                              : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </pre>
+                      );
                     },
                     blockquote: ({ children }) => (
                       <blockquote className={`border-l-4 border-indigo-500/50 pl-4 py-1 italic mb-4 rounded-r-lg ${
@@ -630,28 +449,8 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                 >
                   {displayContent}
                 </ReactMarkdown>
-                        {isTall && !isExpanded && (
-                          <button
-                            onClick={toggleExpanded}
-                            className="text-xs mt-2 opacity-70 hover:opacity-100 underline"
-                          >
-                            Show more
-                          </button>
-                        )}
               </div>
             </div>
-            {/* Word count badge — shown on hover */}
-            {msg.content.trim() && (() => {
-              const { words, readTime } = getWordStats(msg.content);
-              return (
-                <div className="opacity-0 group-hover/bubble:opacity-100 transition-opacity pt-1 px-1 text-[10px] text-gray-500 flex items-center gap-1">
-                  <Gauge className="w-3 h-3" aria-hidden="true" />
-                  <span>{words}w</span>
-                  <span aria-hidden="true">·</span>
-                  <span>{readTime}</span>
-                </div>
-              );
-            })()}
             {/* Copy button — shown on hover */}
             <button
               onClick={() => {
@@ -676,38 +475,22 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
             {/* Reaction buttons — shown on hover for AI messages */}
             {msg.role === 'assistant' && !isStreaming && (
               <div className="absolute -bottom-8 left-0 flex items-center gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
-                {/* Reaction picker */}
-                <div className="relative">
-                  <button
-                    onClick={() => setShowReactionMenu(prev => !prev)}
-                    className="p-1 rounded hover:bg-gray-700/50 transition-colors text-gray-500"
-                    aria-label="React to message"
-                    title="React"
-                  >
-                    {reaction ? (
-                      <span className="text-sm">{REACTION_OPTIONS.find(r => r.value === reaction)?.emoji ?? '👍'}</span>
-                    ) : (
-                      <ThumbsUp className="w-3.5 h-3.5" />
-                    )}
-                  </button>
-                  {showReactionMenu && (
-                    <>
-                      <div className="fixed inset-0 z-40" onClick={() => setShowReactionMenu(false)} aria-hidden="true" />
-                      <div className={`absolute bottom-full mb-1 left-0 z-50 flex gap-1 p-1.5 rounded-xl border shadow-xl ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-                        {REACTION_OPTIONS.map(opt => (
-                          <button
-                            key={opt.value}
-                            onClick={() => { setReaction(opt.value as MessageReaction); setShowReactionMenu(false); }}
-                            className="text-lg hover:scale-125 transition-transform"
-                            aria-label={opt.label}
-                            title={opt.label}
-                          >{opt.emoji}</button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-
+                <button
+                  onClick={() => setReaction(prev => prev === 'up' ? null : 'up')}
+                  className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${reaction === 'up' ? 'text-green-400' : 'text-gray-500'}`}
+                  aria-label={reaction === 'up' ? 'Remove thumbs up' : 'Thumbs up'}
+                  title={reaction === 'up' ? 'Remove' : 'Helpful'}
+                >
+                  <ThumbsUp className={`w-3.5 h-3.5 ${reaction === 'up' ? 'fill-current' : ''}`} />
+                </button>
+                <button
+                  onClick={() => setReaction(prev => prev === 'down' ? null : 'down')}
+                  className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${reaction === 'down' ? 'text-red-400' : 'text-gray-500'}`}
+                  aria-label={reaction === 'down' ? 'Remove thumbs down' : 'Thumbs down'}
+                  title={reaction === 'down' ? 'Remove' : 'Not helpful'}
+                >
+                  <ThumbsDown className={`w-3.5 h-3.5 ${reaction === 'down' ? 'fill-current' : ''}`} />
+                </button>
                 <button
                   onClick={() => setIsBookmarked(prev => !prev)}
                   className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${isBookmarked ? 'text-amber-400' : 'text-gray-500'}`}
@@ -715,29 +498,6 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                   title={isBookmarked ? 'Remove bookmark' : 'Bookmark'}
                 >
                   <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-current' : ''}`} />
-                </button>
-
-                {/* Star button */}
-                <button
-                  onClick={() => setIsStarred(prev => !prev)}
-                  className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${isStarred ? 'text-yellow-400' : 'text-gray-500'}`}
-                  aria-label={isStarred ? 'Unstar' : 'Star message'}
-                  title={isStarred ? 'Unstar' : 'Star'}
-                >
-                  <Star className={`w-3.5 h-3.5 ${isStarred ? 'fill-current' : ''}`} />
-                </button>
-
-                {/* Copy link button */}
-                <button
-                  onClick={() => {
-                    const url = `${window.location.origin}${window.location.pathname}#${msg.id}`;
-                    navigator.clipboard.writeText(url).then(() => setLinkCopied(true));
-                  }}
-                  className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${linkCopied ? 'text-indigo-400' : 'text-gray-500'}`}
-                  aria-label={linkCopied ? 'Link copied!' : 'Copy link to message'}
-                  title={linkCopied ? 'Link copied!' : 'Copy link'}
-                >
-                  {linkCopied ? <Check className="w-3.5 h-3.5" /> : <Link className="w-3.5 h-3.5" />}
                 </button>
                 {/* Label selector */}
                 <div className="relative">
@@ -857,7 +617,54 @@ const MessageSkeleton = memo(() => {
   );
 });
 
-// ---- Message types
+// Context window usage indicator — estimates how much of the 128k NVIDIA context is used
+const CONTEXT_WINDOW_TOKENS = 128_000;
+
+const ContextWindowBar = memo(({ totalTokens }: { totalTokens: number }) => {
+  const { settings } = useSettings();
+  const isDark = settings.theme === 'dark';
+
+  // totalTokens is already in token units (approx chars/4 from server). We also need
+  // to account for the tokens that will be sent as part of the next request
+  // (system prompt + history). Use a conservative 500-token overhead estimate.
+  const estimatedTokens = totalTokens + 500;
+  const pct = Math.min((estimatedTokens / CONTEXT_WINDOW_TOKENS) * 100, 100);
+
+  // Color coding: green < 60%, amber 60-85%, red > 85%
+  const barColor = pct >= 85
+    ? 'bg-red-500'
+    : pct >= 60
+      ? 'bg-amber-500'
+      : 'bg-emerald-500';
+
+  const textColor = pct >= 85
+    ? 'text-red-400'
+    : pct >= 60
+      ? 'text-amber-400'
+      : 'text-emerald-400';
+
+  // Format large numbers
+  const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+
+  return (
+    <div
+      className={`max-w-4xl mx-auto flex items-center gap-3 px-1 mb-2`}
+      title={`Estimated context usage: ~${fmt(estimatedTokens)} / 128k tokens`}
+      aria-label={`Context window: ${fmt(estimatedTokens)} of 128k tokens used`}
+    >
+      <Gauge className={`w-3.5 h-3.5 shrink-0 ${textColor}`} aria-hidden="true" />
+      <div className={`flex-1 h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`} role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className={`text-[10px] font-mono font-medium ${textColor}`}>
+        {fmt(estimatedTokens)} / 128k
+      </span>
+    </div>
+  );
+});
 
 export const ChatWindow: React.FC = () => {
   const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, tokensPerSecond, sendMessage, dismissError, lastSentMessage, lastUserMessage, regenerateLastResponse, deleteChat, branchChat, continueResponse } = useChat();
@@ -865,11 +672,13 @@ export const ChatWindow: React.FC = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const emptyStateRef = useRef<HTMLDivElement>(null);
   const [isPinned, setIsPinned] = useState(true);
-  const [chatCopied, setChatCopied] = useState(false);
   // Show regenerate button briefly after a response completes
   const [showRegenerate, setShowRegenerate] = useState(false);
   const [showBookmarksPanel, setShowBookmarksPanel] = useState(false);
-
+  const [chatCopied, setChatCopied] = useState(false);
+  const [chatSearchQuery, setChatSearchQuery] = useState<string>('');
+  const [chatSearchIndex, setChatSearchIndex] = useState(0);
+  const chatSearchInputRef = useRef<HTMLInputElement>(null);
 
   // Show regenerate briefly when streaming ends with a successful response
   useEffect(() => {
@@ -952,12 +761,65 @@ export const ChatWindow: React.FC = () => {
     return () => window.removeEventListener('chat:scroll-to-message', handleScrollToMessage);
   }, []);
 
+  // Compute search results (stable, derived from state)
+  const chatSearchResults = getChatSearchResults(
+    activeChat?.messages ?? [],
+    (chatSearchQuery as string) === '__open__' ? '' : chatSearchQuery
+  );
+
+  const openChatSearch = useCallback(() => {
+    setChatSearchQuery('__open__');
+    requestAnimationFrame(() => chatSearchInputRef.current?.focus());
+  }, []);
+
+  const closeChatSearch = useCallback(() => {
+    setChatSearchQuery('');
+    setChatSearchIndex(0);
+  }, []);
+
+  const navigateChatSearch = useCallback((direction: 'next' | 'prev') => {
+    if (chatSearchResults.length === 0) return;
+    const next = direction === 'next'
+      ? (chatSearchIndex + 1) % chatSearchResults.length
+      : (chatSearchIndex - 1 + chatSearchResults.length) % chatSearchResults.length;
+    setChatSearchIndex(next);
+    const msgId = chatSearchResults[next].id;
+    requestAnimationFrame(() => {
+      const el = scrollRef.current?.querySelector(`[data-message-id="${msgId}"]`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el?.classList.add('ring-2', 'ring-amber-500/60');
+      setTimeout(() => el?.classList.remove('ring-2', 'ring-amber-500/60'), 1500);
+    });
+  }, [chatSearchResults, chatSearchIndex]);
+
+  // Ctrl+F / F3 / Escape keyboard handler for in-chat search
+  useEffect(() => {
+    const handleSearchKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept if user is typing in an input/textarea
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        openChatSearch();
+      }
+      if (e.key === 'F3' && chatSearchQuery && chatSearchQuery !== '__open__') {
+        e.preventDefault();
+        navigateChatSearch(e.shiftKey ? 'prev' : 'next');
+      }
+      if (e.key === 'Escape' && chatSearchQuery) {
+        closeChatSearch();
+      }
+    };
+    window.addEventListener('keydown', handleSearchKeyDown);
+    return () => window.removeEventListener('keydown', handleSearchKeyDown);
+  }, [chatSearchQuery, chatSearchIndex, openChatSearch, closeChatSearch, navigateChatSearch]);
+
   const suggestions = SUGGESTIONS; // stable reference, no re-creation
 
   const handleSuggestionClick = useCallback(async (text: string) => {
     await sendMessage(text);
   }, [sendMessage]);
-
 
   const handleExportChat = useCallback(() => {
     if (!activeChat || activeChat.messages.length === 0) return;
@@ -996,8 +858,17 @@ export const ChatWindow: React.FC = () => {
       await navigator.clipboard.writeText(lines.join('\n'));
       setChatCopied(true);
       setTimeout(() => setChatCopied(false), 2000);
-    } catch { /* ignore */ }
+    } catch {
+      // clipboard unavailable silently ignored
+    }
   }, [activeChat]);
+
+  // Handle /export slash command from ChatInput
+  useEffect(() => {
+    const handleTriggerExport = () => handleExportChat();
+    window.addEventListener('chat:trigger-export', handleTriggerExport);
+    return () => window.removeEventListener('chat:trigger-export', handleTriggerExport);
+  }, [handleExportChat]);
 
   // Detect network vs API errors for a more specific message
   const isNetworkError = error && (
@@ -1080,71 +951,6 @@ export const ChatWindow: React.FC = () => {
     <div
       className={`flex-1 flex flex-col h-full min-h-0 overflow-hidden relative ${chatBgClass}`}
     >
-      {/* Chat control icon row */}
-      {activeChat && activeChat.messages.length > 0 && (
-        <div className="max-w-4xl mx-auto flex items-center justify-end gap-1 px-4 md:px-8 lg:px-12 pt-4 pb-2">
-          <button
-            onClick={() => setShowBookmarksPanel(p => !p)}
-            className={`p-2 rounded-lg transition-colors ${
-              isDark ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-gray-100 text-gray-400'
-            }`}
-            aria-label="Bookmarks"
-          >
-            <Bookmark className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => branchChat(activeChatId!)}
-            className={`p-2 rounded-lg transition-colors ${
-              isDark ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-gray-100 text-gray-400'
-            }`}
-            aria-label="Branch chat"
-          >
-            <GitBranch className="w-4 h-4" />
-          </button>
-          <button
-            onClick={handleExportChat}
-            className={`p-2 rounded-lg transition-colors ${
-              isDark ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-gray-100 text-gray-400'
-            }`}
-            aria-label="Export chat"
-          >
-            <Download className="w-4 h-4" />
-          </button>
-          <button
-            onClick={handleCopyChat}
-            className={`p-2 rounded-lg transition-colors ${
-              isDark ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-gray-100 text-gray-400'
-            }`}
-            aria-label={chatCopied ? 'Copied!' : 'Copy chat'}
-          >
-            {chatCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-          </button>
-          <button
-            onClick={() => {
-              if (window.confirm('Delete this chat? This cannot be undone.')) {
-                deleteChat(activeChatId!);
-              }
-            }}
-            className={`p-2 rounded-lg transition-colors ${
-              isDark ? 'hover:bg-red-500/20 text-red-400' : 'hover:bg-red-50 text-red-500'
-            }`}
-            aria-label="Delete chat"
-          >
-            <Trash className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => window.dispatchEvent(new CustomEvent('chat:mini-mode'))}
-            className={`p-2 rounded-lg transition-colors ${
-              isDark ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-gray-100 text-gray-400'
-            }`}
-            aria-label="Mini mode"
-            title="Enter mini mode (Ctrl+M)"
-          >
-            <Minimize2 className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
       <div
         ref={scrollRef}
         onScroll={handleScroll}
@@ -1153,7 +959,98 @@ export const ChatWindow: React.FC = () => {
         aria-live="polite"
         aria-label="Chat messages"
       >
-        {/* Messages rendered here */}
+        {/* Context window usage indicator */}
+        {activeChat && (activeChat.totalTokens ?? 0) > 0 && (
+          <ContextWindowBar totalTokens={activeChat.totalTokens!} />
+        )}
+
+        {/* Export button — only shown when chat has messages */}
+        {activeChat && activeChat.messages.length > 0 && (
+          <div className="max-w-4xl mx-auto flex justify-end gap-2 mb-2">
+            <button
+              onClick={() => setShowBookmarksPanel(prev => !prev)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                showBookmarksPanel
+                  ? isDark ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-amber-50 text-amber-600 border border-amber-200'
+                  : isDark
+                    ? 'text-gray-500 hover:text-amber-400 hover:bg-gray-800'
+                    : 'text-gray-400 hover:text-amber-600 hover:bg-gray-100'
+              }`}
+              aria-label="Toggle bookmarks panel"
+              aria-pressed={showBookmarksPanel}
+              title="Bookmarks"
+            >
+              <Bookmark className={`w-3.5 h-3.5 ${showBookmarksPanel ? 'fill-current' : ''}`} />
+              Bookmarks
+            </button>
+            <button
+              onClick={() => {
+                if (activeChatId) {
+                  branchChat(activeChatId);
+                }
+              }}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                isDark
+                  ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
+                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+              }`}
+              aria-label="Branch conversation"
+              title="Create a branch copy of this conversation"
+            >
+              <GitBranch className="w-3.5 h-3.5" aria-hidden="true" />
+              Branch
+            </button>
+            <button
+              onClick={handleExportChat}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                isDark
+                  ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
+                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+              }`}
+              aria-label="Export chat as Markdown"
+              title="Export as Markdown"
+            >
+              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+              Export
+            </button>
+            <button
+              onClick={handleCopyChat}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                chatCopied
+                  ? isDark
+                    ? 'text-green-400 bg-green-500/10'
+                    : 'text-green-600 bg-green-50'
+                  : isDark
+                    ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
+                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+              }`}
+              aria-label={chatCopied ? 'Copied!' : 'Copy chat as Markdown'}
+              title="Copy as Markdown"
+            >
+              {chatCopied
+                ? <Check className="w-3.5 h-3.5" aria-hidden="true" />
+                : <Copy className="w-3.5 h-3.5" aria-hidden="true" />}
+              {chatCopied ? 'Copied!' : 'Copy'}
+            </button>
+            <button
+              onClick={() => {
+                if (window.confirm('Delete this chat? This cannot be undone.')) {
+                  deleteChat(activeChatId ?? '');
+                }
+              }}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                isDark
+                  ? 'text-gray-500 hover:text-red-400 hover:bg-red-500/10'
+                  : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+              }`}
+              aria-label="Delete active chat"
+              title="Delete chat"
+            >
+              <Trash className="w-3.5 h-3.5" aria-hidden="true" />
+              Delete
+            </button>
+          </div>
+        )}
         {activeChat && activeChat.messages.length === 0 ? (
           /* Empty state */
           <div 
@@ -1197,8 +1094,77 @@ export const ChatWindow: React.FC = () => {
             </div>
           </div>
         ) : (
-          /* Messages list */
-          <div className="max-w-4xl mx-auto" role="list" aria-label="Chat messages">
+          <>
+            {/* In-chat search bar — shown when Ctrl+F has been pressed */}
+            {(chatSearchQuery !== '' || (chatSearchQuery as string) === '__open__') && activeChat && activeChat.messages.length > 0 && (
+              <div className="max-w-4xl mx-auto mb-3 flex items-center gap-2 px-3 py-2 rounded-xl border shadow-lg z-10"
+                style={{
+                  backgroundColor: isDark ? 'rgba(17,24,39,0.95)' : 'rgba(255,255,255,0.95)',
+                  borderColor: isDark ? 'rgba(75,85,99,0.6)' : 'rgba(209,213,219,0.8)',
+                }}
+                role="search"
+                aria-label="Search within chat"
+              >
+                <Search className={`w-3.5 h-3.5 shrink-0 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} aria-hidden="true" />
+                <input
+                  ref={chatSearchInputRef}
+                  type="text"
+                  value={(chatSearchQuery as string) === '__open__' ? '' : chatSearchQuery}
+                  onChange={(e) => {
+                    setChatSearchQuery(e.target.value);
+                    setChatSearchIndex(0);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (e.shiftKey) navigateChatSearch('prev');
+                      else navigateChatSearch('next');
+                    }
+                    if (e.key === 'Escape') closeChatSearch();
+                  }}
+                  placeholder="Search messages…"
+                  className={`flex-1 bg-transparent text-sm outline-none ${isDark ? 'text-gray-100 placeholder:text-gray-500' : 'text-gray-900 placeholder:text-gray-400'}`}
+                  aria-label="Search query"
+                  autoFocus={(chatSearchQuery as string) === '__open__'}
+                />
+                {chatSearchResults.length > 0 ? (
+                  <>
+                    <span className={`text-xs font-medium shrink-0 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} aria-live="polite">
+                      {chatSearchIndex + 1} / {chatSearchResults.length}
+                    </span>
+                    <button
+                      onClick={() => navigateChatSearch('prev')}
+                      className={`p-1 rounded transition-colors ${isDark ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}
+                      aria-label="Previous match"
+                      title="Previous (Shift+F3)"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5 rotate-180" aria-hidden="true" />
+                    </button>
+                    <button
+                      onClick={() => navigateChatSearch('next')}
+                      className={`p-1 rounded transition-colors ${isDark ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}
+                      aria-label="Next match"
+                      title="Next (F3)"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
+                    </button>
+                  </>
+                ) : chatSearchQuery && chatSearchQuery !== '__open__' ? (
+                  <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>No matches</span>
+                ) : null}
+                <button
+                  onClick={closeChatSearch}
+                  className={`p-1 rounded transition-colors ${isDark ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}
+                  aria-label="Close search"
+                  title="Close (Esc)"
+                >
+                  <X className="w-3.5 h-3.5" aria-hidden="true" />
+                </button>
+              </div>
+            )}
+
+            {/* Messages list */}
+            <div className="max-w-4xl mx-auto" role="list" aria-label="Chat messages">
             {activeChat?.messages.map((msg, index) => {
               const isLast = index === (activeChat?.messages.length ?? 0) - 1;
               const isMessageStreaming = isStreaming && isLast && msg.id === streamingMessageId;
@@ -1216,42 +1182,7 @@ export const ChatWindow: React.FC = () => {
                 </div>
               );
             })}
-
-            {/* Suggested follow-up prompts — shown after AI finishes responding */}
-            {!isStreaming && activeChat && activeChat.messages.some(m => m.role === 'assistant' && m.content.trim()) && (() => {
-              // Find last assistant message content
-              let lastAssistantContent = '';
-              for (let i = (activeChat.messages.length ?? 0) - 1; i >= 0; i--) {
-                const msg = activeChat.messages[i];
-                if (msg.role === 'assistant' && msg.content.trim()) {
-                  lastAssistantContent = msg.content;
-                  break;
-                }
-              }
-              const followups = getSuggestedFollowups(lastAssistantContent);
-              if (followups.length === 0) return null;
-              return (
-                <div className="flex flex-wrap gap-2 mt-4 mb-2 justify-center" role="list" aria-label="Suggested follow-up prompts">
-                  {followups.map((prompt, i) => (
-                    <button
-                      key={i}
-                      onClick={() => sendMessage(prompt)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 hover:-translate-y-0.5 ${
-                        isDark
-                          ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/30'
-                          : 'bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300'
-                      }`}
-                      role="listitem"
-                      aria-label={`Follow up: ${prompt}`}
-                    >
-                      <Sparkles className="w-3 h-3" aria-hidden="true" />
-                      {prompt}
-                    </button>
-                  ))}
-                </div>
-              );
-            })()}
-
+            
             {/* Show skeleton when streaming but no message content yet */}
             {isStreaming && activeChat?.messages.length === 0 && (
               <MessageSkeleton />
@@ -1278,6 +1209,7 @@ export const ChatWindow: React.FC = () => {
               </button>
             )}
           </div>
+          </>
         )}
       </div>
 
