@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play, Sparkles } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown,  RotateCw, Bookmark, Trash, ThumbsUp,  Quote, Tag, Gauge, GitBranch, Play, Sparkles, Star, Link } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -70,6 +70,16 @@ function getSuggestedFollowups(content: string): string[] {
 
 export type MessageLabel = 'important' | 'question' | 'todo' | 'idea' | 'code' | null;
 
+export type MessageReaction = 'up' | 'down' | 'laugh' | 'love' | 'surprised' | 'sad' | 'lightbulb' | null;
+export const REACTION_OPTIONS: { value: MessageReaction; emoji: string; label: string }[] = [
+  { value: 'up', emoji: '👍', label: 'Helpful'    },
+  { value: 'down', emoji: '👎', label: 'Not helpful' },
+  { value: 'laugh', emoji: '😄', label: 'Funny'       },
+  { value: 'love', emoji: '❤️', label: 'Love it'    },
+  { value: 'surprised', emoji: '😮', label: 'Surprised'  },
+  { value: 'sad', emoji: '😢', label: 'Sad'         },
+  { value: 'lightbulb', emoji: '💡', label: 'Insightful'  },
+];
 export const LABEL_OPTIONS: { value: MessageLabel; label: string; color: string; bgClass: string; textClass: string }[] = [
   { value: 'important', label: 'Important', color: 'text-red-400',   bgClass: 'bg-red-500/20 border-red-500/40',   textClass: 'text-red-400'   },
   { value: 'question',  label: 'Question', color: 'text-blue-400',   bgClass: 'bg-blue-500/20 border-blue-500/40',   textClass: 'text-blue-400'   },
@@ -79,8 +89,21 @@ export const LABEL_OPTIONS: { value: MessageLabel; label: string; color: string;
 ];
 
 const LABEL_STORAGE_KEY = 'message_labels';
+const STARRED_STORAGE_KEY = 'message_starred';
+const COLLAPSED_STORAGE_KEY = 'collapsed_messages';
 
 // Detect if a message likely got cut off mid-sentence
+// Word count and estimated read time
+function getWordStats(content: string): { words: number; readTime: string } {
+  const text = content.trim();
+  if (!text) return { words: 0, readTime: '0s' };
+  const words = text.split(/\s+/).filter(w => w.length > 0).length;
+  // ~200 wpm average reading speed
+  const minutes = words / 200;
+  const readTime = minutes < 1 ? '\<1m' : `${Math.round(minutes)}m`;
+  return { words, readTime };
+}
+
 function looksTruncated(content: string): boolean {
   if (!content || content.trim().length < 30) return false;
   const trimmed = content.trim();
@@ -220,11 +243,24 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
     return false;
   });
 
-  const [reaction, setReaction] = useState<'up' | 'down' | null>(() => {
+  const [isStarred, setIsStarred] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem(STARRED_STORAGE_KEY);
+      if (stored) return JSON.parse(stored).includes(msg.id);
+    } catch { /* ignore */ }
+    return false;
+  });
+
+  const [showReactionMenu, setShowReactionMenu] = useState(false);
+
+  const [linkCopied, setLinkCopied] = useState(false);
+  useEffect(() => { if (linkCopied) { const t = setTimeout(() => setLinkCopied(false), 2000); return () => clearTimeout(t); } }, [linkCopied]);
+
+  const [reaction, setReaction] = useState<MessageReaction>(() => {
     try {
       const stored = localStorage.getItem('message_reactions');
       if (stored) {
-        const reactions = JSON.parse(stored) as Record<string, 'up' | 'down'>;
+        const reactions = JSON.parse(stored) as Record<string, MessageReaction>;
         return reactions[msg.id] ?? null;
       }
     } catch { /* ignore */ }
@@ -290,7 +326,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
   useEffect(() => {
     try {
       const stored = localStorage.getItem('message_reactions');
-      const reactions: Record<string, 'up' | 'down'> = stored ? JSON.parse(stored) : {};
+      const reactions: Record<string, MessageReaction> = stored ? JSON.parse(stored) : {};
       if (reaction) {
         reactions[msg.id] = reaction;
       } else {
@@ -307,6 +343,37 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
       return () => clearTimeout(timer);
     }
   }, [reaction, setReaction]);
+
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [isExpanded, setIsExpanded] = useState(true);
+  const [isTall, setIsTall] = useState(false);
+
+  useEffect(() => {
+    if (msg.role === 'assistant' && !isStreaming && contentRef.current) {
+      const height = contentRef.current.scrollHeight;
+      if (height > 320) {
+        setIsTall(true);
+        try {
+          const stored = localStorage.getItem(COLLAPSED_STORAGE_KEY);
+          if (stored && JSON.parse(stored)[msg.id]) setIsExpanded(false);
+        } catch { /* ignore */ }
+      }
+    }
+  }, [msg.id, msg.content, isStreaming]);
+
+  const toggleExpanded = () => {
+    setIsExpanded(prev => {
+      const next = !prev;
+      try {
+        const stored = localStorage.getItem(COLLAPSED_STORAGE_KEY);
+        const collapsed: Record<string, boolean> = stored ? JSON.parse(stored) : {};
+        if (next) delete collapsed[msg.id];
+        else collapsed[msg.id] = true;
+        localStorage.setItem(COLLAPSED_STORAGE_KEY, JSON.stringify(collapsed));
+      } catch { /* ignore */ }
+      return next;
+    });
+  };
 
   const isDark = msg.role === 'user' ? true : settings.theme === 'dark';
   const activeChatTheme = chatTheme ?? settings.chatTheme;
@@ -563,6 +630,14 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                 >
                   {displayContent}
                 </ReactMarkdown>
+                        {isTall && !isExpanded && (
+                          <button
+                            onClick={toggleExpanded}
+                            className="text-xs mt-2 opacity-70 hover:opacity-100 underline"
+                          >
+                            Show more
+                          </button>
+                        )}
               </div>
             </div>
             {/* Word count badge — shown on hover */}
@@ -601,22 +676,38 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
             {/* Reaction buttons — shown on hover for AI messages */}
             {msg.role === 'assistant' && !isStreaming && (
               <div className="absolute -bottom-8 left-0 flex items-center gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
-                <button
-                  onClick={() => setReaction(prev => prev === 'up' ? null : 'up')}
-                  className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${reaction === 'up' ? 'text-green-400' : 'text-gray-500'}`}
-                  aria-label={reaction === 'up' ? 'Remove thumbs up' : 'Thumbs up'}
-                  title={reaction === 'up' ? 'Remove' : 'Helpful'}
-                >
-                  <ThumbsUp className={`w-3.5 h-3.5 ${reaction === 'up' ? 'fill-current' : ''}`} />
-                </button>
-                <button
-                  onClick={() => setReaction(prev => prev === 'down' ? null : 'down')}
-                  className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${reaction === 'down' ? 'text-red-400' : 'text-gray-500'}`}
-                  aria-label={reaction === 'down' ? 'Remove thumbs down' : 'Thumbs down'}
-                  title={reaction === 'down' ? 'Remove' : 'Not helpful'}
-                >
-                  <ThumbsDown className={`w-3.5 h-3.5 ${reaction === 'down' ? 'fill-current' : ''}`} />
-                </button>
+                {/* Reaction picker */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowReactionMenu(prev => !prev)}
+                    className="p-1 rounded hover:bg-gray-700/50 transition-colors text-gray-500"
+                    aria-label="React to message"
+                    title="React"
+                  >
+                    {reaction ? (
+                      <span className="text-sm">{REACTION_OPTIONS.find(r => r.value === reaction)?.emoji ?? '👍'}</span>
+                    ) : (
+                      <ThumbsUp className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                  {showReactionMenu && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowReactionMenu(false)} aria-hidden="true" />
+                      <div className={`absolute bottom-full mb-1 left-0 z-50 flex gap-1 p-1.5 rounded-xl border shadow-xl ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+                        {REACTION_OPTIONS.map(opt => (
+                          <button
+                            key={opt.value}
+                            onClick={() => { setReaction(opt.value as MessageReaction); setShowReactionMenu(false); }}
+                            className="text-lg hover:scale-125 transition-transform"
+                            aria-label={opt.label}
+                            title={opt.label}
+                          >{opt.emoji}</button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+
                 <button
                   onClick={() => setIsBookmarked(prev => !prev)}
                   className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${isBookmarked ? 'text-amber-400' : 'text-gray-500'}`}
@@ -624,6 +715,29 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                   title={isBookmarked ? 'Remove bookmark' : 'Bookmark'}
                 >
                   <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-current' : ''}`} />
+                </button>
+
+                {/* Star button */}
+                <button
+                  onClick={() => setIsStarred(prev => !prev)}
+                  className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${isStarred ? 'text-yellow-400' : 'text-gray-500'}`}
+                  aria-label={isStarred ? 'Unstar' : 'Star message'}
+                  title={isStarred ? 'Unstar' : 'Star'}
+                >
+                  <Star className={`w-3.5 h-3.5 ${isStarred ? 'fill-current' : ''}`} />
+                </button>
+
+                {/* Copy link button */}
+                <button
+                  onClick={() => {
+                    const url = `${window.location.origin}${window.location.pathname}#${msg.id}`;
+                    navigator.clipboard.writeText(url).then(() => setLinkCopied(true));
+                  }}
+                  className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${linkCopied ? 'text-indigo-400' : 'text-gray-500'}`}
+                  aria-label={linkCopied ? 'Link copied!' : 'Copy link to message'}
+                  title={linkCopied ? 'Link copied!' : 'Copy link'}
+                >
+                  {linkCopied ? <Check className="w-3.5 h-3.5" /> : <Link className="w-3.5 h-3.5" />}
                 </button>
                 {/* Label selector */}
                 <div className="relative">
