@@ -1,5 +1,5 @@
-import { memo } from 'react';
-import { X, MessageSquare, Zap, Clock, TrendingUp, DollarSign } from 'lucide-react';
+import { memo, useState, useEffect } from 'react';
+import { X, MessageSquare, Zap, TrendingUp, DollarSign, Timer } from 'lucide-react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
 
@@ -17,6 +17,28 @@ export const ChatStatsModal = memo(function ChatStatsModal({ onClose }: ChatStat
   const isDark = settings.theme === 'dark';
 
   const activeChat = chats.find(c => c.id === activeChatId);
+
+  // Live session timer (ticks every second while modal is open)
+  const [sessionSeconds, setSessionSeconds] = useState(0);
+  useEffect(() => {
+    if (!activeChat?.createdAt) return;
+    // Initialize elapsed time since chat was created
+    const initial = Math.floor((Date.now() - new Date(activeChat.createdAt).getTime()) / 1000);
+    setSessionSeconds(initial < 0 ? 0 : initial);
+    const id = setInterval(() => {
+      setSessionSeconds(s => s + 1);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [activeChat?.id, activeChat?.createdAt]);
+
+  const formatDuration = (secs: number) => {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    if (h > 0) return `${h}h ${m.toString().padStart(2, '0')}m`;
+    if (m > 0) return `${m}m ${s.toString().padStart(2, '0')}s`;
+    return `${s}s`;
+  };
 
   // All-time stats
   const allTimeTokens = chats.reduce((sum, c) => sum + (c.totalTokens || 0), 0);
@@ -112,6 +134,12 @@ export const ChatStatsModal = memo(function ChatStatsModal({ onClose }: ChatStat
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <StatCard
+                  icon={Timer}
+                  label="Session Time"
+                  value={formatDuration(sessionSeconds)}
+                  accent="text-pink-400"
+                />
+                <StatCard
                   icon={Zap}
                   label="Tokens Used"
                   value={formatTokens(chatTokens)}
@@ -130,12 +158,6 @@ export const ChatStatsModal = memo(function ChatStatsModal({ onClose }: ChatStat
                   value={`${chatMessages}`}
                   sub={`${chatUserMessages} you · ${chatAssistantMessages} AI`}
                   accent="text-amber-400"
-                />
-                <StatCard
-                  icon={Clock}
-                  label="Created"
-                  value={activeChat.createdAt ? new Date(activeChat.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—'}
-                  accent="text-cyan-400"
                 />
               </div>
             </>
