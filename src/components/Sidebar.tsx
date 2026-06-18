@@ -8,6 +8,7 @@ import { ChatSearchModal } from './ChatSearchModal';
 import { KhmerRielFormatter } from './KhmerRielFormatter';
 import { KhmerNumberWords } from './KhmerNumberWords';
 import { WorkplaceTips } from './WorkplaceTips';
+import { KhmerLeaveCalculator } from './KhmerLeaveCalculator';
 import { ChatStatsModal } from './ChatStatsModal';
 
 // Move outside component — pure function, no deps on component scope
@@ -34,6 +35,7 @@ export const Sidebar = memo(() => {
   const [showWorkplaceTips, setShowWorkplaceTips] = useState(false);
   const [showRielFormatter, setShowRielFormatter] = useState(false);
   const [showNumberWords, setShowNumberWords] = useState(false);
+  const [showLeaveCalculator, setShowLeaveCalculator] = useState(false);
   const [renamingChatId, setRenamingChatId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
 
@@ -492,6 +494,13 @@ export const Sidebar = memo(() => {
                 <CalendarDays className={`w-4 h-4 ${footerIconClass}`} />
               </button>
             <button
+                onClick={() => setShowLeaveCalculator(true)}
+                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
+                title="Leave Entitlements Calculator"
+              >
+                <Shield className={`w-4 h-4 ${footerIconClass}`} />
+              </button>
+            <button
                 onClick={() => setShowWorkplaceTips(true)}
                 className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
                 title="Khmer Workplace Tips"
@@ -521,6 +530,7 @@ export const Sidebar = memo(() => {
         {showRielFormatter && <KhmerRielFormatter onClose={() => setShowRielFormatter(false)} />}
         {showNumberWords && <KhmerNumberWords onClose={() => setShowNumberWords(false)} />}
         {showWorkplaceTips && <WorkplaceTips onClose={() => setShowWorkplaceTips(false)} />}
+        {showLeaveCalculator && <KhmerLeaveCalculator onClose={() => setShowLeaveCalculator(false)} />}
     </>
   );
 });
