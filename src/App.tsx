@@ -7,11 +7,13 @@ import { Sidebar } from './components/Sidebar';
 import { ChatWindow } from './components/ChatWindow';
 import { ChatInput } from './components/ChatInput';
 import { ShortcutsModal } from './components/ShortcutsModal';
+import { ResumeBuilder } from './components/ResumeBuilder';
 import { MiniMode } from './components/MiniMode';
 
 const AppInner = memo(function AppInner() {
   const { isStreaming, cancelStream, createNewChat } = useChat();
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showResumeBuilder, setShowResumeBuilder] = useState(false);
   const [miniMode, setMiniMode] = useState(() => {
     try { return localStorage.getItem('mini_mode_active') === 'true'; } catch { return false; }
   });
@@ -72,6 +74,13 @@ const AppInner = memo(function AppInner() {
     return () => window.removeEventListener('chat:mini-mode', handler);
   }, []);
 
+  // Listen for resume:open event from Sidebar button
+  useEffect(() => {
+    const handler = () => setShowResumeBuilder(true);
+    window.addEventListener('resume:open', handler);
+    return () => window.removeEventListener('resume:open', handler);
+  }, []);
+
   if (miniMode) {
     return <MiniMode onExit={() => setMiniMode(false)} />;
   }
@@ -104,6 +113,9 @@ const AppInner = memo(function AppInner() {
       </main>
       {showShortcuts && (
         <ShortcutsModal onClose={() => setShowShortcuts(false)} />
+      )}
+      {showResumeBuilder && (
+        <ResumeBuilder onClose={() => setShowResumeBuilder(false)} />
       )}
     </div>
   );
