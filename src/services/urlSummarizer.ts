@@ -93,6 +93,36 @@ function extractText(body: string): string {
 const cache = new Map<string, { result: SummarizeResult; ts: number }>();
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
+// Parse IPv4 address to a 32-bit integer for CIDR range checks
+function ipv4ToInt(ip: string): number {
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some(isNaN)) return -1;
+  return (parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3];
+}
+
+// Check if an IPv4 address (or IPv4-mapped IPv6 address) falls in a private/reserved range
+function isPrivateIPv4(ip: string): boolean {
+  const n = ipv4ToInt(ip);
+  if (n < 0) return false;
+  // 127.0.0.0/8 — loopback
+  if ((n & 0xff000000) === 0x7f000000) return true;
+  // 10.0.0.0/8
+  if ((n & 0xff000000) === 0x0a000000) return true;
+  // 172.16.0.0/12
+  if ((n & 0xfff00000) === 0xac100000) return true;
+  // 192.168.0.0/16
+  if ((n & 0xffff0000) === 0xc0a80000) return true;
+  // 169.254.0.0/16 — link-local
+  if ((n & 0xffff0000) === 0xa9fe0000) return true;
+  return false;
+}
+
+// Extract embedded IPv4 from IPv4-mapped IPv6 (::ffff:x.x.x.x)
+function extractEmbeddedIPv4(hostname: string): string | null {
+  const m = hostname.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
+  return m ? m[1] : null;
+}
+
 export async function summarizeUrl(rawUrl: string): Promise<SummarizeResult> {
   // --- Validate & parse URL ---
   let url: URL;
@@ -107,37 +137,50 @@ export async function summarizeUrl(rawUrl: string): Promise<SummarizeResult> {
     throw new Error('Only http and https URLs are supported');
   }
 
-  // SSRF check: resolve hostname, block private ranges
+  // SSRF check: block all private, loopback, link-local, and multicast ranges
   const hostname = url.hostname.toLowerCase();
-  const isPrivate =
+
+  // Reject plain hostnames that resolve to private ranges
+  const isPrivateHost =
     hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
     hostname === '0.0.0.0' ||
-    hostname.startsWith('192.168.') ||
-    hostname.startsWith('10.') ||
-    hostname.startsWith('172.16.') ||
+    hostname === '::1' ||
     hostname.endsWith('.internal') ||
     hostname.endsWith('.local') ||
-    hostname === '::1' ||
     /^fe80:/i.test(hostname) ||
-    /^::ffff:/i.test(hostname);
-  if (isPrivate) {
+    /^::1$/i.test(hostname) ||
+    /^::ffff:/i.test(hostname) ||
+    hostname === '127.0.0.1';
+
+  if (isPrivateHost) {
+    throw new Error('Private/internal URLs are not allowed');
+  }
+
+  // Check IPv4 addresses and IPv4-mapped IPv6 addresses against private ranges
+  const ipv4 = ipv4ToInt(hostname);
+  if (ipv4 >= 0 && isPrivateIPv4(hostname)) {
+    throw new Error('Private/internal URLs are not allowed');
+  }
+  const embeddedV4 = extractEmbeddedIPv4(hostname);
+  if (embeddedV4 && isPrivateIPv4(embeddedV4)) {
     throw new Error('Private/internal URLs are not allowed');
   }
 
   // --- Check cache ---
-  const cached = cache.get(rawUrl);
+  // Use validated url.href (not rawUrl) as cache key to be consistent
+  const cacheKey = url.href;
+  const cached = cache.get(cacheKey);
   if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
     return cached.result;
   }
 
   // --- Fetch ---
-  // SSRF protection: rawUrl was validated as non-private (lines 83-111) before this call.
-  // Allowed protocols (http/https) and private hostnames were already checked.
-  // Use redirect:'manual' to validate each redirect URL before following.
+  // Use the validated and normalized url.href — not the raw string.
+  // This prevents bypasses where rawUrl contains encoding or fragment tricks
+  // that new URL() normalizes away but fetch() might interpret differently.
   let response: Response;
   try {
-    response = await fetch(rawUrl, {
+    response = await fetch(url.href, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; AI-Dashboard/1.0; +summarize)',
         Accept: 'text/html,application/xhtml+xml',
@@ -146,26 +189,30 @@ export async function summarizeUrl(rawUrl: string): Promise<SummarizeResult> {
       redirect: 'manual',
     });
 
-    // Handle redirects manually — validate each redirect URL to prevent redirect-based SSRF
+    // Handle redirects manually — validate each redirect URL before following
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       const location = response.headers.get('location');
       if (!location) {
         throw new Error('Redirect response has no Location header');
       }
       // Resolve relative redirects against the original URL
-      const redirectUrl = new URL(location, rawUrl);
-      // Re-validate the redirect target hostname (prevents redirect to internal IPs)
+      const redirectUrl = new URL(location, url.href);
+      // Re-validate the redirect target hostname
       const rh = redirectUrl.hostname.toLowerCase();
-      const isPrivate =
-        rh === 'localhost' || rh === '127.0.0.1' || rh === '0.0.0.0' ||
-        rh.startsWith('192.168.') || rh.startsWith('10.') || rh.startsWith('172.16.') ||
+      const rhIPv4 = ipv4ToInt(rh);
+      const rhEmbeddedV4 = extractEmbeddedIPv4(rh);
+      const rhIsPrivate =
+        rh === 'localhost' || rh === '0.0.0.0' || rh === '::1' ||
         rh.endsWith('.internal') || rh.endsWith('.local') ||
-        rh === '::1' || /^fe80:/i.test(rh) || /^::ffff:/i.test(rh);
-      if (isPrivate) {
+        /^fe80:/i.test(rh) || /^::ffff:/i.test(rh) ||
+        rh === '127.0.0.1' ||
+        (rhIPv4 >= 0 && isPrivateIPv4(rh)) ||
+        (!!rhEmbeddedV4 && isPrivateIPv4(rhEmbeddedV4));
+      if (rhIsPrivate) {
         throw new Error('Redirect to private/internal URL is not allowed');
       }
       // Follow the validated redirect
-      response = await fetch(redirectUrl.toString(), {
+      response = await fetch(redirectUrl.href, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; AI-Dashboard/1.0; +summarize)',
           Accept: 'text/html,application/xhtml+xml',
