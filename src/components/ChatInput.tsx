@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
-import { Send, Loader2, Link, Sparkles, Edit2, RefreshCw, MessageSquare, X, Minimize2, Maximize2, Eye, EyeOff, FileText, MessageSquarePlus, BookOpen } from 'lucide-react';
+import { Send, Loader2, Link, Sparkles, Edit2, RefreshCw, MessageSquare, X, Minimize2, Maximize2, Eye, EyeOff, FileText, MessageSquarePlus, BookOpen, Briefcase } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
@@ -9,6 +9,7 @@ import PromptEngineer from './PromptEngineer';
 import { StreamingHUD } from './StreamingHUD';
 import { SmartReplyPopover } from './SmartReplyPopover';
 import { KhmerPhrasebank } from './KhmerPhrasebank';
+import { JobQuickReplies } from './JobQuickReplies';
 import { detectCurrencies, type DetectedCurrency } from '../utils/currencyDetector';
 
 // Regex to detect a standalone URL in input
@@ -56,6 +57,7 @@ export const ChatInput = memo(() => {
   const [showPreview, setShowPreview] = useState(false);
   const [showSmartReply, setShowSmartReply] = useState(false);
   const [showKhmerPhrasebank, setShowKhmerPhrasebank] = useState(false);
+  const [showJobQuickReplies, setShowJobQuickReplies] = useState(false);
   const [detectedCurrencies, setDetectedCurrencies] = useState<DetectedCurrency[]>([]);
   const { sendMessage, isStreaming, cancelStream, createNewChat, clearMessages, editLastMessage, lastSentMessage, error, retryLastMessage } = useChat();
   const { settings } = useSettings();
@@ -604,6 +606,29 @@ export const ChatInput = memo(() => {
             {showKhmerPhrasebank && (
               <KhmerPhrasebank
                 onClose={() => setShowKhmerPhrasebank(false)}
+                onInsert={(text) => {
+                  setInput(prev => prev ? `${prev}\n${text}` : text);
+                  setTimeout(() => textareaRef.current?.focus(), 50);
+                }}
+              />
+            )}
+          </div>
+
+          {/* Khmer Job Quick Replies button */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowJobQuickReplies(prev => !prev)}
+              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showJobQuickReplies ? (isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200')}`}
+              aria-label="Khmer Job Quick Replies"
+              title="Khmer Job Quick Replies — one-tap professional phrases"
+            >
+              <Briefcase className="w-4 h-4" />
+            </button>
+            {showJobQuickReplies && (
+              <JobQuickReplies
+                isDark={isDark}
+                onClose={() => setShowJobQuickReplies(false)}
                 onInsert={(text) => {
                   setInput(prev => prev ? `${prev}\n${text}` : text);
                   setTimeout(() => textareaRef.current?.focus(), 50);
