@@ -1,12 +1,13 @@
 import { useState, memo, useEffect, useCallback } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useChat } from '../context/ChatContext';
-import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles, Search, X as XIcon, Palette, Command, Pin, Pencil, BarChart2, FileText, GraduationCap, CalendarDays, Currency, Type, Shield } from 'lucide-react';
+import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles, Search, X as XIcon, Palette, Command, Pin, Pencil, BarChart2, FileText, GraduationCap, CalendarDays, Currency, Type, Shield, Lightbulb } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { ThemesModal } from './ThemesModal';
 import { ChatSearchModal } from './ChatSearchModal';
 import { KhmerRielFormatter } from './KhmerRielFormatter';
 import { KhmerNumberWords } from './KhmerNumberWords';
+import { WorkplaceTips } from './WorkplaceTips';
 import { ChatStatsModal } from './ChatStatsModal';
 
 // Move outside component — pure function, no deps on component scope
@@ -30,6 +31,7 @@ export const Sidebar = memo(() => {
   const [showThemesModal, setShowThemesModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
+  const [showWorkplaceTips, setShowWorkplaceTips] = useState(false);
   const [showRielFormatter, setShowRielFormatter] = useState(false);
   const [showNumberWords, setShowNumberWords] = useState(false);
   const [renamingChatId, setRenamingChatId] = useState<string | null>(null);
@@ -490,6 +492,13 @@ export const Sidebar = memo(() => {
                 <CalendarDays className={`w-4 h-4 ${footerIconClass}`} />
               </button>
             <button
+                onClick={() => setShowWorkplaceTips(true)}
+                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
+                title="Khmer Workplace Tips"
+              >
+                <Lightbulb className={`w-4 h-4 ${footerIconClass}`} />
+              </button>
+            <button
                 onClick={() => setShowStatsModal(true)}
                 className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
                 title="Chat Statistics"
@@ -511,6 +520,7 @@ export const Sidebar = memo(() => {
         {showStatsModal && <ChatStatsModal onClose={() => setShowStatsModal(false)} />}
         {showRielFormatter && <KhmerRielFormatter onClose={() => setShowRielFormatter(false)} />}
         {showNumberWords && <KhmerNumberWords onClose={() => setShowNumberWords(false)} />}
+        {showWorkplaceTips && <WorkplaceTips onClose={() => setShowWorkplaceTips(false)} />}
     </>
   );
 });
