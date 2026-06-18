@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
-import { Send, Loader2, Link, Sparkles, Edit2, RefreshCw, MessageSquare, X, Minimize2, Maximize2, Eye, EyeOff, FileText } from 'lucide-react';
+import { Send, Loader2, Link, Sparkles, Edit2, RefreshCw, MessageSquare, X, Minimize2, Maximize2, Eye, EyeOff, FileText, MessageSquarePlus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import PromptEngineer from './PromptEngineer';
 import { StreamingHUD } from './StreamingHUD';
+import { SmartReplyPopover } from './SmartReplyPopover';
 
 // Regex to detect a standalone URL in input
 const URL_REGEX = /^https?:\/\/[^\s]+$/;
@@ -51,6 +52,7 @@ export const ChatInput = memo(() => {
     try { return localStorage.getItem(COMPACT_KEY) === 'true'; } catch { return false; }
   });
   const [showPreview, setShowPreview] = useState(false);
+  const [showSmartReply, setShowSmartReply] = useState(false);
   const { sendMessage, isStreaming, cancelStream, createNewChat, clearMessages, editLastMessage, lastSentMessage, error, retryLastMessage } = useChat();
   const { settings } = useSettings();
   const isDark = settings.theme === 'dark';
@@ -523,6 +525,29 @@ export const ChatInput = memo(() => {
               ? <Maximize2 className="w-3.5 h-3.5" />
               : <Minimize2 className="w-3.5 h-3.5" />}
           </button>
+
+          {/* Smart Reply button */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowSmartReply(prev => !prev)}
+              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showSmartReply ? (isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200')}`}
+              aria-label="Smart Reply"
+              title="Khmer Smart Reply — bilingual quick responses"
+            >
+              <MessageSquarePlus className="w-4 h-4" />
+            </button>
+            {showSmartReply && (
+              <SmartReplyPopover
+                isDark={isDark}
+                onClose={() => setShowSmartReply(false)}
+                onInsert={(text) => {
+                  setInput(prev => prev ? `${prev}\n${text}` : text);
+                  setTimeout(() => textareaRef.current?.focus(), 50);
+                }}
+              />
+            )}
+          </div>
 
           {/* Markdown preview toggle */}
           {input.trim().length > 0 && (

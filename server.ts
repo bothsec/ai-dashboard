@@ -7,6 +7,7 @@ import cors from 'cors';
 import expressFileUpload from 'express-fileupload';
 import { summarizeUrl } from './src/services/urlSummarizer';
 import { parseDocument } from './src/services/documentParser';
+import { generateResumePDF } from './src/services/resumeGenerator';
 dotenv.config({ override: true });
 
 const __filename = fileURLToPath(import.meta.url);
@@ -137,6 +138,32 @@ app.get('/api/auth/me', (req, res) => {
     return;
   }
   res.json({ authenticated: true, username: process.env.AUTH_USERNAME || 'admin' });
+});
+
+// POST /api/resume — generate resume PDF (auth required)
+app.post('/api/resume', express.json({ limit: '1mb' }), async (req, res) => {
+  const { name, email, phone, linkedin, summary, experience = [], skills = [], education = [], template = 'modern' } = req.body ?? {};
+
+  if (!name || !email || !phone) {
+    res.status(400).json({ error: { message: 'Name, email, and phone are required.', type: 'validation_error' } });
+    return;
+  }
+
+  if (!['modern', 'classic'].includes(template)) {
+    res.status(400).json({ error: { message: 'Template must be "modern" or "classic".', type: 'validation_error' } });
+    return;
+  }
+
+  try {
+    const pdfBytes = await generateResumePDF({ name, email, phone, linkedin, summary, experience, skills, education, template: template as 'modern' | 'classic' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${name.replace(/\s+/g, '_')}_Resume.pdf"`);
+    res.setHeader('Content-Length', pdfBytes.length);
+    res.status(200).send(Buffer.from(pdfBytes));
+  } catch (err) {
+    console.error('[Resume] generation failed:', err);
+    res.status(500).json({ error: { message: 'Failed to generate resume PDF.', type: 'server_error' } });
+  }
 });
 
 // Mount auth middleware globally for all remaining /api routes
