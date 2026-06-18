@@ -10,7 +10,9 @@ import { StreamingHUD } from './StreamingHUD';
 import { SmartReplyPopover } from './SmartReplyPopover';
 import { KhmerPhrasebank } from './KhmerPhrasebank';
 import { JobQuickReplies } from './JobQuickReplies';
+import { SalaryPopover } from './SalaryPopover';
 import { detectCurrencies, type DetectedCurrency } from '../utils/currencyDetector';
+import { detectSalaryRanges } from '../utils/salaryDetector';
 
 // Regex to detect a standalone URL in input
 const URL_REGEX = /^https?:\/\/[^\s]+$/;
@@ -58,6 +60,7 @@ export const ChatInput = memo(() => {
   const [showSmartReply, setShowSmartReply] = useState(false);
   const [showKhmerPhrasebank, setShowKhmerPhrasebank] = useState(false);
   const [showJobQuickReplies, setShowJobQuickReplies] = useState(false);
+  const [showSalaryPopover, setShowSalaryPopover] = useState(false);
   const [detectedCurrencies, setDetectedCurrencies] = useState<DetectedCurrency[]>([]);
   const { sendMessage, isStreaming, cancelStream, createNewChat, clearMessages, editLastMessage, lastSentMessage, error, retryLastMessage } = useChat();
   const { settings } = useSettings();
@@ -636,6 +639,32 @@ export const ChatInput = memo(() => {
               />
             )}
           </div>
+
+          {/* Salary converter — appears when salary is detected in input */}
+          {(() => {
+            const detected = detectSalaryRanges(input);
+            if (detected.length === 0) return null;
+            return (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowSalaryPopover(prev => !prev)}
+                  className={`shrink-0 transition-colors duration-200 px-1.5 py-1 rounded-full flex items-center gap-1 text-[10px] font-semibold ${showSalaryPopover ? (isDark ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40' : 'bg-yellow-100 text-yellow-700 border border-yellow-300') : (isDark ? 'text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20' : 'text-yellow-600 bg-yellow-50 hover:bg-yellow-100')}`}
+                  aria-label="Salary converter"
+                  title="💰 Convert salary USD ↔ KHR"
+                >
+                  💰 {detected.length} salary{detected.length > 1 ? 's' : ''} detected
+                </button>
+                {showSalaryPopover && (
+                  <SalaryPopover
+                    text={input}
+                    isDark={isDark}
+                    onClose={() => setShowSalaryPopover(false)}
+                  />
+                )}
+              </div>
+            );
+          })()}
 
           {/* Markdown preview toggle */}
           {input.trim().length > 0 && (
