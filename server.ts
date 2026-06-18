@@ -795,6 +795,48 @@ app.get('/api/summarize', async (req, res) => {
     return;
   }
 
+  // SSRF prevention: validate URL in server.ts before it reaches summarizeUrl.
+  // CodeQL tracks the dataflow from user input to fetch() — adding the validation
+  // here (on top of summarizeUrl's own checks) makes the security boundary visible
+  // to static analysis and defense-in-depth against bypasses.
+  try {
+    const parsedUrl = new URL(urlString);
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      throw new Error('Only http and https are allowed');
+    }
+    const hostname = parsedUrl.hostname.toLowerCase();
+    // Reject all forms of localhost, private, link-local, and broadcast
+    const isBlocked =
+      hostname === 'localhost' ||
+      hostname === '0.0.0.0' ||
+      hostname === '::1' ||
+      /^::ffff:/i.test(hostname) ||
+      hostname === '127.0.0.1' ||
+      hostname.endsWith('.internal') ||
+      hostname.endsWith('.local') ||
+      /^fe80:/i.test(hostname);
+    if (isBlocked) {
+      throw new Error('Private/internal URLs are not allowed');
+    }
+    // Block private IPv4 ranges (10.x, 172.16-31.x, 192.168.x, 127.x, 169.254.x)
+    const ipParts = hostname.split('.').map(Number);
+    if (ipParts.length === 4 && ipParts.every(n => !isNaN(n))) {
+      const n = (ipParts[0] << 24) | (ipParts[1] << 16) | (ipParts[2] << 8) | ipParts[3];
+      const isPrivate =
+        (n & 0xff000000) === 0x7f000000 || // 127.x
+        (n & 0xff000000) === 0x0a000000 || // 10.x
+        (n & 0xfff00000) === 0xac100000 || // 172.16-31.x
+        (n & 0xffff0000) === 0xc0a80000 || // 192.168.x
+        (n & 0xffff0000) === 0xa9fe0000;   // 169.254.x
+      if (isPrivate) {
+        throw new Error('Private/internal URLs are not allowed');
+      }
+    }
+  } catch (e) {
+    res.status(400).json({ error: { message: e instanceof Error ? e.message : 'Invalid URL', type: 'invalid_request' } });
+    return;
+  }
+
   try {
     const result = await summarizeUrl(urlString);
     res.json(result);
