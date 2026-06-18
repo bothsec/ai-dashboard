@@ -133,8 +133,8 @@ export async function summarizeUrl(rawUrl: string): Promise<SummarizeResult> {
 
   // --- Fetch ---
   // SSRF protection: rawUrl was validated as non-private (lines 83-111) before this call.
-  // The URL is not re-constructed here to prevent bypass via redirects.
   // Allowed protocols (http/https) and private hostnames were already checked.
+  // Use redirect:'manual' to validate each redirect URL before following.
   let response: Response;
   try {
     response = await fetch(rawUrl, {
@@ -143,9 +143,37 @@ export async function summarizeUrl(rawUrl: string): Promise<SummarizeResult> {
         Accept: 'text/html,application/xhtml+xml',
       },
       signal: AbortSignal.timeout(10_000),
-      // Don't follow redirects to avoid redirect-based SSRF (same protection as upstream)
-      redirect: 'follow',
+      redirect: 'manual',
     });
+
+    // Handle redirects manually — validate each redirect URL to prevent redirect-based SSRF
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      const location = response.headers.get('location');
+      if (!location) {
+        throw new Error('Redirect response has no Location header');
+      }
+      // Resolve relative redirects against the original URL
+      const redirectUrl = new URL(location, rawUrl);
+      // Re-validate the redirect target hostname (prevents redirect to internal IPs)
+      const rh = redirectUrl.hostname.toLowerCase();
+      const isPrivate =
+        rh === 'localhost' || rh === '127.0.0.1' || rh === '0.0.0.0' ||
+        rh.startsWith('192.168.') || rh.startsWith('10.') || rh.startsWith('172.16.') ||
+        rh.endsWith('.internal') || rh.endsWith('.local') ||
+        rh === '::1' || /^fe80:/i.test(rh) || /^::ffff:/i.test(rh);
+      if (isPrivate) {
+        throw new Error('Redirect to private/internal URL is not allowed');
+      }
+      // Follow the validated redirect
+      response = await fetch(redirectUrl.toString(), {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; AI-Dashboard/1.0; +summarize)',
+          Accept: 'text/html,application/xhtml+xml',
+        },
+        signal: AbortSignal.timeout(10_000),
+        redirect: 'manual',
+      });
+    }
   } catch (err) {
     throw new Error(`Failed to fetch URL: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
   }
