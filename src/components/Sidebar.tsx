@@ -1,10 +1,11 @@
 import { useState, memo, useEffect, useCallback } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useChat } from '../context/ChatContext';
-import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles, Search, X as XIcon, Palette, Command, Pin, Pencil, BarChart2, FileText, GraduationCap, CalendarDays } from 'lucide-react';
+import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles, Search, X as XIcon, Palette, Command, Pin, Pencil, BarChart2, FileText, GraduationCap, CalendarDays, Currency } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { ThemesModal } from './ThemesModal';
 import { ChatSearchModal } from './ChatSearchModal';
+import { KhmerRielFormatter } from './KhmerRielFormatter';
 import { ChatStatsModal } from './ChatStatsModal';
 
 // Move outside component — pure function, no deps on component scope
@@ -28,6 +29,7 @@ export const Sidebar = memo(() => {
   const [showThemesModal, setShowThemesModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
+  const [showRielFormatter, setShowRielFormatter] = useState(false);
   const [renamingChatId, setRenamingChatId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
 
@@ -465,6 +467,13 @@ export const Sidebar = memo(() => {
                 <GraduationCap className={`w-4 h-4 ${footerIconClass}`} />
               </button>
             <button
+                onClick={() => setShowRielFormatter(true)}
+                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
+                title="Khmer Riel Formatter"
+              >
+                <Currency className={`w-4 h-4 ${footerIconClass}`} />
+              </button>
+            <button
                 onClick={() => window.dispatchEvent(new CustomEvent('khmer-calendar:open'))}
                 className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
                 title="Khmer Calendar Converter"
@@ -484,6 +493,7 @@ export const Sidebar = memo(() => {
         {showThemesModal && <ThemesModal onClose={() => setShowThemesModal(false)} />}
         {showSearchModal && <ChatSearchModal onClose={() => setShowSearchModal(false)} onSelectMessage={handleSearchSelect} />}
         {showStatsModal && <ChatStatsModal onClose={() => setShowStatsModal(false)} />}
+        {showRielFormatter && <KhmerRielFormatter onClose={() => setShowRielFormatter(false)} />}
     </>
   );
 });
