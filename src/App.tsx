@@ -9,6 +9,7 @@ import { ChatInput } from './components/ChatInput';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { ResumeBuilder } from './components/ResumeBuilder';
 import { InterviewPrep } from './components/InterviewPrep';
+import { KhmerCalendarConverter } from './components/KhmerCalendarConverter';
 import { MiniMode } from './components/MiniMode';
 
 const AppInner = memo(function AppInner() {
@@ -16,6 +17,7 @@ const AppInner = memo(function AppInner() {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showResumeBuilder, setShowResumeBuilder] = useState(false);
   const [showInterviewPrep, setShowInterviewPrep] = useState(false);
+  const [showKhmerCalendarConverter, setShowKhmerCalendarConverter] = useState(false);
   const [miniMode, setMiniMode] = useState(() => {
     try { return localStorage.getItem('mini_mode_active') === 'true'; } catch { return false; }
   });
@@ -57,6 +59,12 @@ const AppInner = memo(function AppInner() {
         setMiniMode(prev => !prev);
         return;
       }
+      // Ctrl+Shift+K — Khmer calendar converter
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'K') {
+        e.preventDefault();
+        setShowKhmerCalendarConverter(prev => !prev);
+        return;
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -88,6 +96,13 @@ const AppInner = memo(function AppInner() {
     const handler = () => setShowInterviewPrep(true);
     window.addEventListener('interview:open', handler);
     return () => window.removeEventListener('interview:open', handler);
+  }, []);
+
+  // Listen for khmer-calendar:open event from Sidebar button
+  useEffect(() => {
+    const handler = () => setShowKhmerCalendarConverter(true);
+    window.addEventListener('khmer-calendar:open', handler);
+    return () => window.removeEventListener('khmer-calendar:open', handler);
   }, []);
 
   if (miniMode) {
@@ -131,6 +146,9 @@ const AppInner = memo(function AppInner() {
           onClose={() => setShowInterviewPrep(false)}
           onAskAI={(prompt) => { sendMessage(prompt); setShowInterviewPrep(false); }}
         />
+      )}
+      {showKhmerCalendarConverter && (
+        <KhmerCalendarConverter onClose={() => setShowKhmerCalendarConverter(false)} />
       )}
     </div>
   );

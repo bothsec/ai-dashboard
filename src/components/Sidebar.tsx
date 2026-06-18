@@ -1,7 +1,7 @@
 import { useState, memo, useEffect, useCallback } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useChat } from '../context/ChatContext';
-import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles, Search, X as XIcon, Palette, Command, Pin, Pencil, BarChart2, FileText, GraduationCap } from 'lucide-react';
+import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles, Search, X as XIcon, Palette, Command, Pin, Pencil, BarChart2, FileText, GraduationCap, CalendarDays } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { ThemesModal } from './ThemesModal';
 import { ChatSearchModal } from './ChatSearchModal';
@@ -463,6 +463,13 @@ export const Sidebar = memo(() => {
                 title="Interview Prep"
               >
                 <GraduationCap className={`w-4 h-4 ${footerIconClass}`} />
+              </button>
+            <button
+                onClick={() => window.dispatchEvent(new CustomEvent('khmer-calendar:open'))}
+                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
+                title="Khmer Calendar Converter"
+              >
+                <CalendarDays className={`w-4 h-4 ${footerIconClass}`} />
               </button>
             <button
                 onClick={() => setShowStatsModal(true)}
