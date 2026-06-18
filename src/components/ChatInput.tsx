@@ -1,13 +1,14 @@
 import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
-import { Send, Loader2, Link, Sparkles, Edit2, RefreshCw, MessageSquare, X, Minimize2, Maximize2, Eye, EyeOff, FileText, MessageSquarePlus } from 'lucide-react';
+import { Send, Loader2, Link, Sparkles, Edit2, RefreshCw, MessageSquare, X, Minimize2, Maximize2, Eye, EyeOff, FileText, MessageSquarePlus, BookOpen } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import PromptEngineer from './PromptEngineer';
 import { StreamingHUD } from './StreamingHUD';
 import { SmartReplyPopover } from './SmartReplyPopover';
+import { KhmerPhrasebank } from './KhmerPhrasebank';
 
 // Regex to detect a standalone URL in input
 const URL_REGEX = /^https?:\/\/[^\s]+$/;
@@ -53,6 +54,7 @@ export const ChatInput = memo(() => {
   });
   const [showPreview, setShowPreview] = useState(false);
   const [showSmartReply, setShowSmartReply] = useState(false);
+  const [showKhmerPhrasebank, setShowKhmerPhrasebank] = useState(false);
   const { sendMessage, isStreaming, cancelStream, createNewChat, clearMessages, editLastMessage, lastSentMessage, error, retryLastMessage } = useChat();
   const { settings } = useSettings();
   const isDark = settings.theme === 'dark';
@@ -541,6 +543,28 @@ export const ChatInput = memo(() => {
               <SmartReplyPopover
                 isDark={isDark}
                 onClose={() => setShowSmartReply(false)}
+                onInsert={(text) => {
+                  setInput(prev => prev ? `${prev}\n${text}` : text);
+                  setTimeout(() => textareaRef.current?.focus(), 50);
+                }}
+              />
+            )}
+          </div>
+
+          {/* Khmer Phrasebank button */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowKhmerPhrasebank(prev => !prev)}
+              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showKhmerPhrasebank ? (isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200')}`}
+              aria-label="Khmer Phrasebank"
+              title="Khmer Phrasebank — browse phrases in Khmer & English"
+            >
+              <BookOpen className="w-4 h-4" />
+            </button>
+            {showKhmerPhrasebank && (
+              <KhmerPhrasebank
+                onClose={() => setShowKhmerPhrasebank(false)}
                 onInsert={(text) => {
                   setInput(prev => prev ? `${prev}\n${text}` : text);
                   setTimeout(() => textareaRef.current?.focus(), 50);
