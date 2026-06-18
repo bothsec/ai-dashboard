@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
 import React, { memo, useState, useEffect, useCallback } from 'react';
 import { X, UserPlus, Trash2, Edit2, Check, Loader2, LogOut, Users, Shield } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
