@@ -1,6 +1,6 @@
 import { memo, useState } from 'react';
-import { X, ChevronDown, ChevronUp, Lightbulb, Sparkles } from 'lucide-react';
-import { INTERVIEW_QUESTIONS, INTERVIEW_CATEGORIES, type InterviewQuestion } from '../data/interviewPrepData';
+import { X, ChevronDown, ChevronUp, Lightbulb, Sparkles, Briefcase } from 'lucide-react';
+import { INTERVIEW_QUESTIONS, INTERVIEW_CATEGORIES, INDUSTRIES, type InterviewQuestion } from '../data/interviewPrepData';
 
 interface Props {
   onClose: () => void;
@@ -75,11 +75,14 @@ const QuestionCard = memo(({ q, khLang }: { q: InterviewQuestion; khLang: boolea
 
 export const InterviewPrep = memo(({ onClose, onAskAI }: Props) => {
   const [activeCategory, setActiveCategory] = useState('All');
+  const [activeIndustry, setActiveIndustry] = useState('all');
   const [khLang, setKhLang] = useState(false);
 
-  const filtered = INTERVIEW_QUESTIONS.filter(q =>
-    activeCategory === 'All' || q.category === activeCategory
-  );
+  const filtered = INTERVIEW_QUESTIONS.filter(q => {
+    const matchCat = activeCategory === 'All' || q.category === activeCategory;
+    const matchInd = activeIndustry === 'all' || q.industry === activeIndustry;
+    return matchCat && matchInd;
+  });
 
   const handleAskAI = () => {
     const questions = filtered.map(q => `- ${q.en}`).join('\n');
@@ -101,7 +104,10 @@ export const InterviewPrep = memo(({ onClose, onAskAI }: Props) => {
         <div className="flex items-center justify-between px-5 py-4 border-b border-z-700/50 shrink-0">
           <div>
             <h2 className="text-sm font-semibold text-z-200">Interview Prep</h2>
-            <p className="text-xs text-z-500 mt-0.5">Cambodia Job Market • Bilingual EN/KH • {filtered.length} questions</p>
+            <p className="text-xs text-z-500 mt-0.5">
+              Cambodia Job Market • {filtered.length} questions
+              {activeIndustry !== 'all' && ` • ${INDUSTRIES.find(i => i.id === activeIndustry)?.icon} ${INDUSTRIES.find(i => i.id === activeIndustry)?.label}`}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -121,6 +127,26 @@ export const InterviewPrep = memo(({ onClose, onAskAI }: Props) => {
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+          {/* Industry track selector */}
+          <div className="flex items-center gap-2 mb-1">
+            <Briefcase className="w-3.5 h-3.5 text-z-500 shrink-0" />
+            <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+              {INDUSTRIES.map(ind => (
+                <button
+                  key={ind.id}
+                  onClick={() => setActiveIndustry(ind.id)}
+                  className={`shrink-0 px-2 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap transition-colors ${
+                    activeIndustry === ind.id
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-z-800 text-z-400 hover:text-z-200 border border-z-700'
+                  }`}
+                >
+                  {ind.icon} {ind.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <CategoryTabs active={activeCategory} onSelect={setActiveCategory} />
 
           {filtered.map(q => (

@@ -8,6 +8,7 @@ import expressFileUpload from 'express-fileupload';
 import { summarizeUrl } from './src/services/urlSummarizer';
 import { parseDocument } from './src/services/documentParser';
 import { generateResumePDF } from './src/services/resumeGenerator';
+import { registerAdminRoutes } from './src/routes/admin-routes';
 dotenv.config({ override: true });
 
 const __filename = fileURLToPath(import.meta.url);
@@ -165,6 +166,9 @@ app.post('/api/resume', express.json({ limit: '1mb' }), async (req, res) => {
     res.status(500).json({ error: { message: 'Failed to generate resume PDF.', type: 'server_error' } });
   }
 });
+
+// Register admin routes BEFORE global auth middleware (SQLite user DB)
+registerAdminRoutes(app);
 
 // Mount auth middleware globally for all remaining /api routes
 app.use('/api', requireAuth);

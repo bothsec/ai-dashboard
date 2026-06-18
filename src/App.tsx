@@ -8,6 +8,7 @@ import { ChatWindow } from './components/ChatWindow';
 import { ChatInput } from './components/ChatInput';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { ResumeBuilder } from './components/ResumeBuilder';
+import { AdminDashboard } from './components/AdminDashboard';
 import { InterviewPrep } from './components/InterviewPrep';
 import { KhmerCalendarConverter } from './components/KhmerCalendarConverter';
 import { MiniMode } from './components/MiniMode';
@@ -16,6 +17,7 @@ const AppInner = memo(function AppInner() {
   const { isStreaming, cancelStream, createNewChat, sendMessage } = useChat();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showResumeBuilder, setShowResumeBuilder] = useState(false);
+  const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [showInterviewPrep, setShowInterviewPrep] = useState(false);
   const [showKhmerCalendarConverter, setShowKhmerCalendarConverter] = useState(false);
   const [miniMode, setMiniMode] = useState(() => {
@@ -91,6 +93,13 @@ const AppInner = memo(function AppInner() {
     return () => window.removeEventListener('resume:open', handler);
   }, []);
 
+  // Listen for admin:open event from Sidebar button
+  useEffect(() => {
+    const handler = () => setShowAdminDashboard(true);
+    window.addEventListener('admin:open', handler);
+    return () => window.removeEventListener('admin:open', handler);
+  }, []);
+
   // Listen for interview:open event from Sidebar button
   useEffect(() => {
     const handler = () => setShowInterviewPrep(true);
@@ -140,6 +149,9 @@ const AppInner = memo(function AppInner() {
       )}
       {showResumeBuilder && (
         <ResumeBuilder onClose={() => setShowResumeBuilder(false)} />
+      )}
+      {showAdminDashboard && (
+        <AdminDashboard onClose={() => setShowAdminDashboard(false)} />
       )}
       {showInterviewPrep && (
         <InterviewPrep
