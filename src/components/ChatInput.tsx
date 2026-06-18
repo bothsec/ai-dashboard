@@ -12,6 +12,7 @@ import { KhmerPhrasebank } from './KhmerPhrasebank';
 import { KhmerJobTermDictionary } from './KhmerJobTermDictionary';
 import { JobQuickReplies } from './JobQuickReplies';
 import { SalaryPopover } from './SalaryPopover';
+import { ContractAnalyzer } from './ContractAnalyzer';
 import { detectCurrencies, type DetectedCurrency } from '../utils/currencyDetector';
 import { detectSalaryRanges } from '../utils/salaryDetector';
 
@@ -63,6 +64,7 @@ export const ChatInput = memo(() => {
   const [showKhmerJobTermDictionary, setShowKhmerJobTermDictionary] = useState(false);
   const [showJobQuickReplies, setShowJobQuickReplies] = useState(false);
   const [showSalaryPopover, setShowSalaryPopover] = useState(false);
+  const [showContractAnalyzer, setShowContractAnalyzer] = useState(false);
   const [detectedCurrencies, setDetectedCurrencies] = useState<DetectedCurrency[]>([]);
   const { sendMessage, isStreaming, cancelStream, createNewChat, clearMessages, editLastMessage, lastSentMessage, error, retryLastMessage } = useChat();
   const { settings } = useSettings();
@@ -689,6 +691,26 @@ export const ChatInput = memo(() => {
               </div>
             );
           })()}
+
+          {/* Contract Analyzer — manual button to check for red flag clauses */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowContractAnalyzer(prev => !prev)}
+              className={`shrink-0 transition-colors duration-200 px-1.5 py-1 rounded-full flex items-center gap-1 text-[10px] font-semibold ${showContractAnalyzer ? (isDark ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-red-100 text-red-700 border border-red-300') : (isDark ? 'text-red-400 bg-red-500/10 hover:bg-red-500/20' : 'text-red-600 bg-red-50 hover:bg-red-100')}`}
+              aria-label="Contract analyzer"
+              title="📋 Analyze labor contract red flags"
+            >
+              📋 Contract Check
+            </button>
+            {showContractAnalyzer && (
+              <ContractAnalyzer
+                text={input}
+                isDark={isDark}
+                onClose={() => setShowContractAnalyzer(false)}
+              />
+            )}
+          </div>
 
           {/* Markdown preview toggle */}
           {input.trim().length > 0 && (
