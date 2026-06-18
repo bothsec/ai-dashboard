@@ -228,10 +228,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let isNewChat = false;
 
     // Pre-build messages before any async work
+    const userMessageContent = settings.khLang ? `[Respond in Khmer] ${content}` : content;
     const userMessage: Message = {
       id: generateId(),
       role: 'user',
-      content,
+      content: userMessageContent,
       timestamp: Date.now(),
     };
     const assistantMessageId = generateId();

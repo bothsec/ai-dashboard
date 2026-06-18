@@ -4,7 +4,9 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import helmet from 'helmet';
 import cors from 'cors';
+import expressFileUpload from 'express-fileupload';
 import { summarizeUrl } from './src/services/urlSummarizer';
+import { parseDocument } from './src/services/documentParser';
 dotenv.config({ override: true });
 
 const __filename = fileURLToPath(import.meta.url);
@@ -61,6 +63,12 @@ const AUTH_COOKIE_MAXAGE = 86400; // 24 hours in seconds
 
 // Auth middleware — validates bearer token OR HttpOnly cookie
 function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  // Skip health check paths — these are public readiness probes
+  const path = req.path;
+  if (path.startsWith('/health') || path.startsWith('/api/health')) {
+    return next();
+  }
+
   // Skip if no AUTH_SECRET is configured (auth disabled)
   if (!AUTH_SECRET) return next();
 
@@ -170,6 +178,12 @@ app.use(cors({
 
 // Parse JSON body with size limit (chat conversations can grow large)
 app.use(express.json({ limit: '1mb' }));
+
+// File upload middleware for document parsing (PDF/DOCX)
+app.use(expressFileUpload({
+  limits: { fileSize: 5 * 1024 * 1024 },
+  abortOnLimit: true,
+}));
 
 // Rate limit tracking (simple in-memory, use Redis for production)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
@@ -679,6 +693,15 @@ app.get('/health/ready', (_req, res) => {
   });
 });
 
+// Mirrored at /api/health/ready for Caddy proxy compatibility
+app.get('/api/health/ready', (_req, res) => {
+  const ready = nvidiaApiKeys.length > 0 || !!process.env.OPENAI_API_KEY || !!process.env.ANTHROPIC_API_KEY;
+  res.status(ready ? 200 : 503).json({
+    status: ready ? 'ready' : 'not_ready',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.get('/health', (_req, res) => {
   const now = Date.now();
 
@@ -751,6 +774,59 @@ app.get('/api/summarize', async (req, res) => {
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     res.status(422).json({ error: { message: msg, type: 'summarize_error' } });
+  }
+});
+
+// --- Document Parser: upload PDF/DOCX, extract text for AI Q&A ---
+// POST /api/document → { text, fileName, mimeType }
+app.post('/api/document', async (req, res) => {
+  if (!req.files || !req.files.file) {
+    res.status(400).json({ error: { message: 'No file uploaded', type: 'invalid_request' } });
+    return;
+  }
+
+  const file = req.files.file;
+
+  // Handle both single-file and array formats from express-fileupload
+  const fileData = Array.isArray(file) ? file[0] : file;
+  if (!fileData || !fileData.data) {
+    res.status(400).json({ error: { message: 'Invalid file', type: 'invalid_request' } });
+    return;
+  }
+
+  try {
+    const text = await parseDocument(Buffer.from(fileData.data), fileData.mimetype);
+    res.json({
+      text,
+      fileName: fileData.name,
+      mimeType: fileData.mimetype,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Failed to parse document';
+    res.status(422).json({ error: { message: msg, type: 'parse_error' } });
+  }
+});
+
+// --- Resume/Cover Letter Generator ---
+import { generateResumePDF } from './src/services/resumeGenerator.js';
+app.post('/api/resume', express.json({ limit: '1mb' }), async (req, res) => {
+  const { type, data } = req.body ?? {};
+  if (!type || !data) {
+    res.status(400).json({ error: { message: 'type and data are required', type: 'invalid_request' } });
+    return;
+  }
+  if (type !== 'resume' && type !== 'cover-letter') {
+    res.status(400).json({ error: { message: 'type must be "resume" or "cover-letter"', type: 'invalid_request' } });
+    return;
+  }
+  try {
+    const pdfBytes = await generateResumePDF(type, data);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${type}.pdf"`);
+    res.send(Buffer.from(pdfBytes));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Failed to generate PDF';
+    res.status(500).json({ error: { message: msg, type: 'generation_error' } });
   }
 });
 

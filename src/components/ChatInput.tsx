@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
-import { Send, Loader2, Link, Sparkles, Edit2, RefreshCw, MessageSquare, X, Minimize2, Maximize2, Eye, EyeOff } from 'lucide-react';
+import { Send, Loader2, Link, Sparkles, Edit2, RefreshCw, MessageSquare, X, Minimize2, Maximize2, Eye, EyeOff, FileText } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
@@ -42,6 +42,9 @@ export const ChatInput = memo(() => {
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [showPromptEngineer, setShowPromptEngineer] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [isProcessingDoc, setIsProcessingDoc] = useState(false);
+  const [docError, setDocError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [quotedMessage, setQuotedMessage] = useState<QuotedMessage | null>(null);
   const [isCompact, setIsCompact] = useState(() => {
@@ -112,6 +115,46 @@ export const ChatInput = memo(() => {
   const handleClearQuote = useCallback(() => {
     setQuotedMessage(null);
   }, []);
+
+  // --- Document Drop / Upload ---
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const processDocumentFile = async (file: File) => {
+    const allowedTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      setDocError('Only PDF and DOCX files are supported');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setDocError('File too large (max 5MB)');
+      return;
+    }
+    setIsProcessingDoc(true);
+    setDocError(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/document', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || 'Failed to parse document');
+      const docPrompt = `Here's the content of "${file.name}":\n\n${data.text}\n\nPlease answer my questions about this document.`;
+      await sendMessage(docPrompt);
+    } catch (err) {
+      setDocError(err instanceof Error ? err.message : 'Failed to process document');
+    } finally {
+      setIsProcessingDoc(false);
+    }
+  };
+
+  const handleFileDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processDocumentFile(file);
+  };
 
   // --- URL Summarizer ---
   const handleSummarize = async () => {
@@ -257,7 +300,11 @@ export const ChatInput = memo(() => {
         {/* ChatGPT-style input container */}
         <form
           className={`relative flex items-center gap-1.5 md:gap-2 rounded-full px-2 md:px-3 py-1.5 md:py-2 transition-all duration-300 ${isCompact ? '!py-1' : ''} ${
-            isFocused || isEditing
+            isDragOver
+              ? isDark
+                ? 'bg-indigo-900/40 border-2 border-dashed border-indigo-400'
+                : 'bg-indigo-50 border-2 border-dashed border-indigo-400'
+              : isFocused || isEditing
               ? isDark
                 ? 'bg-gray-800/90 shadow-2xl shadow-black/40 border border-gray-600/50'
                 : 'bg-white/90 shadow-lg shadow-gray-900/10 border border-gray-300'
@@ -266,8 +313,36 @@ export const ChatInput = memo(() => {
                 : 'bg-white/60 hover:bg-white/80 border border-gray-200 hover:border-gray-300'
           } ${isEditing ? (isDark ? '!border-blue-500/50' : '!border-blue-400') : ''}`}
           onSubmit={handleSubmit}
+          onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+          onDragLeave={() => setIsDragOver(false)}
+          onDrop={handleFileDrop}
           aria-label="Message input form"
         >
+          {/* Drag-over overlay */}
+          {isDragOver && (
+            <div className="absolute inset-0 flex items-center justify-center rounded-full pointer-events-none z-10">
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
+                isDark ? 'bg-indigo-600 text-white' : 'bg-indigo-600 text-white'
+              }`}>
+                <FileText className="w-4 h-4" />
+                Drop PDF or DOCX to analyze
+              </div>
+            </div>
+          )}
+
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) processDocumentFile(file);
+              e.target.value = '';
+            }}
+            aria-hidden="true"
+          />
           {/* Prompt Engineer button */}
           <button
             type="button"
@@ -363,6 +438,26 @@ export const ChatInput = memo(() => {
               <span>{isSummarizing ? 'Summarizing…' : 'Summarize URL'}</span>
             </button>
           )}
+
+          {/* Document upload button — always visible as secondary action */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isStreaming || isProcessingDoc}
+            className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${
+              isProcessingDoc
+                ? isDark ? 'text-indigo-400' : 'text-indigo-600'
+                : isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200'
+            }`}
+            aria-label="Attach PDF or DOCX document"
+            title="Attach PDF or DOCX document"
+          >
+            {isProcessingDoc ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <FileText className="w-4 h-4" />
+            )}
+          </button>
 
           {/* Send button */}
           <button
@@ -469,6 +564,18 @@ export const ChatInput = memo(() => {
         {summaryError && (
           <p className="text-center text-[11px] mt-1.5 text-red-500" role="alert">
             {summaryError}
+          </p>
+        )}
+
+        {/* Document processing indicator + error */}
+        {isProcessingDoc && (
+          <p className="text-center text-[11px] mt-1.5 text-indigo-500" role="status">
+            Processing document…
+          </p>
+        )}
+        {docError && (
+          <p className="text-center text-[11px] mt-1.5 text-red-500" role="alert">
+            {docError}
           </p>
         )}
 

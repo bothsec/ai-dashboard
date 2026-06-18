@@ -25,6 +25,7 @@ export interface Settings {
   theme: Theme;
   chatTheme: ChatTheme;
   activeProvider: AIProvider;
+  khLang: boolean;
   apiKeys: {
     openai: string;
     anthropic: string;

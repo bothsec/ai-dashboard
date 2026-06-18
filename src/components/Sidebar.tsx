@@ -21,7 +21,7 @@ const formatTime = (timestamp: number) => {
 };
 
 export const Sidebar = memo(() => {
-  const { settings } = useSettings();
+  const { settings, khLang, toggleKhLang } = useSettings();
   const { chats, activeChatId, createNewChat, switchChat, deleteChat, togglePinChat, renameChat } = useChat();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -426,6 +426,13 @@ export const Sidebar = memo(() => {
         <div className={`p-3 sm:p-4 pl-[calc(0.75rem+env(safe-area-inset-left,0px))] border-t ${sidebarHeaderBorder}`}>
           <div className="flex items-center gap-2">
             <ThemeToggle />
+            <button
+              onClick={toggleKhLang}
+              className={`w-9 h-9 rounded-lg flex items-center justify-center border bg-gradient-to-br ${footerBtnClass}`}
+              title={khLang ? 'Khmer mode — click for English' : 'English mode — click for Khmer'}
+            >
+              <span className={`text-[10px] font-bold leading-none ${footerIconClass}`}>{khLang ? 'EN' : 'ខ្មែរ'}</span>
+            </button>
               <div className={`w-9 h-9 rounded-lg flex items-center justify-center border bg-gradient-to-br ${footerBtnClass}`} aria-hidden="true">
                 <Cpu className={`w-4 h-4 ${footerIconClass}`} />
               </div>

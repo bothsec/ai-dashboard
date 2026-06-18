@@ -14,12 +14,16 @@ interface SettingsContextType {
   updateSettings: (newSettings: Partial<Settings>) => void;
   updateApiKey: (provider: AIProvider, key: string) => void;
   updateModel: (provider: AIProvider, model: string) => void;
+  khLang: boolean;
+  setKhLang: (v: boolean) => void;
+  toggleKhLang: () => void;
 }
 
 const defaultSettings: Settings = {
   theme: 'dark',
   chatTheme: 'default',
   activeProvider: 'api',
+  khLang: false,
   apiKeys: {
     openai: '',
     anthropic: '',
@@ -57,6 +61,15 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return defaultSettings;
   });
 
+  const [khLang, setKhLangState] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('khLang');
+      return saved === 'true';
+    } catch {
+      return false;
+    }
+  });
+
   // Apply theme to document
   useEffect(() => {
     document.documentElement.classList.remove('light', 'dark');
@@ -73,6 +86,19 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
     localStorage.setItem('ai-dashboard-settings', JSON.stringify(toSave));
   }, [settings]);
+
+  // Persist khLang to localStorage
+  useEffect(() => {
+    localStorage.setItem('khLang', String(khLang));
+  }, [khLang]);
+
+  const setKhLang = useCallback((v: boolean) => {
+    setKhLangState(v);
+  }, []);
+
+  const toggleKhLang = useCallback(() => {
+    setKhLangState(prev => !prev);
+  }, []);
 
   const setTheme = useCallback((theme: Theme) => {
     setSettings((prev) => ({ ...prev, theme }));
@@ -106,7 +132,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const contextValue = useMemo(() => ({
     settings, setTheme, toggleTheme, setChatTheme, updateSettings, updateApiKey, updateModel,
-  }), [settings, setTheme, toggleTheme, setChatTheme, updateSettings, updateApiKey, updateModel]);
+    khLang, setKhLang, toggleKhLang,
+  }), [settings, setTheme, toggleTheme, setChatTheme, updateSettings, updateApiKey, updateModel, khLang, setKhLang, toggleKhLang]);
 
   return (
     <SettingsContext.Provider value={contextValue}>
