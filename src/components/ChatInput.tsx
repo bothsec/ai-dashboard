@@ -9,6 +9,7 @@ import PromptEngineer from './PromptEngineer';
 import { StreamingHUD } from './StreamingHUD';
 import { SmartReplyPopover } from './SmartReplyPopover';
 import { KhmerPhrasebank } from './KhmerPhrasebank';
+import { detectCurrencies, type DetectedCurrency } from '../utils/currencyDetector';
 
 // Regex to detect a standalone URL in input
 const URL_REGEX = /^https?:\/\/[^\s]+$/;
@@ -55,6 +56,7 @@ export const ChatInput = memo(() => {
   const [showPreview, setShowPreview] = useState(false);
   const [showSmartReply, setShowSmartReply] = useState(false);
   const [showKhmerPhrasebank, setShowKhmerPhrasebank] = useState(false);
+  const [detectedCurrencies, setDetectedCurrencies] = useState<DetectedCurrency[]>([]);
   const { sendMessage, isStreaming, cancelStream, createNewChat, clearMessages, editLastMessage, lastSentMessage, error, retryLastMessage } = useChat();
   const { settings } = useSettings();
   const isDark = settings.theme === 'dark';
@@ -74,6 +76,15 @@ export const ChatInput = memo(() => {
   useEffect(() => {
     try { localStorage.setItem(COMPACT_KEY, String(isCompact)); } catch { /* ignore */ }
   }, [isCompact]);
+
+  // Detect currency amounts for inline conversion
+  useEffect(() => {
+    if (!input.trim()) { setDetectedCurrencies([]); return; }
+    try {
+      const detected = detectCurrencies(input);
+      setDetectedCurrencies(detected);
+    } catch { setDetectedCurrencies([]); }
+  }, [input]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -419,6 +430,34 @@ export const ChatInput = memo(() => {
               />
             )}
           </div>
+
+          {/* Khmer currency inline converter — shown when amounts detected */}
+          {detectedCurrencies.length > 0 && (
+            <div className={`flex flex-wrap gap-2 mt-1.5 px-1`}>
+              {detectedCurrencies.map((dc, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    const conversion = dc.type === 'usd' ? dc.displayRiel : dc.displayUSD;
+                    setInput(prev => prev + ` (${conversion})`);
+                    textareaRef.current?.focus();
+                  }}
+                  title={`Click to insert conversion`}
+                  className={`text-xs px-2 py-1 rounded border transition-colors ${
+                    isDark
+                      ? 'bg-emerald-950/50 border-emerald-800 text-emerald-300 hover:bg-emerald-900/50'
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                  }`}
+                >
+                  <span className="font-medium">{dc.fullMatch.trim()}</span>
+                  <span className="mx-1 opacity-50">→</span>
+                  <span>{dc.type === 'usd' ? dc.displayRiel.split(' ')[0] : dc.displayUSD}</span>
+                  <span className="ml-1 opacity-60 text-[10px]">{dc.type === 'usd' ? '៛' : '$'}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Summarize URL button — shown when input is a standalone URL */}
           {URL_REGEX.test(input.trim()) && !isStreaming && (
