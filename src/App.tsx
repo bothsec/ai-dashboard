@@ -8,12 +8,14 @@ import { ChatWindow } from './components/ChatWindow';
 import { ChatInput } from './components/ChatInput';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { ResumeBuilder } from './components/ResumeBuilder';
+import { InterviewPrep } from './components/InterviewPrep';
 import { MiniMode } from './components/MiniMode';
 
 const AppInner = memo(function AppInner() {
-  const { isStreaming, cancelStream, createNewChat } = useChat();
+  const { isStreaming, cancelStream, createNewChat, sendMessage } = useChat();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showResumeBuilder, setShowResumeBuilder] = useState(false);
+  const [showInterviewPrep, setShowInterviewPrep] = useState(false);
   const [miniMode, setMiniMode] = useState(() => {
     try { return localStorage.getItem('mini_mode_active') === 'true'; } catch { return false; }
   });
@@ -81,6 +83,13 @@ const AppInner = memo(function AppInner() {
     return () => window.removeEventListener('resume:open', handler);
   }, []);
 
+  // Listen for interview:open event from Sidebar button
+  useEffect(() => {
+    const handler = () => setShowInterviewPrep(true);
+    window.addEventListener('interview:open', handler);
+    return () => window.removeEventListener('interview:open', handler);
+  }, []);
+
   if (miniMode) {
     return <MiniMode onExit={() => setMiniMode(false)} />;
   }
@@ -116,6 +125,12 @@ const AppInner = memo(function AppInner() {
       )}
       {showResumeBuilder && (
         <ResumeBuilder onClose={() => setShowResumeBuilder(false)} />
+      )}
+      {showInterviewPrep && (
+        <InterviewPrep
+          onClose={() => setShowInterviewPrep(false)}
+          onAskAI={(prompt) => { sendMessage(prompt); setShowInterviewPrep(false); }}
+        />
       )}
     </div>
   );
