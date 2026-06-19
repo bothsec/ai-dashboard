@@ -20,7 +20,7 @@ interface SettingsContextType {
 }
 
 const defaultSettings: Settings = {
-  theme: 'dark',
+  theme: 'light',
   chatTheme: 'default',
   activeProvider: 'api',
   khLang: false,
@@ -40,7 +40,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [settings, setSettings] = useState<Settings>(() => {
-    const saved = localStorage.getItem('ai-dashboard-settings');
+    const saved = localStorage.getItem('ai-dashboard-settings-v2');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -84,7 +84,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       activeProvider: settings.activeProvider,
       model: settings.model,
     };
-    localStorage.setItem('ai-dashboard-settings', JSON.stringify(toSave));
+    localStorage.setItem('ai-dashboard-settings-v2', JSON.stringify(toSave));
   }, [settings]);
 
   // Persist khLang to localStorage
