@@ -22,6 +22,16 @@ const SUGGESTIONS = [
   { icon: '🐛', text: 'Debug my code' },
 ];
 
+// Khmer/Cambodia-focused home suggestions — gated by 'homeSuggestions' admin flag
+const KHMER_SUGGESTIONS = [
+  { icon: '📄', text: 'Write my Khmer/English CV' },
+  { icon: '🎯', text: 'Prepare me for a job interview' },
+  { icon: '🌐', text: 'Translate Khmer to English professionally' },
+  { icon: '📜', text: 'Explain my Cambodian labor contract' },
+  { icon: '✉️', text: 'Write a cover letter for a Phnom Penh job' },
+  { icon: '💰', text: 'Check if my salary offer is fair' },
+];
+
 export type MessageLabel = 'important' | 'question' | 'todo' | 'idea' | 'code' | null;
 
 export const LABEL_OPTIONS: { value: MessageLabel; label: string; color: string; bgClass: string; textClass: string }[] = [
@@ -671,7 +681,7 @@ const ContextWindowBar = memo(({ totalTokens }: { totalTokens: number }) => {
 
 export const ChatWindow: React.FC = () => {
   const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, tokensPerSecond, sendMessage, dismissError, lastSentMessage, lastUserMessage, regenerateLastResponse, deleteChat, branchChat, continueResponse } = useChat();
-  const { settings } = useSettings();
+  const { settings, isFeatureEnabled } = useSettings();
   const scrollRef = useRef<HTMLDivElement>(null);
   const emptyStateRef = useRef<HTMLDivElement>(null);
   const [isPinned, setIsPinned] = useState(true);
@@ -818,7 +828,7 @@ export const ChatWindow: React.FC = () => {
     return () => window.removeEventListener('keydown', handleSearchKeyDown);
   }, [chatSearchQuery, chatSearchIndex, openChatSearch, closeChatSearch, navigateChatSearch]);
 
-  const suggestions = SUGGESTIONS; // stable reference, no re-creation
+  const suggestions = isFeatureEnabled('homeSuggestions') ? KHMER_SUGGESTIONS : SUGGESTIONS;
 
   const handleSuggestionClick = useCallback(async (text: string) => {
     await sendMessage(text);
@@ -1072,7 +1082,9 @@ export const ChatWindow: React.FC = () => {
               How can I help you today?
             </h2>
             <p className={`mb-8 md:mb-10 max-w-md text-base md:text-lg ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-              Your conversations are saved automatically
+              {isFeatureEnabled('homeSuggestions')
+                ? 'Khmer career, writing, and productivity assistant'
+                : 'Your conversations are saved automatically'}
             </p>
             
             {/* Quick suggestions */}

@@ -37,6 +37,7 @@ const FEATURE_FLAGS = [
   { key: 'rielFormatter', label: 'Khmer Riel Formatter' },
   { key: 'numberWords', label: 'Khmer Number to Words' },
   { key: 'khmerCalendar', label: 'Khmer Calendar Converter' },
+  { key: 'homeSuggestions', label: 'Khmer Home Suggestions' },
 ] as const;
 
 interface User {
