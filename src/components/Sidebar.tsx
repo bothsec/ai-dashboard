@@ -303,7 +303,7 @@ export const Sidebar = memo(() => {
             </div>
             <div className="flex-1 min-w-0">
               <h1 className={`text-base sm:text-lg font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Khmer AI</h1>
-              <p className={`text-[10px] sm:text-[11px] text-gray-500 truncate`}>Career & Productivity</p>
+              <p className={`text-[10px] sm:text-[11px] ${isDark ? 'text-gray-400' : 'text-gray-500'} truncate`}>Career & Productivity</p>
             </div>
           </div>
         </div>
