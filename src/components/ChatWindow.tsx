@@ -16,10 +16,10 @@ import type { BookmarkedMessage } from './BookmarkPanel';
 
 // Stable — no component-state dependency
 const SUGGESTIONS = [
-  { icon: '📝', text: 'Help me write code' },
-  { icon: '🔍', text: 'Explain something' },
-  { icon: '💡', text: 'Brainstorm ideas' },
-  { icon: '🐛', text: 'Debug my code' },
+  { icon: '📄', text: 'Help me write my CV' },
+  { icon: '💬', text: 'Translate Khmer to English' },
+  { icon: '💼', text: 'Prepare for a job interview' },
+  { icon: '💡', text: 'Brainstorm career ideas' },
 ];
 
 // Khmer/Cambodia-focused home suggestions — gated by 'homeSuggestions' admin flag
@@ -1084,7 +1084,7 @@ export const ChatWindow: React.FC = () => {
             <p className={`mb-8 md:mb-10 max-w-md text-base md:text-lg ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
               {isFeatureEnabled('homeSuggestions')
                 ? 'Khmer career, writing, and productivity assistant'
-                : 'Your conversations are saved automatically'}
+                : 'Your Khmer career and productivity assistant'}
             </p>
             
             {/* Quick suggestions */}
