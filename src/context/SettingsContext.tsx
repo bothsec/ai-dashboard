@@ -21,7 +21,7 @@ interface SettingsContextType {
 
 const defaultSettings: Settings = {
   theme: 'light',
-  chatTheme: 'default',
+  chatTheme: 'minimal',
   activeProvider: 'api',
   khLang: false,
   apiKeys: {
