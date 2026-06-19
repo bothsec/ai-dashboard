@@ -5,6 +5,7 @@ import { dirname, join } from 'path';
 import helmet from 'helmet';
 import cors from 'cors';
 import expressFileUpload from 'express-fileupload';
+import rateLimit from 'express-rate-limit';
 import { summarizeUrl } from './src/services/urlSummarizer';
 import { parseDocument } from './src/services/documentParser';
 import { generateResumePDF } from './src/services/resumeGenerator';
@@ -886,35 +887,19 @@ app.use('/api', (_req, res) => {
 });
 
 // --- SPA fallback: rate-limited catch-all (prevents DoS on res.sendFile) ---
-const spaRateLimit = new Map<string, { count: number; resetAt: number }>();
-const SPA_RATE_LIMIT = 500; // requests per window
-const SPA_RATE_WINDOW = 60_000; // 1 minute
-const SPA_RATE_LIMIT_MB = 100 * 1024 * 1024; // 100MB limit for static files — enforced by nginx/proxy in production
-void SPA_RATE_LIMIT_MB; // suppress unused var warning (placeholder for future byte-level limiting)
-
-app.use((req, _res, next) => {
-  if (isDev) return next();
-  const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim()
-    ?? req.socket.remoteAddress ?? 'unknown';
-  const now = Date.now();
-  const record = spaRateLimit.get(ip);
-  if (record && now < record.resetAt && record.count >= SPA_RATE_LIMIT) {
-    _res.status(429).json({ error: { message: 'Too many requests', type: 'rate_limited' } });
-    return;
-  }
-  if (!record || now >= record.resetAt) {
-    spaRateLimit.set(ip, { count: 1, resetAt: now + SPA_RATE_WINDOW });
-  } else {
-    record.count++;
-  }
-  next();
+const spaFallbackRateLimit = rateLimit({
+  windowMs: 60_000,
+  limit: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { message: 'Too many requests', type: 'rate_limited' } },
 });
 
 if (!isDev) {
   app.use(express.static(join(__dirname, 'dist')));
 
   // SPA fallback - serve index.html for all non-API routes
-  app.use((_req, res) => {
+  app.use(spaFallbackRateLimit, (_req, res) => {
     res.sendFile(join(__dirname, 'dist', 'index.html'));
   });
 }

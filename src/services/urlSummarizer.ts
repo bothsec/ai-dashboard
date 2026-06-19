@@ -3,6 +3,8 @@
  * Powers the "summarize this article" feature in the chat.
  */
 import sanitizeHtmlLib from 'sanitize-html';
+import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
 
 interface SummarizeResult {
   title: string;
@@ -76,24 +78,32 @@ function extractEmbeddedIPv4(hostname: string): string | null {
   return m ? m[1] : null;
 }
 
-export async function summarizeUrl(rawUrl: string): Promise<SummarizeResult> {
-  // --- Validate & parse URL ---
-  let url: URL;
-  try {
-    url = new URL(rawUrl);
-  } catch {
-    throw new Error('Invalid URL');
-  }
+function isPrivateOrReservedIPv6(ip: string): boolean {
+  const normalized = ip.toLowerCase();
+  return normalized === '::1' ||
+    normalized.startsWith('fe80:') || // link-local
+    normalized.startsWith('fc') || normalized.startsWith('fd') || // unique local
+    normalized === '::' ||
+    normalized.startsWith('::ffff:127.') ||
+    normalized.startsWith('::ffff:10.') ||
+    normalized.startsWith('::ffff:192.168.') ||
+    /^::ffff:172\.(1[6-9]|2\d|3[0-1])\./.test(normalized);
+}
 
-  // Only allow http/https
+function isPrivateOrReservedAddress(address: string): boolean {
+  const embedded = extractEmbeddedIPv4(address);
+  if (embedded) return isPrivateIPv4(embedded);
+  const family = isIP(address);
+  if (family === 4) return isPrivateIPv4(address);
+  if (family === 6) return isPrivateOrReservedIPv6(address);
+  return false;
+}
+
+async function assertPublicHttpUrl(url: URL): Promise<void> {
   if (!['http:', 'https:'].includes(url.protocol)) {
     throw new Error('Only http and https URLs are supported');
   }
-
-  // SSRF check: block all private, loopback, link-local, and multicast ranges
   const hostname = url.hostname.toLowerCase();
-
-  // Reject plain hostnames that resolve to private ranges
   const isPrivateHost =
     hostname === 'localhost' ||
     hostname === '0.0.0.0' ||
@@ -104,20 +114,25 @@ export async function summarizeUrl(rawUrl: string): Promise<SummarizeResult> {
     /^::1$/i.test(hostname) ||
     /^::ffff:/i.test(hostname) ||
     hostname === '127.0.0.1';
+  if (isPrivateHost || isPrivateOrReservedAddress(hostname)) {
+    throw new Error('Private/internal URLs are not allowed');
+  }
+  const resolved = await lookup(hostname, { all: true, verbatim: true });
+  if (resolved.length === 0 || resolved.some(({ address }) => isPrivateOrReservedAddress(address))) {
+    throw new Error('Private/internal URLs are not allowed');
+  }
+}
 
-  if (isPrivateHost) {
-    throw new Error('Private/internal URLs are not allowed');
+export async function summarizeUrl(rawUrl: string): Promise<SummarizeResult> {
+  // --- Validate & parse URL ---
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    throw new Error('Invalid URL');
   }
 
-  // Check IPv4 addresses and IPv4-mapped IPv6 addresses against private ranges
-  const ipv4 = ipv4ToInt(hostname);
-  if (ipv4 >= 0 && isPrivateIPv4(hostname)) {
-    throw new Error('Private/internal URLs are not allowed');
-  }
-  const embeddedV4 = extractEmbeddedIPv4(hostname);
-  if (embeddedV4 && isPrivateIPv4(embeddedV4)) {
-    throw new Error('Private/internal URLs are not allowed');
-  }
+  await assertPublicHttpUrl(url);
 
   // --- Check cache ---
   // Use validated url.href (not rawUrl) as cache key to be consistent
@@ -148,22 +163,9 @@ export async function summarizeUrl(rawUrl: string): Promise<SummarizeResult> {
       if (!location) {
         throw new Error('Redirect response has no Location header');
       }
-      // Resolve relative redirects against the original URL
+      // Resolve relative redirects against the original URL and re-validate.
       const redirectUrl = new URL(location, url.href);
-      // Re-validate the redirect target hostname
-      const rh = redirectUrl.hostname.toLowerCase();
-      const rhIPv4 = ipv4ToInt(rh);
-      const rhEmbeddedV4 = extractEmbeddedIPv4(rh);
-      const rhIsPrivate =
-        rh === 'localhost' || rh === '0.0.0.0' || rh === '::1' ||
-        rh.endsWith('.internal') || rh.endsWith('.local') ||
-        /^fe80:/i.test(rh) || /^::ffff:/i.test(rh) ||
-        rh === '127.0.0.1' ||
-        (rhIPv4 >= 0 && isPrivateIPv4(rh)) ||
-        (!!rhEmbeddedV4 && isPrivateIPv4(rhEmbeddedV4));
-      if (rhIsPrivate) {
-        throw new Error('Redirect to private/internal URL is not allowed');
-      }
+      await assertPublicHttpUrl(redirectUrl);
       // Follow the validated redirect
       response = await fetch(redirectUrl.href, {
         headers: {

@@ -4,6 +4,7 @@
  */
 import { Router } from 'express';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'crypto';
@@ -134,28 +135,13 @@ function getSessionCookie(cookieHeader: string | undefined): string | null {
   return m ? m[1] : null;
 }
 
-const loginRateLimit = new Map<string, { count: number; resetAt: number }>();
-const LOGIN_RATE_LIMIT_MAX = 10;
-const LOGIN_RATE_LIMIT_WINDOW = 60_000;
-
-function requireLoginRateLimit(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim()
-    ?? req.socket.remoteAddress
-    ?? 'unknown';
-  const now = Date.now();
-  const record = loginRateLimit.get(ip);
-  if (!record || now >= record.resetAt) {
-    loginRateLimit.set(ip, { count: 1, resetAt: now + LOGIN_RATE_LIMIT_WINDOW });
-    next();
-    return;
-  }
-  if (record.count >= LOGIN_RATE_LIMIT_MAX) {
-    res.status(429).json({ error: { message: 'Too many login attempts. Try again later.' } });
-    return;
-  }
-  record.count++;
-  next();
-}
+const requireLoginRateLimit = rateLimit({
+  windowMs: 60_000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { message: 'Too many login attempts. Try again later.' } },
+});
 
 export function registerAdminRoutes(app: import('express').Application) {
   const admin = Router();
