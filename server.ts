@@ -552,8 +552,7 @@ app.post('/api/chat', async (req, res) => {
     // Check per-key rate limit
     const keyRecord = keyRateLimitStore.get(apiKey);
     if (keyRecord && now < keyRecord.resetTime && keyRecord.count >= KEY_RATE_LIMIT_MAX) {
-      // This key is rate limited, try next one
-      console.log(`[NVIDIA] Key rate limited, rotating — attempt ${attempt + 1}/${maxRetries}`);
+      // Selected key is locally rate-limited; rotate silently.
       continue;
     }
 
@@ -616,8 +615,7 @@ app.post('/api/chat', async (req, res) => {
       }
 
       if (response.status === 429) {
-        // Key rate limited, try next key
-        console.log(`[NVIDIA] Got 429 from upstream, rotating — attempt ${attempt + 1}/${maxRetries}`);
+        // Upstream rate-limited this request; rotate silently.
         continue;
       }
 

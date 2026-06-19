@@ -2,6 +2,7 @@
  * URL Summarizer: fetch any public URL, extract readable text, return markdown.
  * Powers the "summarize this article" feature in the chat.
  */
+import sanitizeHtmlLib from 'sanitize-html';
 
 interface SummarizeResult {
   title: string;
@@ -10,62 +11,14 @@ interface SummarizeResult {
   url: string;
 }
 
-// Safe HTML sanitizer: iteratively remove dangerous tags until stable.
-// Avoids fragile regex that can be bypassed with malformed HTML.
-// Approach: encode < > first, then decode safe tags, then strip everything else.
 function sanitizeHtml(html: string): string {
-  // Step 1: encode all angle brackets to neutralize any injected script/text
-  let t = html
-    .replace(/</g, '<')
-    .replace(/>/g, '>');
-
-  // Step 2: iteratively strip dangerous tags until no change (handles nested/malformed)
-  let prev = '';
-  while (prev !== t) {
-    prev = t;
-    t = t
-      // Remove script, style, and their content completely (case-insensitive, dotall)
-      .replace(/<script[^>]*>[\s\S]*?<\/script\s*>/gi, '')
-      .replace(/<style[^>]*>[\s\S]*?<\/style\s*>/gi, '')
-      // Remove on* event handler attributes (XSS vector)
-      .replace(/\son\w+="[^"]*"/gi, '')
-      .replace(/\son\w+='[^']*'/gi, '')
-      // Remove javascript: URLs
-      .replace(/href\s*=\s*["']javascript:[^"']*["']/gi, 'href="#"')
-      .replace(/src\s*=\s*["']javascript:[^"']*["']/gi, 'src="#"');
-  }
-
-  // Step 3: convert safe block tags to newlines for readability
-  t = t
-    .replace(/<\/(p|div|br|h[1-6]|li|tr)>/gi, '\n')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<hr\s*\/?>/gi, '\n\n');
-
-  // Step 4: remove all remaining HTML tags
-  t = t.replace(/<[^>]+>/g, '');
-
-  // Step 5: decode common HTML entities
-  t = t
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&/gi, '&')
-    .replace(/</gi, '<')
-    .replace(/>/gi, '>')
-    .replace(/"/gi, '"')
-    .replace(/&apos;/gi, "'")
-    .replace(/&#x2F;/gi, '/')
-    .replace(/&mdash;/gi, '—')
-    .replace(/&ndash;/gi, '–')
-    .replace(/&hellip;/gi, '…')
-    .replace(/&copy;/gi, '©')
-    .replace(/&reg;/gi, '®')
-    .replace(/&trade;/gi, '™');
-
-  // Step 6: collapse whitespace
-  t = t.replace(/[ \t]+/g, ' ');
-  t = t.replace(/\n\s*\n/g, '\n\n');
-  t = t.trim();
-
-  return t;
+  const text = sanitizeHtmlLib(html, {
+    allowedTags: [],
+    allowedAttributes: {},
+    disallowedTagsMode: 'discard',
+    textFilter: (value) => value.replace(/\s+/g, ' '),
+  });
+  return text.replace(/\s+/g, ' ').trim();
 }
 
 function extractTitle(html: string): string {

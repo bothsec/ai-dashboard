@@ -134,12 +134,35 @@ function getSessionCookie(cookieHeader: string | undefined): string | null {
   return m ? m[1] : null;
 }
 
+const loginRateLimit = new Map<string, { count: number; resetAt: number }>();
+const LOGIN_RATE_LIMIT_MAX = 10;
+const LOGIN_RATE_LIMIT_WINDOW = 60_000;
+
+function requireLoginRateLimit(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim()
+    ?? req.socket.remoteAddress
+    ?? 'unknown';
+  const now = Date.now();
+  const record = loginRateLimit.get(ip);
+  if (!record || now >= record.resetAt) {
+    loginRateLimit.set(ip, { count: 1, resetAt: now + LOGIN_RATE_LIMIT_WINDOW });
+    next();
+    return;
+  }
+  if (record.count >= LOGIN_RATE_LIMIT_MAX) {
+    res.status(429).json({ error: { message: 'Too many login attempts. Try again later.' } });
+    return;
+  }
+  record.count++;
+  next();
+}
+
 export function registerAdminRoutes(app: import('express').Application) {
   const admin = Router();
   admin.use(express.json());
 
   // Login
-  admin.post('/login', (req, res) => {
+  admin.post('/login', requireLoginRateLimit, (req, res) => {
     const { email, password } = req.body as { email?: string; password?: string } || {};
     if (!email || !password) { res.status(400).json({ error: { message: 'Email and password required.' } }); return; }
     const users = getUsers();
