@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
   const LOCAL_TARGET = `http://localhost:${env.PORT || 3000}`
 
 // Helper: configure proxy with X-Forwarded-Host so backend can set correct cookie Domain
-function proxyBackend(_path: string) {
+function proxyBackend() {
   return {
     target: LOCAL_TARGET,
     changeOrigin: true,
@@ -33,11 +33,11 @@ return {
     host: '0.0.0.0',
     port: 8080,
     proxy: {
-      '/api/auth/me':         proxyBackend('/api/auth/me'),
-      '/api/chat':            proxyBackend('/api/chat'),
-      '/api/auth/login':      proxyBackend('/api/auth/login'),
-      '/api/auth/status':     proxyBackend('/api/auth/status'),
-      '/api/summarize':       proxyBackend('/api/summarize'),
+      '/api/auth/me':         proxyBackend(),
+      '/api/chat':            proxyBackend(),
+      '/api/auth/login':      proxyBackend(),
+      '/api/auth/status':     proxyBackend(),
+      '/api/summarize':       proxyBackend(),
       '/api/openai': {
           target: 'https://api.openai.com',
           changeOrigin: true,
