@@ -880,29 +880,6 @@ app.post('/api/document', async (req, res) => {
   }
 });
 
-// --- Resume/Cover Letter Generator ---
-import { generateResumePDF } from './src/services/resumeGenerator.js';
-app.post('/api/resume', express.json({ limit: '1mb' }), async (req, res) => {
-  const { type, data } = req.body ?? {};
-  if (!type || !data) {
-    res.status(400).json({ error: { message: 'type and data are required', type: 'invalid_request' } });
-    return;
-  }
-  if (type !== 'resume' && type !== 'cover-letter') {
-    res.status(400).json({ error: { message: 'type must be "resume" or "cover-letter"', type: 'invalid_request' } });
-    return;
-  }
-  try {
-    const pdfBytes = await generateResumePDF(type, data);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${type}.pdf"`);
-    res.send(Buffer.from(pdfBytes));
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Failed to generate PDF';
-    res.status(500).json({ error: { message: msg, type: 'generation_error' } });
-  }
-});
-
 // --- 404 handler for unknown API routes ---
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: { message: 'API endpoint not found', type: 'not_found' } });
