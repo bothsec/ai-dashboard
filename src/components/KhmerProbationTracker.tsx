@@ -14,23 +14,23 @@ const MILESTONES = [
   {
     day: 30,
     label: '30-Day Check-in',
-    labelKh: 'ថេរវេស 30 ថ្ងៃ',
+    labelKh: 'ការវាយតម្លៃ ៣០ ថ្ងៃ',
     message: 'Employer should review performance. Either party can terminate with 7 days notice + prorated pay.',
-    messageKh: 'នេះគឺជាពេលវេលាដែលនិយោជកគួរតែពិនិត្យមើលការងាររបស់អ្នក។ ភាគីទាំងពីរអាចបញ្ចប់ hrgument ដោយផ្តល់ ការជូនដំណឹង 7 ថ្ងៃ និង ប្រាក់ខែប្រចាំថ្ងៃ.',
+    messageKh: 'និយោជកគួរតែពិនិត្យមើលការអនុវត្តការងារ។ ភាគីនីមួយៗអាចបញ្ចប់កិច្ចសន្យាដោយផ្តល់ការជូនដំណឹងជាមុន ៧ ថ្ងៃ និងទទួលបានប្រាក់បៀវត្សរ៍សមាមាត្រ។',
   },
   {
     day: 60,
     label: '60-Day Review',
-    labelKh: 'ថេរវេស 60 ថ្ងៃ',
+    labelKh: 'ការវាយតម្លៃ ៦០ ថ្ងៃ',
     message: 'Mid-probation assessment. If concerns exist, employer should document them and give chance to improve.',
-    messageKh: 'នេះគឺជាការវាយតម្លៃកណ្ត middle of probation. ប្រសិនបើមានបញ្ហា, និយោជកគួរតែកេរ ្តិ៍វា និងផ្តល់ឱកាសលើកស្ទួយ.',
+    messageKh: 'ការវាយតម្លៃពាក់កណ្តាលការសាកល្បងការងារ។ ប្រសិនបើមានការព្រួយបារម្ភ និយោជកគួរតែកត់ត្រាទុក និងផ្តល់ឱកាសឱ្យកែលម្អ។',
   },
   {
     day: 90,
     label: '90-Day Completion',
-    labelKh: 'ថេរវេស 90 ថ្ងៃ',
+    labelKh: 'បញ្ចប់ការសាកល្បងការងារ ៩០ ថ្ងៃ',
     message: 'Probation ends. Employer must decide: confirm, extend (max 2 months extra), or terminate. Written notice required.',
-    messageKh: ' probation បញ្ចប់។ និយោជកត្រូវតែសម្រេច: បញ្ជាក់, ប延长 (អតិបរមា 2 ខែ), ឬ បញ្ចប់. ត្រូវការ កំណត់សេចក្តី ជូនដំណឹង.',
+    messageKh: 'ការសាកល្បងការងារត្រូវបានបញ្ចប់។ និយោជកត្រូវសម្រេច៖ ទទួលយកជាផ្លូវការ បន្តការសាកល្បង (អតិបរមា ២ ខែបន្ថែម) ឬបញ្ឈប់ពីការងារ។ ត្រូវតែមានលិខិតជូនដំណឹងជាលាយលក្ខណ៍អក្សរ។',
   },
 ];
 
@@ -41,7 +41,12 @@ function formatRiel(amount: number): string {
 
 function calcProbation(startDate: Date, monthlySalary: number) {
   const now = new Date();
-  const daysElapsed = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  
+  // Normalize both dates to midnight local time to avoid timezone/DST/time of day bugs
+  const startMidnight = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  const daysElapsed = Math.floor((nowMidnight.getTime() - startMidnight.getTime()) / (1000 * 60 * 60 * 24));
   const totalDays = 90;
   const daysRemaining = Math.max(0, totalDays - daysElapsed);
   const progress = Math.min(100, Math.max(0, (daysElapsed / totalDays) * 100));
@@ -81,7 +86,13 @@ export const KhmerProbationTracker = memo(function KhmerProbationTracker({
   const [monthlySalary, setMonthlySalary] = useState(0);
 
   const result = useMemo(() => {
-    const d = new Date(startDate);
+    // Parse "YYYY-MM-DD" as local time midnight to match calcProbation's midnight logic
+    const parts = startDate.split('-');
+    if (parts.length !== 3) return null;
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const d = new Date(year, month, day);
     if (isNaN(d.getTime())) return null;
     return calcProbation(d, monthlySalary);
   }, [startDate, monthlySalary]);
@@ -101,10 +112,10 @@ export const KhmerProbationTracker = memo(function KhmerProbationTracker({
 
   const statusLabelKh =
     !result ? '' :
-    result.daysRemaining === 0 ? 'បានប�្រឡាក់ Probation រួច' :
-    result.daysRemaining < 30 ? 'វេលាចុងក្រោយ' :
-    result.daysElapsed < 30 ? 'ដំណាhệ prob 30' :
-    'Probation 60-90';
+    result.daysRemaining === 0 ? 'ការសាកល្បងការងារត្រូវបានបញ្ចប់ ✓' :
+    result.daysRemaining < 30 ? 'ដំណាក់កាលចុងក្រោយ' :
+    result.daysElapsed < 30 ? 'ដំណាក់កាលដំបូង' :
+    'ដំណាក់កាលកណ្តាល';
 
   return (
     <div
@@ -187,7 +198,7 @@ export const KhmerProbationTracker = memo(function KhmerProbationTracker({
                 {[33, 66, 100].map((pct, i) => (
                   <div key={i} className="absolute top-0" style={{ left: `${pct}%`, transform: 'translateX(-50%)' }}>
                     <div className="w-0.5 h-2 bg-gray-300 dark:bg-gray-600 mx-auto" />
-                    <p className="text-[8px] text-gray-400 text-center mt-0.5 -translate-x-1/2">{[(30, 60, 90)][i]}d</p>
+                    <p className="text-[8px] text-gray-400 text-center mt-0.5 -translate-x-1/2">{[30, 60, 90][i]}d</p>
                   </div>
                 ))}
               </div>

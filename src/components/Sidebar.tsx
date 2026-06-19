@@ -1,7 +1,7 @@
 import { useState, memo, useEffect, useCallback } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useChat } from '../context/ChatContext';
-import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles, Search, X as XIcon, Palette, Command, Pin, Pencil, BarChart2, FileText, GraduationCap, CalendarDays, Currency, Type, Shield, Lightbulb, Clock, TrendingUp } from 'lucide-react';
+import { Menu, X, Plus, MessageSquare, Trash, Sparkles, Search, X as XIcon, Palette, Command, Pin, Pencil, BarChart2, FileText, GraduationCap, CalendarDays, Currency, Type, Shield, Lightbulb, Clock, TrendingUp } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { ThemesModal } from './ThemesModal';
 import { ChatSearchModal } from './ChatSearchModal';
@@ -40,6 +40,20 @@ export const Sidebar = memo(() => {
   const [showLeaveCalculator, setShowLeaveCalculator] = useState(false);
   const [showOTCalculator, setShowOTCalculator] = useState(false);
   const [showProbationTracker, setShowProbationTracker] = useState(false);
+  const [showToolsMenu, setShowToolsMenu] = useState(false);
+
+  // Close tools menu when clicking outside
+  useEffect(() => {
+    if (!showToolsMenu) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target?.closest('[data-tools-menu]')) setShowToolsMenu(false);
+    };
+    const escHandler = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowToolsMenu(false); };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('keydown', escHandler);
+    return () => { document.removeEventListener('mousedown', handler); document.removeEventListener('keydown', escHandler); };
+  }, [showToolsMenu]);
   const [renamingChatId, setRenamingChatId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
 
@@ -320,7 +334,7 @@ export const Sidebar = memo(() => {
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search chats…"
-                className={`flex-1 bg-transparent text-xs outline-none placeholder:text-${isDark ? themeAccent + '-400/50' : themeAccent + '-400/70'} ${isDark ? 'text-' + themeAccent + '-300' : 'text-' + themeAccent + '-700'}`}
+                className={`flex-1 bg-transparent text-xs outline-none placeholder:text-indigo-400/70 text-indigo-200`}
                 aria-label="Search chat history"
               />
               {searchQuery && (
@@ -445,100 +459,52 @@ export const Sidebar = memo(() => {
             >
               <span className={`text-[10px] font-bold leading-none ${footerIconClass}`}>{khLang ? 'EN' : 'ខ្មែរ'}</span>
             </button>
-              <div className={`w-9 h-9 rounded-lg flex items-center justify-center border bg-gradient-to-br ${footerBtnClass}`} aria-hidden="true">
-                <Cpu className={`w-4 h-4 ${footerIconClass}`} />
-              </div>
-            <button
-                onClick={() => setShowThemesModal(true)}
+            <div className="relative">
+              <button
+                data-tools-menu
+                onClick={() => setShowToolsMenu(prev => !prev)}
                 className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
-                title="Chat Themes"
+                title="Tools"
+                aria-label="Tools"
               >
-                <Palette className={`w-4 h-4 ${footerIconClass}`} />
+                <Sparkles className={`w-4 h-4 ${footerIconClass}`} />
               </button>
-            <button
-                onClick={() => setShowSearchModal(true)}
-                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
-                title="Search (Ctrl+K)"
-              >
-                <Command className={`w-4 h-4 ${footerIconClass}`} />
-              </button>
-            <button
-                onClick={() => window.dispatchEvent(new CustomEvent('resume:open'))}
-                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
-                title="Resume Builder"
-              >
-                <FileText className={`w-4 h-4 ${footerIconClass}`} />
-              </button>
-            <button
-                onClick={() => window.dispatchEvent(new CustomEvent('interview:open'))}
-                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
-                title="Interview Prep"
-              >
-                <GraduationCap className={`w-4 h-4 ${footerIconClass}`} />
-              </button>
-            <button
-                onClick={() => setShowRielFormatter(true)}
-                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
-                title="Khmer Riel Formatter"
-              >
-                <Currency className={`w-4 h-4 ${footerIconClass}`} />
-              </button>
-            <button
-                onClick={() => setShowNumberWords(true)}
-                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
-                title="Khmer Number to Words"
-              >
-                <Type className={`w-4 h-4 ${footerIconClass}`} />
-              </button>
-            <button
-                onClick={() => window.dispatchEvent(new CustomEvent('khmer-calendar:open'))}
-                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
-                title="Khmer Calendar Converter"
-              >
-                <CalendarDays className={`w-4 h-4 ${footerIconClass}`} />
-              </button>
-            <button
-                onClick={() => setShowLeaveCalculator(true)}
-                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
-                title="Leave Entitlements Calculator"
-              >
-                <Shield className={`w-4 h-4 ${footerIconClass}`} />
-              </button>
-            <button
-                onClick={() => setShowOTCalculator(true)}
-                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
-                title="OT Calculator"
-              >
-                <Clock className={`w-4 h-4 ${footerIconClass}`} />
-              </button>
-            <button
-                onClick={() => setShowProbationTracker(true)}
-                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
-                title="Probation Tracker"
-              >
-                <TrendingUp className={`w-4 h-4 ${footerIconClass}`} />
-              </button>
-            <button
-                onClick={() => setShowWorkplaceTips(true)}
-                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
-                title="Khmer Workplace Tips"
-              >
-                <Lightbulb className={`w-4 h-4 ${footerIconClass}`} />
-              </button>
-            <button
-                onClick={() => setShowStatsModal(true)}
-                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
-                title="Chat Statistics"
-              >
-                <BarChart2 className={`w-4 h-4 ${footerIconClass}`} />
-              </button>
-            <button
-                onClick={() => window.dispatchEvent(new CustomEvent('admin:open'))}
-                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
-                title="Admin Dashboard"
-              >
-                <Shield className={`w-4 h-4 ${footerIconClass}`} />
-              </button>
+              {showToolsMenu && (
+                <div
+                  data-tools-menu
+                  className={`absolute bottom-full left-0 mb-2 w-56 rounded-xl border shadow-2xl overflow-hidden z-50 ${isDark ? 'bg-gray-900 border-gray-700/60' : 'bg-white border-gray-200'}`}
+                  role="menu"
+                >
+                  {[
+                    { key: 'themes', label: 'Chat Themes', icon: Palette, run: () => setShowThemesModal(true) },
+                    { key: 'search', label: 'Search (Ctrl+K)', icon: Command, run: () => setShowSearchModal(true) },
+                    { key: 'stats', label: 'Chat Statistics', icon: BarChart2, run: () => setShowStatsModal(true) },
+                    { key: 'tips', label: 'Khmer Workplace Tips', icon: Lightbulb, run: () => setShowWorkplaceTips(true) },
+                    { key: 'leave', label: 'Leave Entitlements Calculator', icon: Shield, run: () => setShowLeaveCalculator(true) },
+                    { key: 'ot', label: 'OT Calculator', icon: Clock, run: () => setShowOTCalculator(true) },
+                    { key: 'probation', label: 'Probation Tracker', icon: TrendingUp, run: () => setShowProbationTracker(true) },
+                    { key: 'resume', label: 'Resume Builder', icon: FileText, run: () => window.dispatchEvent(new CustomEvent('resume:open')) },
+                    { key: 'interview', label: 'Interview Prep', icon: GraduationCap, run: () => window.dispatchEvent(new CustomEvent('interview:open')) },
+                    { key: 'riel', label: 'Khmer Riel Formatter', icon: Currency, run: () => setShowRielFormatter(true) },
+                    { key: 'numbers', label: 'Khmer Number to Words', icon: Type, run: () => setShowNumberWords(true) },
+                    { key: 'calendar', label: 'Khmer Calendar Converter', icon: CalendarDays, run: () => window.dispatchEvent(new CustomEvent('khmer-calendar:open')) },
+                  ].map(item => {
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={item.key}
+                        onClick={() => { item.run(); setShowToolsMenu(false); }}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${isDark ? 'text-gray-200 hover:bg-gray-800/70' : 'text-gray-700 hover:bg-gray-100'}`}
+                        role="menuitem"
+                      >
+                        <Icon className={`w-4 h-4 shrink-0 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
+                        <span className="truncate">{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </aside>

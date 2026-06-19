@@ -60,6 +60,7 @@ app.use(helmet({
 
 // --- Auth: bearer token validation ---
 const AUTH_SECRET = process.env.AUTH_SECRET_TOKEN;
+const MAIN_SITE_AUTH_REQUIRED = (process.env.MAIN_SITE_AUTH_REQUIRED ?? 'false').toLowerCase() === 'true';
 const AUTH_COOKIE_NAME = 'ai_auth';
 const AUTH_COOKIE_MAXAGE = 86400; // 24 hours in seconds
 
@@ -71,8 +72,8 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
     return next();
   }
 
-  // Skip if no AUTH_SECRET is configured (auth disabled)
-  if (!AUTH_SECRET) return next();
+  // Main website/API auth is opt-in. Admin routes keep their own session login.
+  if (!MAIN_SITE_AUTH_REQUIRED || !AUTH_SECRET) return next();
 
   const bearerToken =
     req.headers.authorization?.startsWith('Bearer ')
@@ -122,7 +123,7 @@ app.post('/api/auth/login', express.json(), (req, res) => {
 
 // GET /api/auth/status → { authRequired: boolean } (unauthenticated)
 app.get('/api/auth/status', (_req, res) => {
-  res.json({ authRequired: !!AUTH_SECRET });
+  res.json({ authRequired: MAIN_SITE_AUTH_REQUIRED && !!AUTH_SECRET });
 });
 
 // GET /api/auth/me → { authenticated: true } or 401 (cookie-validated)

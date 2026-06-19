@@ -14,6 +14,7 @@ const SESSIONS_FILE = join(DATA_DIR, 'sessions.json');
 
 interface User { id: number; name: string; email: string; password_hash: string; role: string; features: string; created_at: string; }
 interface Session { id: string; user_id: number; expires_at: string; }
+interface PublicUser { id: number; name: string; email: string; role: string; features: Record<string, boolean>; created_at: string; }
 
 function readJson<T>(path: string, defaultVal: T): T {
   try {
@@ -31,6 +32,38 @@ function getUsers(): User[] { return readJson<User[]>(USERS_FILE, []); }
 function saveUsers(users: User[]) { writeJson(USERS_FILE, users); }
 function getSessions(): Session[] { return readJson<Session[]>(SESSIONS_FILE, []); }
 function saveSessions(sessions: Session[]) { writeJson(SESSIONS_FILE, sessions); }
+
+function parseFeatures(features: unknown): Record<string, boolean> {
+  if (!features) return {};
+  if (typeof features === 'string') {
+    try {
+      const parsed = JSON.parse(features) as unknown;
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? parsed as Record<string, boolean>
+        : {};
+    } catch {
+      return {};
+    }
+  }
+  return typeof features === 'object' && !Array.isArray(features)
+    ? features as Record<string, boolean>
+    : {};
+}
+
+function stringifyFeatures(features: unknown): string {
+  return JSON.stringify(parseFeatures(features));
+}
+
+function toPublicUser(user: User): PublicUser {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    features: parseFeatures(user.features),
+    created_at: user.created_at,
+  };
+}
 
 // Init default admin user
 function initDefault() {
@@ -60,7 +93,7 @@ function validateSession(sessionId: string) {
   if (!user) return null;
   return {
     userId: valid.user_id,
-    user: { id: user.id, name: user.name, email: user.email, role: user.role, features: JSON.parse(user.features || '{}') }
+    user: toPublicUser(user)
   };
 }
 
@@ -87,7 +120,7 @@ export function registerAdminRoutes(app: import('express').Application) {
     sessions.push({ id: sessionId, user_id: user.id, expires_at: expiresAt });
     saveSessions(sessions);
     res.setHeader('Set-Cookie', `session_id=${sessionId}; HttpOnly; Path=/; Max-Age=${7 * 24 * 60 * 60}; SameSite=Lax`);
-    res.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role, features: JSON.parse(user.features || '{}') } });
+    res.json({ user: toPublicUser(user) });
   });
 
   // Logout
@@ -116,7 +149,7 @@ export function registerAdminRoutes(app: import('express').Application) {
     const val = validateSession(sid);
     if (!val || !val.user || val.user.role !== 'admin') { res.status(403).json({ error: { message: 'Forbidden.' } }); return; }
     const users = getUsers();
-    res.json({ users: users.map(u => ({ ...u, features: JSON.parse(u.features || '{}') })) });
+    res.json({ users: users.map(toPublicUser) });
   });
 
   // Create user
@@ -125,14 +158,23 @@ export function registerAdminRoutes(app: import('express').Application) {
     if (!sid) { res.status(401).json({ error: { message: 'Not authenticated.' } }); return; }
     const val = validateSession(sid);
     if (!val || !val.user || val.user.role !== 'admin') { res.status(403).json({ error: { message: 'Forbidden.' } }); return; }
-    const { name, email, password, role, features } = req.body as Record<string, string>;
+    const { name, email, password, role, features } = req.body as Record<string, unknown>;
     if (!name || !email || !password) { res.status(400).json({ error: { message: 'name, email, password required.' } }); return; }
     const users = getUsers();
+    if (users.some(u => u.email === email)) { res.status(409).json({ error: { message: 'Email already exists.' } }); return; }
     const id = users.length > 0 ? Math.max(...users.map(u => u.id)) + 1 : 1;
-    const newUser: User = { id, name, email, password_hash: password, role: role || 'user', features: features || '{}', created_at: new Date().toISOString() };
+    const newUser: User = {
+      id,
+      name: String(name),
+      email: String(email),
+      password_hash: String(password),
+      role: role === 'admin' ? 'admin' : 'user',
+      features: stringifyFeatures(features),
+      created_at: new Date().toISOString()
+    };
     users.push(newUser);
     saveUsers(users);
-    res.json({ user: { ...newUser, features: JSON.parse(newUser.features || '{}') } });
+    res.json({ user: toPublicUser(newUser) });
   });
 
   // Update user
@@ -145,14 +187,14 @@ export function registerAdminRoutes(app: import('express').Application) {
     const users = getUsers();
     const idx = users.findIndex(u => u.id === id);
     if (idx === -1) { res.status(404).json({ error: { message: 'User not found.' } }); return; }
-    const body = req.body as Record<string, string>;
-    if (body.name !== undefined) users[idx].name = body.name;
-    if (body.email !== undefined) users[idx].email = body.email;
-    if (body.password !== undefined) users[idx].password_hash = body.password;
-    if (body.role !== undefined) users[idx].role = body.role;
-    if (body.features !== undefined) users[idx].features = typeof body.features === 'string' ? body.features : JSON.stringify(body.features);
+    const body = req.body as Record<string, unknown>;
+    if (body.name !== undefined) users[idx].name = String(body.name);
+    if (body.email !== undefined) users[idx].email = String(body.email);
+    if (body.password !== undefined) users[idx].password_hash = String(body.password);
+    if (body.role !== undefined) users[idx].role = body.role === 'admin' ? 'admin' : 'user';
+    if (body.features !== undefined) users[idx].features = stringifyFeatures(body.features);
     saveUsers(users);
-    res.json({ user: { ...users[idx], features: JSON.parse(users[idx].features || '{}') } });
+    res.json({ user: toPublicUser(users[idx]) });
   });
 
   // Delete user

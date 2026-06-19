@@ -46,19 +46,19 @@ export const ContractAnalyzer = memo(function ContractAnalyzer({ text, isDark, o
   return (
     <div
       className={`absolute bottom-full mb-2 right-4 w-80 z-50 rounded-xl border shadow-2xl overflow-hidden max-h-96 flex flex-col ${
-        isDark ? 'bg-z-900 border-z-700' : 'bg-white border-gray-200'
+        isDark ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'
       }`}
     >
       {/* Header */}
       <div className={`flex items-center justify-between px-3 py-2 border-b shrink-0 ${
-        isDark ? 'border-z-700 bg-z-800' : 'border-gray-100 bg-gray-50'
+        isDark ? 'border-zinc-700 bg-zinc-800' : 'border-gray-100 bg-gray-50'
       }`}>
-        <span className={`text-xs font-semibold flex items-center gap-1.5 ${isDark ? 'text-z-200' : 'text-gray-700'}`}>
+        <span className={`text-xs font-semibold flex items-center gap-1.5 ${isDark ? 'text-zinc-200' : 'text-gray-700'}`}>
           📋 Labor Contract Analyzer
         </span>
         <button
           onClick={onClose}
-          className={`p-0.5 rounded ${isDark ? 'hover:bg-z-700 text-z-400' : 'hover:bg-gray-200 text-gray-500'}`}
+          className={`p-0.5 rounded ${isDark ? 'hover:bg-zinc-700 text-zinc-400' : 'hover:bg-gray-200 text-gray-500'}`}
         >
           <X className="w-3.5 h-3.5" />
         </button>
@@ -93,7 +93,7 @@ export const ContractAnalyzer = memo(function ContractAnalyzer({ text, isDark, o
       </div>
 
       {/* Footer */}
-      <div className={`px-3 py-1.5 text-[10px] border-t shrink-0 ${isDark ? 'border-z-700 text-z-500' : 'border-gray-100 text-gray-400'}`}>
+      <div className={`px-3 py-1.5 text-[10px] border-t shrink-0 ${isDark ? 'border-zinc-700 text-zinc-500' : 'border-gray-100 text-gray-400'}`}>
         Detected {detected.length} clause{detected.length !== 1 ? 's' : ''} — Khmer Labor Law reference
       </div>
     </div>

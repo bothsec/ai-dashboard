@@ -1,6 +1,5 @@
 import { useState, useCallback, memo, useEffect } from 'react';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { AuthGate } from './components/AuthGate';
 import { SettingsProvider } from './context/SettingsContext';
 import { ChatProvider, useChat } from './context/ChatContext';
 import { Sidebar } from './components/Sidebar';
@@ -93,9 +92,12 @@ const AppInner = memo(function AppInner() {
     return () => window.removeEventListener('resume:open', handler);
   }, []);
 
-  // Listen for admin:open event from Sidebar button
+  // Admin is intentionally hidden from the normal user UI.
+  // Open it directly at /admin, or via the internal admin:open event.
   useEffect(() => {
-    const handler = () => setShowAdminDashboard(true);
+    const openAdmin = () => setShowAdminDashboard(true);
+    if (window.location.pathname === '/admin') openAdmin();
+    const handler = () => openAdmin();
     window.addEventListener('admin:open', handler);
     return () => window.removeEventListener('admin:open', handler);
   }, []);
@@ -151,7 +153,10 @@ const AppInner = memo(function AppInner() {
         <ResumeBuilder onClose={() => setShowResumeBuilder(false)} />
       )}
       {showAdminDashboard && (
-        <AdminDashboard onClose={() => setShowAdminDashboard(false)} />
+        <AdminDashboard onClose={() => {
+          setShowAdminDashboard(false);
+          if (window.location.pathname === '/admin') window.history.pushState(null, '', '/');
+        }} />
       )}
       {showInterviewPrep && (
         <InterviewPrep
@@ -171,18 +176,16 @@ const App = memo(function App() {
   const handleReset = useCallback(() => setErrorBoundaryKey(k => k + 1), []);
 
   return (
-    <AuthGate>
-      <ErrorBoundary
-        key={errorBoundaryKey}
-        onReset={handleReset}
-      >
-        <SettingsProvider>
-          <ChatProvider>
-            <AppInner />
-          </ChatProvider>
-        </SettingsProvider>
-      </ErrorBoundary>
-    </AuthGate>
+    <ErrorBoundary
+      key={errorBoundaryKey}
+      onReset={handleReset}
+    >
+      <SettingsProvider>
+        <ChatProvider>
+          <AppInner />
+        </ChatProvider>
+      </SettingsProvider>
+    </ErrorBoundary>
   );
 });
 

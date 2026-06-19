@@ -16,6 +16,9 @@ import { ContractAnalyzer } from './ContractAnalyzer';
 import { detectCurrencies, type DetectedCurrency } from '../utils/currencyDetector';
 import { detectSalaryRanges } from '../utils/salaryDetector';
 
+// === Minimal mode toggle — set true to show ONLY Prompt Engineer + Send ===
+const MINIMAL_MODE = true;
+
 // Regex to detect a standalone URL in input
 const URL_REGEX = /^https?:\/\/[^\s]+$/;
 
@@ -342,8 +345,8 @@ export const ChatInput = memo(() => {
           onDrop={handleFileDrop}
           aria-label="Message input form"
         >
-          {/* Drag-over overlay */}
-          {isDragOver && (
+          {/* Drag-over overlay — hidden in minimal mode */}
+          {!MINIMAL_MODE && isDragOver && (
             <div className="absolute inset-0 flex items-center justify-center rounded-full pointer-events-none z-10">
               <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
                 isDark ? 'bg-indigo-600 text-white' : 'bg-indigo-600 text-white'
@@ -354,19 +357,21 @@ export const ChatInput = memo(() => {
             </div>
           )}
 
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) processDocumentFile(file);
-              e.target.value = '';
-            }}
-            aria-hidden="true"
-          />
+          {/* Hidden file input — hidden in minimal mode */}
+          {!MINIMAL_MODE && (
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) processDocumentFile(file);
+                e.target.value = '';
+              }}
+              aria-hidden="true"
+            />
+          )}
           {/* Prompt Engineer button */}
           <button
             type="button"
@@ -440,8 +445,8 @@ export const ChatInput = memo(() => {
             )}
           </div>
 
-          {/* Khmer currency inline converter — shown when amounts detected */}
-          {detectedCurrencies.length > 0 && (
+          {/* Khmer currency inline converter — hidden in minimal mode */}
+          {!MINIMAL_MODE && detectedCurrencies.length > 0 && (
             <div className={`flex flex-wrap gap-2 mt-1.5 px-1`}>
               {detectedCurrencies.map((dc, i) => (
                 <button
@@ -468,8 +473,8 @@ export const ChatInput = memo(() => {
             </div>
           )}
 
-          {/* Summarize URL button — shown when input is a standalone URL */}
-          {URL_REGEX.test(input.trim()) && !isStreaming && (
+          {/* Summarize URL button — hidden in minimal mode; shown when input is a standalone URL */}
+          {!MINIMAL_MODE && URL_REGEX.test(input.trim()) && !isStreaming && (
             <button
               type="button"
               onClick={handleSummarize}
@@ -491,25 +496,27 @@ export const ChatInput = memo(() => {
             </button>
           )}
 
-          {/* Document upload button — always visible as secondary action */}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isStreaming || isProcessingDoc}
-            className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${
-              isProcessingDoc
-                ? isDark ? 'text-indigo-400' : 'text-indigo-600'
-                : isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200'
-            }`}
-            aria-label="Attach PDF or DOCX document"
-            title="Attach PDF or DOCX document"
-          >
-            {isProcessingDoc ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <FileText className="w-4 h-4" />
-            )}
-          </button>
+          {/* Document upload button — hidden in minimal mode */}
+          {!MINIMAL_MODE && (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isStreaming || isProcessingDoc}
+              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${
+                isProcessingDoc
+                  ? isDark ? 'text-indigo-400' : 'text-indigo-600'
+                  : isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200'
+              }`}
+              aria-label="Attach PDF or DOCX document"
+              title="Attach PDF or DOCX document"
+            >
+              {isProcessingDoc ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileText className="w-4 h-4" />
+              )}
+            </button>
+          )}
 
           {/* Send button */}
           <button
@@ -533,8 +540,8 @@ export const ChatInput = memo(() => {
             )}
           </button>
 
-          {/* Edit button — shown when not streaming, not editing, and lastSentMessage exists */}
-          {!isStreaming && !isEditing && lastSentMessage && (
+          {/* Edit button — hidden in minimal mode; shown when not streaming, not editing, and lastSentMessage exists */}
+          {!MINIMAL_MODE && !isStreaming && !isEditing && lastSentMessage && (
             <button
               type="button"
               onClick={() => {
@@ -550,8 +557,8 @@ export const ChatInput = memo(() => {
             </button>
           )}
 
-          {/* Retry button — shown when a message failed and user hasn't typed new content */}
-          {error && lastSentMessage && !isEditing && (
+          {/* Retry button — hidden in minimal mode; shown when a message failed and user hasn't typed new content */}
+          {!MINIMAL_MODE && error && lastSentMessage && !isEditing && (
             <button
               type="button"
               onClick={retryLastMessage}
@@ -563,111 +570,121 @@ export const ChatInput = memo(() => {
             </button>
           )}
 
-          {/* Compact mode toggle */}
-          <button
-            type="button"
-            onClick={() => setIsCompact(prev => !prev)}
-            className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200'}`}
-            aria-label={isCompact ? 'Expand input area' : 'Compact input area'}
-            title={isCompact ? 'Expand input area' : 'Compact input — more room for messages'}
-          >
-            {isCompact
-              ? <Maximize2 className="w-3.5 h-3.5" />
-              : <Minimize2 className="w-3.5 h-3.5" />}
-          </button>
-
-          {/* Smart Reply button */}
-          <div className="relative">
+          {/* Compact mode toggle — hidden in minimal mode */}
+          {!MINIMAL_MODE && (
             <button
               type="button"
-              onClick={() => setShowSmartReply(prev => !prev)}
-              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showSmartReply ? (isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200')}`}
-              aria-label="Smart Reply"
-              title="Khmer Smart Reply — bilingual quick responses"
+              onClick={() => setIsCompact(prev => !prev)}
+              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200'}`}
+              aria-label={isCompact ? 'Expand input area' : 'Compact input area'}
+              title={isCompact ? 'Expand input area' : 'Compact input — more room for messages'}
             >
-              <MessageSquarePlus className="w-4 h-4" />
+              {isCompact
+                ? <Maximize2 className="w-3.5 h-3.5" />
+                : <Minimize2 className="w-3.5 h-3.5" />}
             </button>
-            {showSmartReply && (
-              <SmartReplyPopover
-                isDark={isDark}
-                onClose={() => setShowSmartReply(false)}
-                onInsert={(text) => {
-                  setInput(prev => prev ? `${prev}\n${text}` : text);
-                  setTimeout(() => textareaRef.current?.focus(), 50);
-                }}
-              />
-            )}
-          </div>
+          )}
 
-          {/* Khmer Phrasebank button */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowKhmerPhrasebank(prev => !prev)}
-              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showKhmerPhrasebank ? (isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200')}`}
-              aria-label="Khmer Phrasebank"
-              title="Khmer Phrasebank — browse phrases in Khmer & English"
-            >
-              <BookOpen className="w-4 h-4" />
-            </button>
-            {showKhmerPhrasebank && (
-              <KhmerPhrasebank
-                onClose={() => setShowKhmerPhrasebank(false)}
-                onInsert={(text) => {
-                  setInput(prev => prev ? `${prev}\n${text}` : text);
-                  setTimeout(() => textareaRef.current?.focus(), 50);
-                }}
-              />
-            )}
-          </div>
+          {/* Smart Reply button — hidden in minimal mode */}
+          {!MINIMAL_MODE && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowSmartReply(prev => !prev)}
+                className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showSmartReply ? (isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200')}`}
+                aria-label="Smart Reply"
+                title="Khmer Smart Reply — bilingual quick responses"
+              >
+                <MessageSquarePlus className="w-4 h-4" />
+              </button>
+              {showSmartReply && (
+                <SmartReplyPopover
+                  isDark={isDark}
+                  onClose={() => setShowSmartReply(false)}
+                  onInsert={(text: string) => {
+                    setInput(prev => prev ? `${prev}\n${text}` : text);
+                    setTimeout(() => textareaRef.current?.focus(), 50);
+                  }}
+                />
+              )}
+            </div>
+          )}
 
-          {/* Khmer Job Term Dictionary button */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowKhmerJobTermDictionary(prev => !prev)}
-              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showKhmerJobTermDictionary ? (isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200')}`}
-              aria-label="Khmer Job Term Dictionary"
-              title="Khmer Job Term Dictionary — understand Cambodian workplace abbreviations"
-            >
-              <HelpCircle className="w-4 h-4" />
-            </button>
-            {showKhmerJobTermDictionary && (
-              <KhmerJobTermDictionary
-                onClose={() => setShowKhmerJobTermDictionary(false)}
-                onInsert={(text) => {
-                  setInput(prev => prev ? `${prev}\n${text}` : text);
-                  setTimeout(() => textareaRef.current?.focus(), 50);
-                }}
-              />
-            )}
-          </div>
+          {/* Khmer Phrasebank button — hidden in minimal mode */}
+          {!MINIMAL_MODE && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowKhmerPhrasebank(prev => !prev)}
+                className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showKhmerPhrasebank ? (isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200')}`}
+                aria-label="Khmer Phrasebank"
+                title="Khmer Phrasebank — browse phrases in Khmer & English"
+              >
+                <BookOpen className="w-4 h-4" />
+              </button>
+              {showKhmerPhrasebank && (
+                <KhmerPhrasebank
+                  onClose={() => setShowKhmerPhrasebank(false)}
+                  onInsert={(text: string) => {
+                    setInput(prev => prev ? `${prev}\n${text}` : text);
+                    setTimeout(() => textareaRef.current?.focus(), 50);
+                  }}
+                />
+              )}
+            </div>
+          )}
 
-          {/* Khmer Job Quick Replies button */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowJobQuickReplies(prev => !prev)}
-              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showJobQuickReplies ? (isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200')}`}
-              aria-label="Khmer Job Quick Replies"
-              title="Khmer Job Quick Replies — one-tap professional phrases"
-            >
-              <Briefcase className="w-4 h-4" />
-            </button>
-            {showJobQuickReplies && (
-              <JobQuickReplies
-                isDark={isDark}
-                onClose={() => setShowJobQuickReplies(false)}
-                onInsert={(text) => {
-                  setInput(prev => prev ? `${prev}\n${text}` : text);
-                  setTimeout(() => textareaRef.current?.focus(), 50);
-                }}
-              />
-            )}
-          </div>
+          {/* Khmer Job Term Dictionary button — hidden in minimal mode */}
+          {!MINIMAL_MODE && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowKhmerJobTermDictionary(prev => !prev)}
+                className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showKhmerJobTermDictionary ? (isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200')}`}
+                aria-label="Khmer Job Term Dictionary"
+                title="Khmer Job Term Dictionary — understand Cambodian workplace abbreviations"
+              >
+                <HelpCircle className="w-4 h-4" />
+              </button>
+              {showKhmerJobTermDictionary && (
+                <KhmerJobTermDictionary
+                  onClose={() => setShowKhmerJobTermDictionary(false)}
+                  onInsert={(text: string) => {
+                    setInput(prev => prev ? `${prev}\n${text}` : text);
+                    setTimeout(() => textareaRef.current?.focus(), 50);
+                  }}
+                />
+              )}
+            </div>
+          )}
 
-          {/* Salary converter — appears when salary is detected in input */}
-          {(() => {
+          {/* Khmer Job Quick Replies button — hidden in minimal mode */}
+          {!MINIMAL_MODE && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowJobQuickReplies(prev => !prev)}
+                className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showJobQuickReplies ? (isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200')}`}
+                aria-label="Khmer Job Quick Replies"
+                title="Khmer Job Quick Replies — one-tap professional phrases"
+              >
+                <Briefcase className="w-4 h-4" />
+              </button>
+              {showJobQuickReplies && (
+                <JobQuickReplies
+                  isDark={isDark}
+                  onClose={() => setShowJobQuickReplies(false)}
+                  onInsert={(text: string) => {
+                    setInput(prev => prev ? `${prev}\n${text}` : text);
+                    setTimeout(() => textareaRef.current?.focus(), 50);
+                  }}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Salary converter — hidden in minimal mode; appears when salary is detected in input */}
+          {!MINIMAL_MODE && (() => {
             const detected = detectSalaryRanges(input);
             if (detected.length === 0) return null;
             return (
@@ -692,28 +709,30 @@ export const ChatInput = memo(() => {
             );
           })()}
 
-          {/* Contract Analyzer — manual button to check for red flag clauses */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowContractAnalyzer(prev => !prev)}
-              className={`shrink-0 transition-colors duration-200 px-1.5 py-1 rounded-full flex items-center gap-1 text-[10px] font-semibold ${showContractAnalyzer ? (isDark ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-red-100 text-red-700 border border-red-300') : (isDark ? 'text-red-400 bg-red-500/10 hover:bg-red-500/20' : 'text-red-600 bg-red-50 hover:bg-red-100')}`}
-              aria-label="Contract analyzer"
-              title="📋 Analyze labor contract red flags"
-            >
-              📋 Contract Check
-            </button>
-            {showContractAnalyzer && (
-              <ContractAnalyzer
-                text={input}
-                isDark={isDark}
-                onClose={() => setShowContractAnalyzer(false)}
-              />
-            )}
-          </div>
+          {/* Contract Analyzer — hidden in minimal mode */}
+          {!MINIMAL_MODE && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowContractAnalyzer(prev => !prev)}
+                className={`shrink-0 transition-colors duration-200 px-1.5 py-1 rounded-full flex items-center gap-1 text-[10px] font-semibold ${showContractAnalyzer ? (isDark ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-red-100 text-red-700 border border-red-300') : (isDark ? 'text-red-400 bg-red-500/10 hover:bg-red-500/20' : 'text-red-600 bg-red-50 hover:bg-red-100')}`}
+                aria-label="Contract analyzer"
+                title="📋 Analyze labor contract red flags"
+              >
+                📋 Contract Check
+              </button>
+              {showContractAnalyzer && (
+                <ContractAnalyzer
+                  text={input}
+                  isDark={isDark}
+                  onClose={() => setShowContractAnalyzer(false)}
+                />
+              )}
+            </div>
+          )}
 
-          {/* Markdown preview toggle */}
-          {input.trim().length > 0 && (
+          {/* Markdown preview toggle — hidden in minimal mode */}
+          {!MINIMAL_MODE && input.trim().length > 0 && (
             <button
               type="button"
               onClick={() => setShowPreview(prev => !prev)}
