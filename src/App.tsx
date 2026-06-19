@@ -1,4 +1,4 @@
-import { useState, useCallback, memo, useEffect } from 'react';
+import { useState, useCallback, memo, useEffect, lazy, Suspense } from 'react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsProvider } from './context/SettingsContext';
 import { ChatProvider, useChat } from './context/ChatContext';
@@ -6,11 +6,26 @@ import { Sidebar } from './components/Sidebar';
 import { ChatWindow } from './components/ChatWindow';
 import { ChatInput } from './components/ChatInput';
 import { ShortcutsModal } from './components/ShortcutsModal';
-import { ResumeBuilder } from './components/ResumeBuilder';
-import { AdminDashboard } from './components/AdminDashboard';
-import { InterviewPrep } from './components/InterviewPrep';
-import { KhmerCalendarConverter } from './components/KhmerCalendarConverter';
-import { MiniMode } from './components/MiniMode';
+
+// Lazy-load heavy hidden-feature components to shrink the initial bundle.
+// These are only rendered when the user triggers them, so we defer their
+// (and their dependencies') JS until they're needed. Suspense fallback is
+// `null` because these all open as overlays/over full app — no layout shift.
+const ResumeBuilder = lazy(() =>
+  import('./components/ResumeBuilder').then(m => ({ default: m.ResumeBuilder })),
+);
+const AdminDashboard = lazy(() =>
+  import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard })),
+);
+const InterviewPrep = lazy(() =>
+  import('./components/InterviewPrep').then(m => ({ default: m.InterviewPrep })),
+);
+const KhmerCalendarConverter = lazy(() =>
+  import('./components/KhmerCalendarConverter').then(m => ({ default: m.KhmerCalendarConverter })),
+);
+const MiniMode = lazy(() =>
+  import('./components/MiniMode').then(m => ({ default: m.MiniMode })),
+);
 
 const AppInner = memo(function AppInner() {
   const { isStreaming, cancelStream, createNewChat, sendMessage } = useChat();
@@ -116,8 +131,14 @@ const AppInner = memo(function AppInner() {
     return () => window.removeEventListener('khmer-calendar:open', handler);
   }, []);
 
+  const lazyFallback = null;
+
   if (miniMode) {
-    return <MiniMode onExit={() => setMiniMode(false)} />;
+    return (
+      <Suspense fallback={lazyFallback}>
+        <MiniMode onExit={() => setMiniMode(false)} />
+      </Suspense>
+    );
   }
 
   return (
@@ -146,27 +167,29 @@ const AppInner = memo(function AppInner() {
           <ChatInput />
         </ErrorBoundary>
       </main>
-      {showShortcuts && (
-        <ShortcutsModal onClose={() => setShowShortcuts(false)} />
-      )}
-      {showResumeBuilder && (
-        <ResumeBuilder onClose={() => setShowResumeBuilder(false)} />
-      )}
-      {showAdminDashboard && (
-        <AdminDashboard onClose={() => {
-          setShowAdminDashboard(false);
-          if (window.location.pathname === '/admin') window.history.pushState(null, '', '/');
-        }} />
-      )}
-      {showInterviewPrep && (
-        <InterviewPrep
-          onClose={() => setShowInterviewPrep(false)}
-          onAskAI={(prompt) => { sendMessage(prompt); setShowInterviewPrep(false); }}
-        />
-      )}
-      {showKhmerCalendarConverter && (
-        <KhmerCalendarConverter onClose={() => setShowKhmerCalendarConverter(false)} />
-      )}
+      <Suspense fallback={lazyFallback}>
+        {showShortcuts && (
+          <ShortcutsModal onClose={() => setShowShortcuts(false)} />
+        )}
+        {showResumeBuilder && (
+          <ResumeBuilder onClose={() => setShowResumeBuilder(false)} />
+        )}
+        {showAdminDashboard && (
+          <AdminDashboard onClose={() => {
+            setShowAdminDashboard(false);
+            if (window.location.pathname === '/admin') window.history.pushState(null, '', '/');
+          }} />
+        )}
+        {showInterviewPrep && (
+          <InterviewPrep
+            onClose={() => setShowInterviewPrep(false)}
+            onAskAI={(prompt) => { sendMessage(prompt); setShowInterviewPrep(false); }}
+          />
+        )}
+        {showKhmerCalendarConverter && (
+          <KhmerCalendarConverter onClose={() => setShowKhmerCalendarConverter(false)} />
+        )}
+      </Suspense>
     </div>
   );
 });
