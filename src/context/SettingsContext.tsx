@@ -17,6 +17,9 @@ interface SettingsContextType {
   khLang: boolean;
   setKhLang: (v: boolean) => void;
   toggleKhLang: () => void;
+  userFeatures: Record<string, boolean>;
+  userFeaturesLoaded: boolean;
+  isFeatureEnabled: (key: string) => boolean;
 }
 
 const defaultSettings: Settings = {
@@ -69,6 +72,32 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return false;
     }
   });
+  const [userFeatures, setUserFeatures] = useState<Record<string, boolean>>({});
+  const [userFeaturesLoaded, setUserFeaturesLoaded] = useState(false);
+
+  const refreshUserFeatures = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/me', { credentials: 'include' });
+      if (!res.ok) {
+        setUserFeatures({});
+        return;
+      }
+      const data = await res.json() as { user?: { features?: Record<string, boolean> } };
+      setUserFeatures(data.user?.features ?? {});
+    } catch {
+      // Not signed in as an admin-managed user — keep minimal defaults.
+      setUserFeatures({});
+    } finally {
+      setUserFeaturesLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    queueMicrotask(() => { void refreshUserFeatures(); });
+    const handler = () => { void refreshUserFeatures(); };
+    window.addEventListener('features:refresh', handler);
+    return () => window.removeEventListener('features:refresh', handler);
+  }, [refreshUserFeatures]);
 
   // Apply theme to document
   useEffect(() => {
@@ -130,10 +159,19 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }));
   }, []);
 
+  const isFeatureEnabled = useCallback((key: string) => {
+    // Safe product default: optional/admin-controlled features stay hidden unless explicitly enabled.
+    return userFeatures[key] === true;
+  }, [userFeatures]);
+
   const contextValue = useMemo(() => ({
     settings, setTheme, toggleTheme, setChatTheme, updateSettings, updateApiKey, updateModel,
     khLang, setKhLang, toggleKhLang,
-  }), [settings, setTheme, toggleTheme, setChatTheme, updateSettings, updateApiKey, updateModel, khLang, setKhLang, toggleKhLang]);
+    userFeatures, userFeaturesLoaded, isFeatureEnabled,
+  }), [
+    settings, setTheme, toggleTheme, setChatTheme, updateSettings, updateApiKey, updateModel,
+    khLang, setKhLang, toggleKhLang, userFeatures, userFeaturesLoaded, isFeatureEnabled,
+  ]);
 
   return (
     <SettingsContext.Provider value={contextValue}>

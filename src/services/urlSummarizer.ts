@@ -14,6 +14,7 @@ export interface SummarizeResult {
   url: string;
 }
 
-export async function summarizeUrl(_rawUrl: string): Promise<SummarizeResult> {
+export async function summarizeUrl(rawUrl: string): Promise<SummarizeResult> {
+  void rawUrl;
   throw new Error('URL summarization is disabled.');
 }

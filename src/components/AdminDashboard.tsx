@@ -13,6 +13,30 @@ const FEATURE_FLAGS = [
   { key: 'voiceInput', label: 'Voice Input' },
   { key: 'autoPlay',   label: 'Auto Play' },
   { key: 'multiModel', label: 'Multi-Model Toggle' },
+  { key: 'documentUpload', label: 'Document Upload' },
+  { key: 'markdownPreview', label: 'Markdown Preview' },
+  { key: 'editRetryControls', label: 'Edit / Retry Controls' },
+  { key: 'compactInput', label: 'Compact Input Toggle' },
+  { key: 'smartReply', label: 'Smart Reply' },
+  { key: 'khmerPhrasebank', label: 'Khmer Phrasebank' },
+  { key: 'jobDictionary', label: 'Job Term Dictionary' },
+  { key: 'jobQuickReplies', label: 'Job Quick Replies' },
+  { key: 'salaryConverter', label: 'Salary Converter' },
+  { key: 'contractAnalyzer', label: 'Contract Analyzer' },
+  { key: 'khLangToggle', label: 'Khmer Language Toggle' },
+  { key: 'toolsMenu', label: 'Tools Menu' },
+  { key: 'themes', label: 'Chat Themes' },
+  { key: 'chatSearch', label: 'Chat Search' },
+  { key: 'chatStats', label: 'Chat Statistics' },
+  { key: 'workplaceTips', label: 'Khmer Workplace Tips' },
+  { key: 'leaveCalculator', label: 'Leave Calculator' },
+  { key: 'otCalculator', label: 'OT Calculator' },
+  { key: 'probationTracker', label: 'Probation Tracker' },
+  { key: 'resumeBuilder', label: 'Resume Builder' },
+  { key: 'interviewPrep', label: 'Interview Prep' },
+  { key: 'rielFormatter', label: 'Khmer Riel Formatter' },
+  { key: 'numberWords', label: 'Khmer Number to Words' },
+  { key: 'khmerCalendar', label: 'Khmer Calendar Converter' },
 ] as const;
 
 interface User {
@@ -74,6 +98,7 @@ export const AdminDashboard = memo(function AdminDashboard({ onClose }: Props) {
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error?.message || `HTTP ${r.status}`);
       const data = await r.json();
       setUser(data.user);
+      window.dispatchEvent(new CustomEvent('features:refresh'));
       await fetchUsers();
     } catch (e: unknown) { setError((e as Error).message); }
     finally { setLoggingIn(false); }
@@ -82,6 +107,7 @@ export const AdminDashboard = memo(function AdminDashboard({ onClose }: Props) {
   const logout = async () => {
     await fetch('/api/admin/logout', { method: 'POST', credentials: 'include' });
     setUser(null); setUsers([]);
+    window.dispatchEvent(new CustomEvent('features:refresh'));
   };
 
   const createUser = async (e: React.FormEvent) => {
@@ -126,6 +152,7 @@ export const AdminDashboard = memo(function AdminDashboard({ onClose }: Props) {
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error?.message || `HTTP ${r.status}`);
       const data = await r.json();
       setUsers(prev => prev.map(u => u.id === id ? data.user : u));
+      if (user?.id === id) window.dispatchEvent(new CustomEvent('features:refresh'));
       setEditingId(null);
     } catch (e: unknown) { setError((e as Error).message); }
   };
@@ -254,21 +281,21 @@ export const AdminDashboard = memo(function AdminDashboard({ onClose }: Props) {
                       {u.role}
                     </span>
                   </div>
-                  {user.id !== u.id && (
-                    <div className="flex items-center gap-1">
-                      {editingId === u.id ? (
-                        <>
-                          <button onClick={() => saveEdit(u.id)} className="p-1.5 rounded-lg bg-green-600/20 text-green-400 hover:bg-green-600/30 transition-colors" title="Save"><Check className="w-3.5 h-3.5" /></button>
-                          <button onClick={cancelEdit} className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-700 transition-colors" title="Cancel"><X className="w-3.5 h-3.5" /></button>
-                        </>
-                      ) : (
-                        <>
-                          <button onClick={() => startEdit(u)} className="p-1.5 rounded-lg text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 transition-colors" title="Edit features"><Edit2 className="w-3.5 h-3.5" /></button>
+                  <div className="flex items-center gap-1">
+                    {editingId === u.id ? (
+                      <>
+                        <button onClick={() => saveEdit(u.id)} className="p-1.5 rounded-lg bg-green-600/20 text-green-400 hover:bg-green-600/30 transition-colors" title="Save"><Check className="w-3.5 h-3.5" /></button>
+                        <button onClick={cancelEdit} className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-700 transition-colors" title="Cancel"><X className="w-3.5 h-3.5" /></button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => startEdit(u)} className="p-1.5 rounded-lg text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 transition-colors" title="Edit features"><Edit2 className="w-3.5 h-3.5" /></button>
+                        {user.id !== u.id && (
                           <button onClick={() => deleteUser(u.id)} className="p-1.5 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
-                        </>
-                      )}
-                    </div>
-                  )}
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 {editingId === u.id ? (

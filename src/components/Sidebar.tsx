@@ -13,10 +13,6 @@ import { KhmerOTCalculator } from './KhmerOTCalculator';
 import { KhmerProbationTracker } from './KhmerProbationTracker';
 import { ChatStatsModal } from './ChatStatsModal';
 
-// === Sidebar minimal mode — hides footer tools menu + Khmer lang toggle ===
-// Set to false to bring back Theme + EN/ខ្មែរ + Tools menu (12 items)
-const SIDEBAR_MINIMAL = true;
-
 // Move outside component — pure function, no deps on component scope
 const formatTime = (timestamp: number) => {
   const date = new Date(timestamp);
@@ -31,7 +27,7 @@ const formatTime = (timestamp: number) => {
 };
 
 export const Sidebar = memo(() => {
-  const { settings, khLang, toggleKhLang } = useSettings();
+  const { settings, khLang, toggleKhLang, isFeatureEnabled } = useSettings();
   const { chats, activeChatId, createNewChat, switchChat, deleteChat, togglePinChat, renameChat } = useChat();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -456,7 +452,7 @@ export const Sidebar = memo(() => {
         <div className={`p-3 sm:p-4 pl-[calc(0.75rem+env(safe-area-inset-left,0px))] border-t ${sidebarHeaderBorder}`}>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            {!SIDEBAR_MINIMAL && (
+            {isFeatureEnabled('khLangToggle') && (
               <button
                 onClick={toggleKhLang}
                 className={`w-9 h-9 rounded-lg flex items-center justify-center border bg-gradient-to-br ${footerBtnClass}`}
@@ -465,7 +461,7 @@ export const Sidebar = memo(() => {
                 <span className={`text-[10px] font-bold leading-none ${footerIconClass}`}>{khLang ? 'EN' : 'ខ្មែរ'}</span>
               </button>
             )}
-            {!SIDEBAR_MINIMAL && (
+            {isFeatureEnabled('toolsMenu') && (
             <div className="relative">
               <button
                 data-tools-menu
@@ -483,19 +479,19 @@ export const Sidebar = memo(() => {
                   role="menu"
                 >
                   {[
-                    { key: 'themes', label: 'Chat Themes', icon: Palette, run: () => setShowThemesModal(true) },
-                    { key: 'search', label: 'Search (Ctrl+K)', icon: Command, run: () => setShowSearchModal(true) },
-                    { key: 'stats', label: 'Chat Statistics', icon: BarChart2, run: () => setShowStatsModal(true) },
-                    { key: 'tips', label: 'Khmer Workplace Tips', icon: Lightbulb, run: () => setShowWorkplaceTips(true) },
-                    { key: 'leave', label: 'Leave Entitlements Calculator', icon: Shield, run: () => setShowLeaveCalculator(true) },
-                    { key: 'ot', label: 'OT Calculator', icon: Clock, run: () => setShowOTCalculator(true) },
-                    { key: 'probation', label: 'Probation Tracker', icon: TrendingUp, run: () => setShowProbationTracker(true) },
-                    { key: 'resume', label: 'Resume Builder', icon: FileText, run: () => window.dispatchEvent(new CustomEvent('resume:open')) },
-                    { key: 'interview', label: 'Interview Prep', icon: GraduationCap, run: () => window.dispatchEvent(new CustomEvent('interview:open')) },
-                    { key: 'riel', label: 'Khmer Riel Formatter', icon: Currency, run: () => setShowRielFormatter(true) },
-                    { key: 'numbers', label: 'Khmer Number to Words', icon: Type, run: () => setShowNumberWords(true) },
-                    { key: 'calendar', label: 'Khmer Calendar Converter', icon: CalendarDays, run: () => window.dispatchEvent(new CustomEvent('khmer-calendar:open')) },
-                  ].map(item => {
+                    { key: 'themes', featureKey: 'themes', label: 'Chat Themes', icon: Palette, run: () => setShowThemesModal(true) },
+                    { key: 'search', featureKey: 'chatSearch', label: 'Search (Ctrl+K)', icon: Command, run: () => setShowSearchModal(true) },
+                    { key: 'stats', featureKey: 'chatStats', label: 'Chat Statistics', icon: BarChart2, run: () => setShowStatsModal(true) },
+                    { key: 'tips', featureKey: 'workplaceTips', label: 'Khmer Workplace Tips', icon: Lightbulb, run: () => setShowWorkplaceTips(true) },
+                    { key: 'leave', featureKey: 'leaveCalculator', label: 'Leave Entitlements Calculator', icon: Shield, run: () => setShowLeaveCalculator(true) },
+                    { key: 'ot', featureKey: 'otCalculator', label: 'OT Calculator', icon: Clock, run: () => setShowOTCalculator(true) },
+                    { key: 'probation', featureKey: 'probationTracker', label: 'Probation Tracker', icon: TrendingUp, run: () => setShowProbationTracker(true) },
+                    { key: 'resume', featureKey: 'resumeBuilder', label: 'Resume Builder', icon: FileText, run: () => window.dispatchEvent(new CustomEvent('resume:open')) },
+                    { key: 'interview', featureKey: 'interviewPrep', label: 'Interview Prep', icon: GraduationCap, run: () => window.dispatchEvent(new CustomEvent('interview:open')) },
+                    { key: 'riel', featureKey: 'rielFormatter', label: 'Khmer Riel Formatter', icon: Currency, run: () => setShowRielFormatter(true) },
+                    { key: 'numbers', featureKey: 'numberWords', label: 'Khmer Number to Words', icon: Type, run: () => setShowNumberWords(true) },
+                    { key: 'calendar', featureKey: 'khmerCalendar', label: 'Khmer Calendar Converter', icon: CalendarDays, run: () => window.dispatchEvent(new CustomEvent('khmer-calendar:open')) },
+                  ].filter(item => isFeatureEnabled(item.featureKey)).map(item => {
                     const Icon = item.icon;
                     return (
                       <button

@@ -16,9 +16,6 @@ import { ContractAnalyzer } from './ContractAnalyzer';
 import { detectCurrencies, type DetectedCurrency } from '../utils/currencyDetector';
 import { detectSalaryRanges } from '../utils/salaryDetector';
 
-// === Minimal mode toggle — set true to show ONLY Prompt Engineer + Send ===
-const MINIMAL_MODE = true;
-
 // Regex to detect a standalone URL in input
 const URL_REGEX = /^https?:\/\/[^\s]+$/;
 
@@ -70,7 +67,7 @@ export const ChatInput = memo(() => {
   const [showContractAnalyzer, setShowContractAnalyzer] = useState(false);
   const [detectedCurrencies, setDetectedCurrencies] = useState<DetectedCurrency[]>([]);
   const { sendMessage, isStreaming, cancelStream, createNewChat, clearMessages, editLastMessage, lastSentMessage, error, retryLastMessage } = useChat();
-  const { settings } = useSettings();
+  const { settings, isFeatureEnabled } = useSettings();
   const isDark = settings.theme === 'dark';
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendButtonRef = useRef<HTMLButtonElement>(null);
@@ -346,7 +343,7 @@ export const ChatInput = memo(() => {
           aria-label="Message input form"
         >
           {/* Drag-over overlay — hidden in minimal mode */}
-          {!MINIMAL_MODE && isDragOver && (
+          {isFeatureEnabled('documentUpload') && isDragOver && (
             <div className="absolute inset-0 flex items-center justify-center rounded-full pointer-events-none z-10">
               <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
                 isDark ? 'bg-indigo-600 text-white' : 'bg-indigo-600 text-white'
@@ -358,7 +355,7 @@ export const ChatInput = memo(() => {
           )}
 
           {/* Hidden file input — hidden in minimal mode */}
-          {!MINIMAL_MODE && (
+          {isFeatureEnabled('documentUpload') && (
             <input
               ref={fileInputRef}
               type="file"
@@ -446,7 +443,7 @@ export const ChatInput = memo(() => {
           </div>
 
           {/* Khmer currency inline converter — hidden in minimal mode */}
-          {!MINIMAL_MODE && detectedCurrencies.length > 0 && (
+          {isFeatureEnabled('salaryConverter') && detectedCurrencies.length > 0 && (
             <div className={`flex flex-wrap gap-2 mt-1.5 px-1`}>
               {detectedCurrencies.map((dc, i) => (
                 <button
@@ -474,7 +471,7 @@ export const ChatInput = memo(() => {
           )}
 
           {/* Summarize URL button — hidden in minimal mode; shown when input is a standalone URL */}
-          {!MINIMAL_MODE && URL_REGEX.test(input.trim()) && !isStreaming && (
+          {isFeatureEnabled('urlSummarize') && URL_REGEX.test(input.trim()) && !isStreaming && (
             <button
               type="button"
               onClick={handleSummarize}
@@ -497,7 +494,7 @@ export const ChatInput = memo(() => {
           )}
 
           {/* Document upload button — hidden in minimal mode */}
-          {!MINIMAL_MODE && (
+          {isFeatureEnabled('documentUpload') && (
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -541,7 +538,7 @@ export const ChatInput = memo(() => {
           </button>
 
           {/* Edit button — hidden in minimal mode; shown when not streaming, not editing, and lastSentMessage exists */}
-          {!MINIMAL_MODE && !isStreaming && !isEditing && lastSentMessage && (
+          {isFeatureEnabled('editRetryControls') && !isStreaming && !isEditing && lastSentMessage && (
             <button
               type="button"
               onClick={() => {
@@ -558,7 +555,7 @@ export const ChatInput = memo(() => {
           )}
 
           {/* Retry button — hidden in minimal mode; shown when a message failed and user hasn't typed new content */}
-          {!MINIMAL_MODE && error && lastSentMessage && !isEditing && (
+          {isFeatureEnabled('editRetryControls') && error && lastSentMessage && !isEditing && (
             <button
               type="button"
               onClick={retryLastMessage}
@@ -571,7 +568,7 @@ export const ChatInput = memo(() => {
           )}
 
           {/* Compact mode toggle — hidden in minimal mode */}
-          {!MINIMAL_MODE && (
+          {isFeatureEnabled('compactInput') && (
             <button
               type="button"
               onClick={() => setIsCompact(prev => !prev)}
@@ -586,7 +583,7 @@ export const ChatInput = memo(() => {
           )}
 
           {/* Smart Reply button — hidden in minimal mode */}
-          {!MINIMAL_MODE && (
+          {isFeatureEnabled('smartReply') && (
             <div className="relative">
               <button
                 type="button"
@@ -611,7 +608,7 @@ export const ChatInput = memo(() => {
           )}
 
           {/* Khmer Phrasebank button — hidden in minimal mode */}
-          {!MINIMAL_MODE && (
+          {isFeatureEnabled('khmerPhrasebank') && (
             <div className="relative">
               <button
                 type="button"
@@ -635,7 +632,7 @@ export const ChatInput = memo(() => {
           )}
 
           {/* Khmer Job Term Dictionary button — hidden in minimal mode */}
-          {!MINIMAL_MODE && (
+          {isFeatureEnabled('jobDictionary') && (
             <div className="relative">
               <button
                 type="button"
@@ -659,7 +656,7 @@ export const ChatInput = memo(() => {
           )}
 
           {/* Khmer Job Quick Replies button — hidden in minimal mode */}
-          {!MINIMAL_MODE && (
+          {isFeatureEnabled('jobQuickReplies') && (
             <div className="relative">
               <button
                 type="button"
@@ -684,7 +681,7 @@ export const ChatInput = memo(() => {
           )}
 
           {/* Salary converter — hidden in minimal mode; appears when salary is detected in input */}
-          {!MINIMAL_MODE && (() => {
+          {isFeatureEnabled('salaryConverter') && (() => {
             const detected = detectSalaryRanges(input);
             if (detected.length === 0) return null;
             return (
@@ -710,7 +707,7 @@ export const ChatInput = memo(() => {
           })()}
 
           {/* Contract Analyzer — hidden in minimal mode */}
-          {!MINIMAL_MODE && (
+          {isFeatureEnabled('contractAnalyzer') && (
             <div className="relative">
               <button
                 type="button"
@@ -732,7 +729,7 @@ export const ChatInput = memo(() => {
           )}
 
           {/* Markdown preview toggle — hidden in minimal mode */}
-          {!MINIMAL_MODE && input.trim().length > 0 && (
+          {isFeatureEnabled('markdownPreview') && input.trim().length > 0 && (
             <button
               type="button"
               onClick={() => setShowPreview(prev => !prev)}
