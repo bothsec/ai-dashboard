@@ -6,7 +6,7 @@ import { Router } from 'express';
 import express from 'express';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { randomUUID } from 'crypto';
+import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'crypto';
 
 const DATA_DIR = join(process.cwd(), 'data');
 const USERS_FILE = join(DATA_DIR, 'users.json');
@@ -32,6 +32,36 @@ function getUsers(): User[] { return readJson<User[]>(USERS_FILE, []); }
 function saveUsers(users: User[]) { writeJson(USERS_FILE, users); }
 function getSessions(): Session[] { return readJson<Session[]>(SESSIONS_FILE, []); }
 function saveSessions(sessions: Session[]) { writeJson(SESSIONS_FILE, sessions); }
+
+const PASSWORD_HASH_PREFIX = 'scrypt';
+const PASSWORD_KEYLEN = 64;
+
+function hashPassword(password: string): string {
+  const salt = randomBytes(16).toString('hex');
+  const hash = scryptSync(password, salt, PASSWORD_KEYLEN).toString('hex');
+  return `${PASSWORD_HASH_PREFIX}:${salt}:${hash}`;
+}
+
+function verifyPassword(password: string, stored: string): boolean {
+  if (!stored.startsWith(`${PASSWORD_HASH_PREFIX}:`)) {
+    // Legacy plaintext value. Login handler migrates it after successful auth.
+    return stored === password;
+  }
+  const [, salt, storedHash] = stored.split(':');
+  if (!salt || !storedHash) return false;
+  const candidate = scryptSync(password, salt, PASSWORD_KEYLEN);
+  const expected = Buffer.from(storedHash, 'hex');
+  return expected.length === candidate.length && timingSafeEqual(expected, candidate);
+}
+
+function isPasswordHash(value: string): boolean {
+  return value.startsWith(`${PASSWORD_HASH_PREFIX}:`);
+}
+
+function adminCookie(value: string, maxAgeSeconds: number): string {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  return `session_id=${value}; HttpOnly; Path=/; Max-Age=${maxAgeSeconds}; SameSite=Lax${secure}`;
+}
 
 function parseFeatures(features: unknown): Record<string, boolean> {
   if (!features) return {};
@@ -69,11 +99,12 @@ function toPublicUser(user: User): PublicUser {
 function initDefault() {
   const users = getUsers();
   if (users.length === 0) {
+    const defaultPassword = process.env.ADMIN_PASSWORD || 'admin123';
     saveUsers([{
       id: 1,
-      name: 'vorreakboth',
-      email: 'vorreakboth@admin.local',
-      password_hash: 'admin123',
+      name: process.env.ADMIN_NAME || 'vorreakboth',
+      email: process.env.ADMIN_EMAIL || 'vorreakboth@admin.local',
+      password_hash: hashPassword(defaultPassword),
       role: 'admin',
       features: '{}',
       created_at: new Date().toISOString()
@@ -113,13 +144,17 @@ export function registerAdminRoutes(app: import('express').Application) {
     if (!email || !password) { res.status(400).json({ error: { message: 'Email and password required.' } }); return; }
     const users = getUsers();
     const user = users.find(u => u.email === email);
-    if (!user || user.password_hash !== password) { res.status(401).json({ error: { message: 'Invalid credentials.' } }); return; }
+    if (!user || !verifyPassword(password, user.password_hash)) { res.status(401).json({ error: { message: 'Invalid credentials.' } }); return; }
+    if (!isPasswordHash(user.password_hash)) {
+      user.password_hash = hashPassword(password);
+      saveUsers(users);
+    }
     const sessionId = randomUUID();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const sessions = getSessions();
     sessions.push({ id: sessionId, user_id: user.id, expires_at: expiresAt });
     saveSessions(sessions);
-    res.setHeader('Set-Cookie', `session_id=${sessionId}; HttpOnly; Path=/; Max-Age=${7 * 24 * 60 * 60}; SameSite=Lax`);
+    res.setHeader('Set-Cookie', adminCookie(sessionId, 7 * 24 * 60 * 60));
     res.json({ user: toPublicUser(user) });
   });
 
@@ -129,7 +164,7 @@ export function registerAdminRoutes(app: import('express').Application) {
     if (sid) {
       saveSessions(getSessions().filter(s => s.id !== sid));
     }
-    res.setHeader('Set-Cookie', `session_id=; HttpOnly; Path=/; Max-Age=0`);
+    res.setHeader('Set-Cookie', adminCookie('', 0));
     res.json({ ok: true });
   });
 
@@ -167,7 +202,7 @@ export function registerAdminRoutes(app: import('express').Application) {
       id,
       name: String(name),
       email: String(email),
-      password_hash: String(password),
+      password_hash: hashPassword(String(password)),
       role: role === 'admin' ? 'admin' : 'user',
       features: stringifyFeatures(features),
       created_at: new Date().toISOString()
@@ -190,7 +225,7 @@ export function registerAdminRoutes(app: import('express').Application) {
     const body = req.body as Record<string, unknown>;
     if (body.name !== undefined) users[idx].name = String(body.name);
     if (body.email !== undefined) users[idx].email = String(body.email);
-    if (body.password !== undefined) users[idx].password_hash = String(body.password);
+    if (body.password !== undefined) users[idx].password_hash = hashPassword(String(body.password));
     if (body.role !== undefined) users[idx].role = body.role === 'admin' ? 'admin' : 'user';
     if (body.features !== undefined) users[idx].features = stringifyFeatures(body.features);
     saveUsers(users);

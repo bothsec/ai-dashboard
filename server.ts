@@ -116,8 +116,9 @@ app.post('/api/auth/login', express.json(), (req, res) => {
   const cookieDomain = (cookieHost && /^(ai\.khmerjob\.tech|khmerjob\.tech|140\.238\.43\.61|localhost)$/.test(cookieHost))
     ? `; Domain=${cookieHost}`
     : '';
+  const mainSecure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
   res.setHeader('Set-Cookie',
-    `${AUTH_COOKIE_NAME}=${AUTH_SECRET}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${AUTH_COOKIE_MAXAGE}${cookieDomain}`);
+    `${AUTH_COOKIE_NAME}=${AUTH_SECRET}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${AUTH_COOKIE_MAXAGE}${cookieDomain}${mainSecure}`);
   res.json({ ok: true, authEnabled: true });
 });
 

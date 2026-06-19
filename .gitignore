@@ -29,5 +29,10 @@ dist-ssr
 # PM2 ecosystem
 ecosystem.config.cjs
 
+# Runtime data (admin users/sessions, local DBs)
+data/*.json
+data/*.db
+admin.db
+
 # Dev output
 nohup.out
