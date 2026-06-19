@@ -1,7 +1,7 @@
 import { useState, memo, useEffect, useCallback } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useChat } from '../context/ChatContext';
-import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles, Search, X as XIcon, Palette, Command, Pin, Pencil, BarChart2, FileText, GraduationCap, CalendarDays, Currency, Type, Shield, Lightbulb } from 'lucide-react';
+import { Cpu, Menu, X, Plus, MessageSquare, Trash, Sparkles, Search, X as XIcon, Palette, Command, Pin, Pencil, BarChart2, FileText, GraduationCap, CalendarDays, Currency, Type, Shield, Lightbulb, Clock } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { ThemesModal } from './ThemesModal';
 import { ChatSearchModal } from './ChatSearchModal';
@@ -9,6 +9,7 @@ import { KhmerRielFormatter } from './KhmerRielFormatter';
 import { KhmerNumberWords } from './KhmerNumberWords';
 import { WorkplaceTips } from './WorkplaceTips';
 import { KhmerLeaveCalculator } from './KhmerLeaveCalculator';
+import { KhmerOTCalculator } from './KhmerOTCalculator';
 import { ChatStatsModal } from './ChatStatsModal';
 
 // Move outside component — pure function, no deps on component scope
@@ -36,6 +37,7 @@ export const Sidebar = memo(() => {
   const [showRielFormatter, setShowRielFormatter] = useState(false);
   const [showNumberWords, setShowNumberWords] = useState(false);
   const [showLeaveCalculator, setShowLeaveCalculator] = useState(false);
+  const [showOTCalculator, setShowOTCalculator] = useState(false);
   const [renamingChatId, setRenamingChatId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
 
@@ -501,6 +503,13 @@ export const Sidebar = memo(() => {
                 <Shield className={`w-4 h-4 ${footerIconClass}`} />
               </button>
             <button
+                onClick={() => setShowOTCalculator(true)}
+                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
+                title="OT Calculator"
+              >
+                <Clock className={`w-4 h-4 ${footerIconClass}`} />
+              </button>
+            <button
                 onClick={() => setShowWorkplaceTips(true)}
                 className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-colors bg-gradient-to-br ${footerBtnClass}`}
                 title="Khmer Workplace Tips"
@@ -531,6 +540,7 @@ export const Sidebar = memo(() => {
         {showNumberWords && <KhmerNumberWords onClose={() => setShowNumberWords(false)} />}
         {showWorkplaceTips && <WorkplaceTips onClose={() => setShowWorkplaceTips(false)} />}
         {showLeaveCalculator && <KhmerLeaveCalculator onClose={() => setShowLeaveCalculator(false)} />}
+        {showOTCalculator && <KhmerOTCalculator onClose={() => setShowOTCalculator(false)} />}
     </>
   );
 });
