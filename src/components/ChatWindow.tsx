@@ -1072,19 +1072,19 @@ export const ChatWindow: React.FC = () => {
           >
             {/* Logo/Brand */}
             <div className="relative mb-8">
-              <div className="w-20 h-20 md:w-24 md:h-24 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-3xl md:rounded-4xl flex items-center justify-center shadow-2xl shadow-indigo-500/30 animate-in zoom-in duration-500" role="img" aria-label="AI Assistant logo">
+              <div className="w-20 h-20 md:w-24 md:h-24 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-3xl md:rounded-4xl flex items-center justify-center shadow-2xl shadow-indigo-500/30 animate-in zoom-in duration-500" role="img" aria-label="Khmer Career Assistant logo">
                 <span className="text-3xl md:text-4xl" aria-hidden="true">🎨</span>
               </div>
               <div className="absolute -inset-4 md:-inset-6 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-3xl md:rounded-4xl blur-2xl -z-10" aria-hidden="true" />
             </div>
             
             <h2 className={`text-2xl md:text-4xl lg:text-5xl font-bold mb-3 md:mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              How can I help you today?
+              Your Khmer Career Assistant
             </h2>
-            <p className={`mb-8 md:mb-10 max-w-md text-base md:text-lg ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+            <p className={`mb-8 md:mb-10 max-w-md text-base md:text-lg text-gray-500`}>
               {isFeatureEnabled('homeSuggestions')
-                ? 'Khmer career, writing, and productivity assistant'
-                : 'Your Khmer career and productivity assistant'}
+                ? 'Career, writing & productivity help for Cambodian professionals'
+                : 'CVs, interviews, translations & salary advice'}
             </p>
             
             {/* Quick suggestions */}
