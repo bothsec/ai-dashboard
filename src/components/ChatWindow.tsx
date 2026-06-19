@@ -1081,7 +1081,7 @@ export const ChatWindow: React.FC = () => {
             <h2 className={`text-2xl md:text-4xl lg:text-5xl font-bold mb-3 md:mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
               Your Khmer Career Assistant
             </h2>
-            <p className={`mb-8 md:mb-10 max-w-md text-base md:text-lg text-gray-500`}>
+            <p className="mb-8 md:mb-10 max-w-md text-base md:text-lg text-gray-500">
               {isFeatureEnabled('homeSuggestions')
                 ? 'Career, writing & productivity help for Cambodian professionals'
                 : 'CVs, interviews, translations & salary advice'}
