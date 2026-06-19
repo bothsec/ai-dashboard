@@ -13,6 +13,10 @@ import { KhmerOTCalculator } from './KhmerOTCalculator';
 import { KhmerProbationTracker } from './KhmerProbationTracker';
 import { ChatStatsModal } from './ChatStatsModal';
 
+// === Sidebar minimal mode — hides footer tools menu + Khmer lang toggle ===
+// Set to false to bring back Theme + EN/ខ្មែរ + Tools menu (12 items)
+const SIDEBAR_MINIMAL = true;
+
 // Move outside component — pure function, no deps on component scope
 const formatTime = (timestamp: number) => {
   const date = new Date(timestamp);
@@ -452,13 +456,16 @@ export const Sidebar = memo(() => {
         <div className={`p-3 sm:p-4 pl-[calc(0.75rem+env(safe-area-inset-left,0px))] border-t ${sidebarHeaderBorder}`}>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <button
-              onClick={toggleKhLang}
-              className={`w-9 h-9 rounded-lg flex items-center justify-center border bg-gradient-to-br ${footerBtnClass}`}
-              title={khLang ? 'Khmer mode — click for English' : 'English mode — click for Khmer'}
-            >
-              <span className={`text-[10px] font-bold leading-none ${footerIconClass}`}>{khLang ? 'EN' : 'ខ្មែរ'}</span>
-            </button>
+            {!SIDEBAR_MINIMAL && (
+              <button
+                onClick={toggleKhLang}
+                className={`w-9 h-9 rounded-lg flex items-center justify-center border bg-gradient-to-br ${footerBtnClass}`}
+                title={khLang ? 'Khmer mode — click for English' : 'English mode — click for Khmer'}
+              >
+                <span className={`text-[10px] font-bold leading-none ${footerIconClass}`}>{khLang ? 'EN' : 'ខ្មែរ'}</span>
+              </button>
+            )}
+            {!SIDEBAR_MINIMAL && (
             <div className="relative">
               <button
                 data-tools-menu
@@ -505,6 +512,7 @@ export const Sidebar = memo(() => {
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
       </aside>
