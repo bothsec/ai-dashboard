@@ -16,10 +16,10 @@ import type { BookmarkedMessage } from './BookmarkPanel';
 
 // Stable — no component-state dependency
 const SUGGESTIONS = [
-  { icon: '📄', text: 'Help me write my CV' },
-  { icon: '💬', text: 'Translate Khmer to English' },
+  { icon: '📄', text: 'Write my Khmer/English CV' },
   { icon: '💼', text: 'Prepare for a job interview' },
-  { icon: '💡', text: 'Brainstorm career ideas' },
+  { icon: '🌐', text: 'Translate Khmer to English' },
+  { icon: '💰', text: 'Check if my salary offer is fair' },
 ];
 
 // Khmer/Cambodia-focused home suggestions — gated by 'homeSuggestions' admin flag
