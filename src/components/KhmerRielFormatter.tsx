@@ -77,12 +77,12 @@ export const KhmerRielFormatter = memo(function KhmerRielFormatter({
             </div>
             <div>
               <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Khmer Riel Formatter</h2>
-              <p className="text-[10px] text-gray-400">៛ Riel currency & Khmer numerals</p>
+              <p className="text-[10px] text-gray-500 dark:text-gray-400">៛ Riel currency & Khmer numerals</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
           >
             <X size={16} />
           </button>
@@ -164,7 +164,7 @@ export const KhmerRielFormatter = memo(function KhmerRielFormatter({
         </div>
 
         <div className="px-5 pb-4">
-          <p className="text-[10px] text-gray-400 dark:text-gray-500 text-center">
+          <p className="text-[10px] text-gray-500 dark:text-gray-400 text-center">
             Exchange rate: ~$1 ≈ 4,000 ៛ &nbsp;|&nbsp; Cambodia uses Riel (៛) as primary currency
           </p>
         </div>

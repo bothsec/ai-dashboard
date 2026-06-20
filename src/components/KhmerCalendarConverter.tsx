@@ -109,7 +109,7 @@ export const KhmerCalendarConverter = memo(function KhmerCalendarConverter({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
           >
             <X size={16} />
           </button>
@@ -195,7 +195,7 @@ export const KhmerCalendarConverter = memo(function KhmerCalendarConverter({
             </div>
           )}
 
-          <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
             Cambodia uses the Buddhist calendar (Gregorian + 543 years)
           </p>
         </div>

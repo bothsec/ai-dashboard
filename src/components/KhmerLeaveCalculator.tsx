@@ -62,22 +62,22 @@ export const KhmerLeaveCalculator = memo(function KhmerLeaveCalculator({
               <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">
                 Leave Entitlements
               </h2>
-              <p className="text-[10px] text-gray-400">Cambodian Labor Law</p>
+              <p className="text-[10px] text-gray-500 dark:text-gray-400">Cambodian Labor Law</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
           >
             <X size={16} />
           </button>
         </div>
 
         <div className="px-5 py-4 space-y-4">
-          {/* Inputs */}
+          {/* Service years */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] text-gray-400 mb-1">Years of Service</label>
+              <label className="block text-[10px] text-gray-500 dark:text-gray-400 mb-1">Years of Service</label>
               <input
                 type="number"
                 min={0}
@@ -88,7 +88,7 @@ export const KhmerLeaveCalculator = memo(function KhmerLeaveCalculator({
               />
             </div>
             <div>
-              <label className="block text-[10px] text-gray-400 mb-1">Monthly Salary ($)</label>
+              <label className="block text-[10px] text-gray-500 dark:text-gray-400 mb-1">Monthly Salary ($)</label>
               <input
                 type="number"
                 min={0}
@@ -111,7 +111,7 @@ export const KhmerLeaveCalculator = memo(function KhmerLeaveCalculator({
               <div key={row.label} className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700/50">
                 <div>
                   <p className="text-xs font-medium text-gray-700 dark:text-gray-300">{row.label}</p>
-                  <p className="text-[10px] text-gray-400">{row.note}</p>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400">{row.note}</p>
                 </div>
                 <span className={`text-lg font-bold font-mono text-${row.color}-600 dark:text-${row.color}-400`}>
                   {row.value}d
