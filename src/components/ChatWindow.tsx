@@ -987,7 +987,7 @@ export const ChatWindow: React.FC = () => {
                   ? isDark ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-amber-50 text-amber-600 border border-amber-200'
                   : isDark
                     ? 'text-gray-500 hover:text-amber-400 hover:bg-gray-800'
-                    : 'text-gray-400 hover:text-amber-600 hover:bg-gray-100'
+                    : 'text-gray-500 hover:text-amber-600 hover:bg-gray-100'
               }`}
               aria-label="Toggle bookmarks panel"
               aria-pressed={showBookmarksPanel}
@@ -1005,7 +1005,7 @@ export const ChatWindow: React.FC = () => {
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 isDark
                   ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
-                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                  : 'text-gray-500 hover:text-gray-600 hover:bg-gray-100'
               }`}
               aria-label="Branch conversation"
               title="Create a branch copy of this conversation"
@@ -1018,7 +1018,7 @@ export const ChatWindow: React.FC = () => {
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 isDark
                   ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
-                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                  : 'text-gray-500 hover:text-gray-600 hover:bg-gray-100'
               }`}
               aria-label="Export chat as Markdown"
               title="Export as Markdown"
@@ -1035,7 +1035,7 @@ export const ChatWindow: React.FC = () => {
                     : 'text-green-600 bg-green-50'
                   : isDark
                     ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
-                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                    : 'text-gray-500 hover:text-gray-600 hover:bg-gray-100'
               }`}
               aria-label={chatCopied ? 'Copied!' : 'Copy chat as Markdown'}
               title="Copy as Markdown"
@@ -1054,7 +1054,7 @@ export const ChatWindow: React.FC = () => {
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 isDark
                   ? 'text-gray-500 hover:text-red-400 hover:bg-red-500/10'
-                  : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+                  : 'text-gray-500 hover:text-red-500 hover:bg-red-50'
               }`}
               aria-label="Delete active chat"
               title="Delete chat"
