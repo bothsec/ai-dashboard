@@ -10,6 +10,7 @@ import rehypeHighlight from 'rehype-highlight';
 import { Bot, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, Trash, Quote, Play, Search, Sparkles, MoreHorizontal, Edit2 } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
+import { KhmerAiLogo } from './KhmerAiLogo';
 
 // Stable — no component-state dependency
 const SUGGESTIONS = [
@@ -927,10 +928,7 @@ export const ChatWindow: React.FC = () => {
           >
             {/* Logo/Brand */}
             <div className="relative mb-6 md:mb-8">
-              <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-3xl flex items-center justify-center shadow-2xl shadow-indigo-500/30 animate-in zoom-in duration-500" role="img" aria-label="Khmer Career Assistant logo">
-                <span className="text-2xl md:text-3xl" aria-hidden="true">🇰🇭</span>
-              </div>
-              <div className="absolute -inset-4 md:-inset-6 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-3xl md:rounded-4xl blur-2xl -z-10" aria-hidden="true" />
+              <KhmerAiLogo size="xl" aria-label="Khmer Career Assistant logo" className="animate-in zoom-in duration-500" />
             </div>
             
             <h2 className={`text-2xl md:text-4xl lg:text-5xl font-semibold tracking-tight mb-3 md:mb-4 ${isDark ? 'text-white' : 'text-gray-950'}`}>

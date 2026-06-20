@@ -2,9 +2,10 @@ import React, { memo } from 'react';
 import {
   Sparkles, Palette, Command, BarChart2, Lightbulb, Shield, Clock,
   TrendingUp, FileText, GraduationCap, Currency, Type, CalendarDays,
-  Calculator, BookOpen, ScrollText, X, Wrench,
+  Calculator, BookOpen, ScrollText, X,
 } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
+import { KhmerAiLogo } from './KhmerAiLogo';
 
 interface ToolItem {
   key: string;
@@ -58,9 +59,7 @@ export const ToolsHomeModal = memo(function ToolsHomeModal({ onClose }: Props) {
       <div className={`relative w-full max-w-4xl max-h-[90vh] rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden flex flex-col ${settings.theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
         <div className={`flex items-center justify-between p-4 md:p-6 border-b ${settings.theme === 'dark' ? 'border-gray-800' : 'border-gray-200'}`}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-              <Wrench className="w-5 h-5 md:w-6 md:h-6 text-white" />
-            </div>
+            <KhmerAiLogo size="md" showGlow={false} aria-label="Khmer AI tools logo" />
             <div>
               <h2 className="text-lg md:text-2xl font-bold">Tools</h2>
               <p className={`text-xs md:text-sm ${settings.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>

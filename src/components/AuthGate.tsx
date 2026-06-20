@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, memo } from 'react';
-import { Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { setAuthToken } from '../services/chatService';
+import { KhmerAiLogo } from './KhmerAiLogo';
 
 interface AuthGateProps {
   children: React.ReactNode;
@@ -98,9 +99,7 @@ export const AuthGate = memo(function AuthGate({ children }: AuthGateProps) {
           <div className="bg-gray-800 border border-gray-700 rounded-2xl p-8 shadow-2xl">
             {/* Header */}
             <div className="flex flex-col items-center mb-6">
-              <div className="w-14 h-14 bg-indigo-600/20 rounded-full flex items-center justify-center mb-4">
-                <Lock className="w-7 h-7 text-indigo-400" />
-              </div>
+              <KhmerAiLogo size="lg" aria-label="Khmer AI secure access logo" className="mb-4" />
               <h1 className="text-xl font-semibold text-white">Khmer AI</h1>
               <p className="text-gray-400 text-sm mt-1 text-center">
                 Enter your credentials to continue

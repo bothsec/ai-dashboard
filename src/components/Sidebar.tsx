@@ -12,6 +12,7 @@ import { KhmerLeaveCalculator } from './KhmerLeaveCalculator';
 import { KhmerOTCalculator } from './KhmerOTCalculator';
 import { KhmerProbationTracker } from './KhmerProbationTracker';
 import { ChatStatsModal } from './ChatStatsModal';
+import { KhmerAiLogo } from './KhmerAiLogo';
 
 // Move outside component — pure function, no deps on component scope
 const formatTime = (timestamp: number) => {
@@ -300,9 +301,7 @@ export const Sidebar = memo(() => {
         {/* Header */}
         <div className={`p-4 sm:p-5 pt-[calc(1rem+env(safe-area-inset-top,0px))] pl-[calc(1rem+env(safe-area-inset-left,0px))] border-b ${sidebarHeaderBorder}`}>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20" aria-hidden="true">
-              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-            </div>
+            <KhmerAiLogo size="sm" showGlow={false} aria-label="Khmer AI logo" />
             <div className="flex-1 min-w-0">
               <h1 className={`text-base sm:text-lg font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Khmer AI</h1>
               <p className={`text-[10px] sm:text-[11px] ${isDark ? 'text-gray-400' : 'text-gray-500'} truncate`}>Career & Productivity</p>
