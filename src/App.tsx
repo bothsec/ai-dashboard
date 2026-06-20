@@ -26,6 +26,9 @@ const KhmerCalendarConverter = lazy(() =>
 const MiniMode = lazy(() =>
   import('./components/MiniMode').then(m => ({ default: m.MiniMode })),
 );
+const ToolsHomeModal = lazy(() =>
+  import('./components/ToolsHomeModal').then(m => ({ default: m.ToolsHomeModal })),
+);
 
 const AppInner = memo(function AppInner() {
   const { isStreaming, cancelStream, createNewChat, sendMessage } = useChat();
@@ -34,6 +37,7 @@ const AppInner = memo(function AppInner() {
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [showInterviewPrep, setShowInterviewPrep] = useState(false);
   const [showKhmerCalendarConverter, setShowKhmerCalendarConverter] = useState(false);
+  const [showToolsHome, setShowToolsHome] = useState(false);
   const [miniMode, setMiniMode] = useState(() => {
     try { return localStorage.getItem('mini_mode_active') === 'true'; } catch { return false; }
   });
@@ -131,6 +135,13 @@ const AppInner = memo(function AppInner() {
     return () => window.removeEventListener('khmer-calendar:open', handler);
   }, []);
 
+  // Listen for tools:open event from ChatWindow home screen button
+  useEffect(() => {
+    const handler = () => setShowToolsHome(true);
+    window.addEventListener('tools:open', handler);
+    return () => window.removeEventListener('tools:open', handler);
+  }, []);
+
   const lazyFallback = null;
 
   if (miniMode) {
@@ -188,6 +199,9 @@ const AppInner = memo(function AppInner() {
         )}
         {showKhmerCalendarConverter && (
           <KhmerCalendarConverter onClose={() => setShowKhmerCalendarConverter(false)} />
+        )}
+        {showToolsHome && (
+          <ToolsHomeModal onClose={() => setShowToolsHome(false)} />
         )}
       </Suspense>
     </div>

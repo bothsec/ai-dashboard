@@ -8,7 +8,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play, Search } from 'lucide-react';
+import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play, Search, Sparkles } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -1107,6 +1107,22 @@ export const ChatWindow: React.FC = () => {
                 </button>
               ))}
             </div>
+
+            {/* Open Tools button — gated by toolsHome feature flag */}
+            {isFeatureEnabled('toolsHome') && (
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent('tools:open'))}
+                className={`mt-6 md:mt-8 inline-flex items-center gap-2 px-5 py-2.5 md:px-6 md:py-3 rounded-full text-sm md:text-base font-medium transition-all duration-200 hover:-translate-y-0.5 ${
+                  isDark
+                    ? 'bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/40 hover:border-indigo-400 text-indigo-300 hover:text-indigo-200'
+                    : 'bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 hover:border-indigo-300 text-indigo-700 hover:text-indigo-800'
+                }`}
+                aria-label="Open Khmer productivity tools"
+              >
+                <Sparkles className="w-4 h-4 md:w-5 md:h-5" aria-hidden="true" />
+                Browse Khmer tools
+              </button>
+            )}
           </div>
         ) : (
           <>
