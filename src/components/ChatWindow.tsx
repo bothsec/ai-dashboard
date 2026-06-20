@@ -44,6 +44,12 @@ export const LABEL_OPTIONS: { value: MessageLabel; label: string; color: string;
 
 const LABEL_STORAGE_KEY = 'message_labels';
 
+const KHMER_SCRIPT_REGEX = /[\u1780-\u17FF]/;
+
+function hasKhmerText(text: string): boolean {
+  return KHMER_SCRIPT_REGEX.test(text);
+}
+
 // Detect if a message likely got cut off mid-sentence
 function looksTruncated(content: string): boolean {
   if (!content || content.trim().length < 30) return false;
@@ -188,6 +194,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
 
   const displayContent = (isLast && streamingContent) || msg.content;
   const hasContent = displayContent && displayContent.trim().length > 0;
+  const useKhmerFont = hasKhmerText(displayContent);
   const showThinking = msg.role === 'assistant' && !hasContent && isStreaming && isLast;
 
   // User avatar + bubble: complete class names per theme
@@ -266,10 +273,12 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
         {msg.role === 'user' ? <User className="w-5 h-5 md:w-6 md:h-6" /> : <Bot className="w-6 h-6 md:w-7 md:h-7" />}
       </div>
 
-      <div className={`flex flex-col space-y-2 max-w-[75%] lg:max-w-[70%] ${
+      <div className={`flex flex-col space-y-2 ${
+        msg.role === 'assistant' ? 'w-full' : 'w-fit'
+      } max-w-[92%] sm:max-w-[85%] md:max-w-[75%] lg:max-w-[70%] ${
         msg.role === 'user' ? 'items-end' : ''
       }`}>
-        {/* Thinking indicator */}
+
         {showThinking && (() => {
           const t = themeAccent; // 'blue' | 'cyan' | 'emerald' | 'orange' | 'neutral' | 'indigo'
           const dotClass = t === 'blue' ? 'bg-blue-400' :
@@ -310,7 +319,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
 
         {/* Message bubble */}
         {displayContent && (
-          <div className="relative group/bubble">
+          <div className={`relative group/bubble ${msg.role === 'assistant' ? 'w-full' : 'w-fit self-end'}`}>
             {/* Label badge */}
             {messageLabel && (() => {
               const opt = LABEL_OPTIONS.find(o => o.value === messageLabel);
@@ -331,7 +340,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
             >
               <div className={`text-[15px] md:text-[15px] leading-[1.75] ${
                 msg.role === 'user' ? '' : 'prose prose-invert dark:prose-invert max-w-none'
-              }`}>
+              } ${useKhmerFont ? 'font-khmer' : ''}`}>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeSanitize, rehypeHighlight]}
@@ -612,9 +621,9 @@ const MessageSkeleton = memo(() => {
         isDark ? 'bg-gray-800' : 'bg-gray-200'
       } animate-pulse`} aria-hidden="true" />
       
-      <div className="flex flex-col space-y-2 max-w-[75%] lg:max-w-[70%]">
+      <div className="flex flex-col space-y-2 w-full max-w-[92%] sm:max-w-[85%] md:max-w-[75%] lg:max-w-[70%]">
         {/* Bubble skeleton */}
-        <div className={`px-5 py-4 rounded-2xl rounded-tl-md ${
+        <div className={`w-full px-4 md:px-5 py-4 rounded-2xl rounded-tl-md ${
           isDark ? 'bg-gray-800' : 'bg-gray-200'
         } animate-pulse`}>
           <div className="flex flex-col gap-2">

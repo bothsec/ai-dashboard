@@ -356,7 +356,7 @@ export const Sidebar = memo(() => {
           role="navigation"
           aria-label="Chat history"
         >
-          <h2 className={`px-2 sm:px-2 text-[10px] font-bold uppercase tracking-widest mb-3 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+          <h2 className="px-2 sm:px-2 text-[10px] font-bold uppercase tracking-widest mb-3 text-gray-500">
             {searchQuery ? `Results (${filteredChats.length})` : 'Recent Chats'}
           </h2>
           {filteredChats.length > 0 ? (
@@ -405,7 +405,7 @@ export const Sidebar = memo(() => {
                       {chat.title || 'New Chat'}
                     </p>
                   )}
-                  <p className={`text-[10px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>
+                  <p className="text-[10px] text-gray-500">
                     {formatTime(chat.createdAt)} • {chat.messages.length} messages{(chat.totalTokens ?? 0) > 0 && ` • ${(chat.totalTokens! / 1000).toFixed(1)}k tok`}
                   </p>
                 </div>
@@ -413,7 +413,7 @@ export const Sidebar = memo(() => {
                   <>
                     <button
                       onClick={(e) => handleStartRename(e, chat)}
-                      className={`opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all duration-200 ${isDark ? 'text-gray-500 hover:text-blue-400 hover:bg-blue-500/10' : 'text-gray-400 hover:text-blue-500 hover:bg-blue-50'}`}
+                      className={`opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all duration-200 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-500/10 dark:hover:bg-blue-500/10`}
                       aria-label={`Rename chat: ${chat.title || 'New Chat'}`}
                     >
                       <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
@@ -427,9 +427,7 @@ export const Sidebar = memo(() => {
                     </button>
                     <button
                       onClick={(e) => handleDeleteChat(e, chat.id)}
-                      className={`opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all duration-200 ${
-                        isDark ? 'text-gray-500 hover:text-red-400 hover:bg-red-500/10' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
-                      }`}
+                      className={`opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all duration-200 text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 dark:hover:bg-red-500/10`}
                       aria-label={`Delete chat: ${chat.title || 'New Chat'}`}
                     >
                       <Trash className="w-3.5 h-3.5" aria-hidden="true" />
@@ -439,9 +437,9 @@ export const Sidebar = memo(() => {
               </div>
             ))
           ) : (
-            <div className={`text-center py-8 px-4 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} role="status">
+            <div className="text-center py-8 px-4 text-gray-500" role="status">
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3 ${isDark ? 'bg-gray-800/50' : 'bg-gray-100'}`} aria-hidden="true">
-                <Search className={`w-5 h-5 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} />
+                <Search className="w-5 h-5 text-gray-500" />
               </div>
               <p className="text-xs italic">{searchQuery ? 'No chats match your search' : 'No conversations yet'}</p>
             </div>
