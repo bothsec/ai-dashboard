@@ -8,7 +8,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Zap, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play, Search, Sparkles } from 'lucide-react';
+import { Bot, User, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play, Search, Sparkles } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -680,7 +680,7 @@ const ContextWindowBar = memo(({ totalTokens }: { totalTokens: number }) => {
 });
 
 export const ChatWindow: React.FC = () => {
-  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, tokensPerSecond, sendMessage, dismissError, lastSentMessage, lastUserMessage, regenerateLastResponse, deleteChat, branchChat, continueResponse } = useChat();
+  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, sendMessage, dismissError, lastSentMessage, lastUserMessage, regenerateLastResponse, deleteChat, branchChat, continueResponse } = useChat();
   const { settings, isFeatureEnabled } = useSettings();
   const scrollRef = useRef<HTMLDivElement>(null);
   const emptyStateRef = useRef<HTMLDivElement>(null);
@@ -906,7 +906,11 @@ export const ChatWindow: React.FC = () => {
           <h3 className={`text-lg font-semibold mb-2 ${isNetworkError ? 'text-amber-400' : 'text-red-400'}`} role="alert">
             {isNetworkError ? 'You appear to be offline' : 'Something went wrong'}
           </h3>
-          <p className={`${isDark ? 'text-gray-400' : 'text-gray-500'} mb-6 text-sm leading-relaxed`}>{error}</p>
+          <p className={`${isDark ? 'text-gray-400' : 'text-gray-500'} mb-6 text-sm leading-relaxed`}>
+            {isNetworkError
+              ? 'Check your internet connection and try again.'
+              : 'The AI failed to respond. Please try again or rephrase your message.'}
+          </p>
           <div className="flex items-center justify-center gap-3 flex-wrap">
             {lastSentMessage && (
               <button
@@ -1255,14 +1259,6 @@ export const ChatWindow: React.FC = () => {
             <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" aria-hidden="true" />
             <span className="text-sm text-indigo-400 font-medium">Generating response...</span>
           </div>
-          {typeof tokensPerSecond === 'number' && tokensPerSecond >= 1 && (
-            <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-              <Zap className="w-4 h-4 text-emerald-400" aria-hidden="true" />
-              <span className="text-sm text-emerald-400 font-medium">
-                {tokensPerSecond.toFixed(1)} tok/s
-              </span>
-            </div>
-          )}
         </div>
       )}
 

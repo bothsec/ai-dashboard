@@ -268,7 +268,7 @@ const PromptEngineer = memo(function PromptEngineer({ onUse, onClose, disabled }
             className={`px-3 py-2 rounded-lg text-xs text-left transition-all border ${
               taskType === tt.value
                 ? 'bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-900/40'
-                : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-600 hover:bg-slate-750'
+                : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-600 hover:bg-slate-700'
             }`}
             title={tt.description}
           >

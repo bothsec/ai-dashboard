@@ -232,6 +232,7 @@ export const ChatInput = memo(() => {
 
     setInput('');
     setQuotedMessage(null);
+    setShowPromptEngineer(false);
     try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
     setIsEditing(false);
