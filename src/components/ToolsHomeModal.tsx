@@ -79,7 +79,7 @@ export const ToolsHomeModal = memo(function ToolsHomeModal({ onClose }: Props) {
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
           {enabledTools.length === 0 ? (
-            <div className={`text-center py-12 ${settings.theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>
+            <div className={`text-center py-12 ${settings.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
               <Clock className="w-10 h-10 mx-auto mb-3 opacity-50" />
               <p className="text-sm">No tools are enabled for your account yet.</p>
               <p className="text-xs mt-1">Ask your admin to enable Khmer workplace tools.</p>

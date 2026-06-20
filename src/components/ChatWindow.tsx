@@ -1291,7 +1291,7 @@ export const ChatWindow: React.FC = () => {
               </button>
               <button
                 onClick={() => setShowRegenerate(false)}
-                className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs transition-colors ${isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-800' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
+                className="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs transition-colors text-gray-500 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-gray-800"
                 aria-label="Dismiss"
               >
                 <X className="w-3.5 h-3.5" aria-hidden="true" />

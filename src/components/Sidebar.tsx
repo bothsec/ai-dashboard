@@ -266,7 +266,7 @@ export const Sidebar = memo(() => {
       {/* Mobile menu button */}
       <button
         onClick={toggleSidebar}
-        className={`fixed top-4 left-4 z-50 md:hidden p-2.5 backdrop-blur-xl border rounded-xl transition-all duration-200 ${
+        className={`fixed top-[calc(1rem+env(safe-area-inset-top,0px))] left-[calc(1rem+env(safe-area-inset-left,0px))] z-50 md:hidden p-2.5 backdrop-blur-xl border rounded-xl transition-all duration-200 ${
           isDark
             ? 'bg-gray-900/90 border-gray-700/50 text-gray-400 hover:text-white hover:border-gray-600'
             : 'bg-white/90 border-gray-200 text-gray-600 hover:text-gray-900 hover:border-gray-300'
@@ -296,7 +296,7 @@ export const Sidebar = memo(() => {
         aria-label="Chat sidebar"
       >
         {/* Header */}
-        <div className={`p-4 sm:p-5 pt-[calc(1rem+env(safe-area-inset-top,0px))] pl-[calc(1rem+env(safe-area-inset-left,0px))] border-b ${sidebarHeaderBorder}`}>
+        <div className={`p-4 sm:p-5 pt-[calc(3rem+env(safe-area-inset-top,0px))] md:pt-[calc(1rem+env(safe-area-inset-top,0px))] pl-[calc(1rem+env(safe-area-inset-left,0px))] border-b ${sidebarHeaderBorder}`}>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20" aria-hidden="true">
               <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
