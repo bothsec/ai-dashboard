@@ -32,7 +32,9 @@ ecosystem.config.cjs
 # Runtime data (admin users/sessions, local DBs)
 data/*.json
 data/*.db
+data/backups/
 admin.db
+.admin-password
 .hermes/qa_state.json
 
 # Dev output
