@@ -321,9 +321,7 @@ export const ChatInput = memo(() => {
           {/* Drag-over overlay — hidden in minimal mode */}
           {isFeatureEnabled('documentUpload') && isDragOver && (
             <div className="absolute inset-0 flex items-center justify-center rounded-full pointer-events-none z-10">
-              <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
-                isDark ? 'bg-indigo-600 text-white' : 'bg-indigo-600 text-white'
-              }`}>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium bg-indigo-600 text-white">
                 <FileText className="w-4 h-4" />
                 Drop PDF or DOCX to analyze
               </div>
@@ -712,9 +710,7 @@ export const ChatInput = memo(() => {
           {/* Character / word count — visible when input has content */}
           {input.length > 0 && (
             <span
-              className={`shrink-0 text-[10px] md:text-[11px] font-mono leading-none ${
-                isDark ? 'text-gray-500' : 'text-gray-500'
-              }`}
+              className="shrink-0 text-[10px] md:text-[11px] font-mono leading-none text-gray-500"
               aria-live="polite"
               aria-label={`${charCount} characters, ${wordCount} words`}
             >

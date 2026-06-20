@@ -8,7 +8,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, User, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play, Search, Sparkles } from 'lucide-react';
+import { Bot, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play, Search, Sparkles } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -217,14 +217,6 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
     avatar: 'from-indigo-500 to-purple-600 shadow-indigo-500/25',
     bubble: 'from-indigo-600 to-indigo-700 shadow-indigo-500/20',
   };
-
-  // AI avatar accent color: complete class names per theme
-  const aiAccentColor = activeChatTheme === 'midnight' ? 'text-blue-400' :
-    activeChatTheme === 'ocean' ? 'text-cyan-400' :
-    activeChatTheme === 'forest' ? 'text-emerald-400' :
-    activeChatTheme === 'sunset' ? 'text-orange-400' :
-    activeChatTheme === 'minimal' ? 'text-neutral-400' :
-    'text-indigo-400';
 
   // AI bubble: complete class names per theme + dark/light
   const aiBubbleClass = activeChatTheme === 'midnight'

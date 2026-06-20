@@ -61,6 +61,7 @@ const AppInner = memo(function AppInner() {
         if (isStreaming) {
           cancelStream();
         } else {
+          // no-op: Escape with nothing to dismiss
         }
         return;
       }
