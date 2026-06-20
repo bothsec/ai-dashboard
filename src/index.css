@@ -174,8 +174,8 @@ select:focus-visible {
   
   /* Sidebar improvements for mobile */
   aside {
-    width: 85vw !important;
-    max-width: 320px;
+    width: 92vw !important;
+    max-width: 360px;
   }
   
   /* Better scroll on mobile */

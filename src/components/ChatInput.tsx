@@ -271,8 +271,8 @@ export const ChatInput = memo(() => {
   const charCount = input.length;
 
   return (
-    <div className={`shrink-0 px-3 md:px-6 lg:px-12 ${isCompact ? 'py-1 md:py-1.5 lg:py-2' : 'py-2 md:py-3 lg:py-4'} ${isDark ? '' : 'bg-white/50'}`}>
-      <div className="max-w-3xl lg:max-w-2xl mx-auto">
+    <div className={`shrink-0 px-3 sm:px-5 md:px-8 lg:px-12 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] ${isCompact ? 'pt-1 md:pt-1.5 lg:pt-2' : 'pt-2 md:pt-3 lg:pt-4'} ${isDark ? 'bg-gradient-to-t from-black/20 to-transparent' : 'bg-gradient-to-t from-white/80 to-transparent'}`}>
+      <div className="max-w-4xl mx-auto">
         {/* Quoted message preview — shown when user clicked Quote on a message */}
         {quotedMessage && (
           <div className="mb-2 flex items-start gap-2 px-3 py-2 rounded-xl border border-indigo-500/30 bg-indigo-500/10">
@@ -299,18 +299,18 @@ export const ChatInput = memo(() => {
 
         {/* ChatGPT-style input container */}
         <form
-          className={`relative flex items-center gap-1.5 md:gap-2 rounded-full px-2 md:px-3 py-1.5 md:py-2 transition-all duration-300 ${isCompact ? '!py-1' : ''} ${
+          className={`relative flex flex-wrap sm:flex-nowrap items-center gap-1.5 md:gap-2 rounded-3xl md:rounded-[1.75rem] px-2.5 md:px-3 py-2 md:py-2.5 transition-all duration-300 ${isCompact ? '!py-1.5' : ''} ${
             isDragOver
               ? isDark
                 ? 'bg-indigo-900/40 border-2 border-dashed border-indigo-400'
                 : 'bg-indigo-50 border-2 border-dashed border-indigo-400'
               : isFocused || isEditing
               ? isDark
-                ? 'bg-gray-800/90 shadow-2xl shadow-black/40 border border-gray-600/50'
-                : 'bg-white/90 shadow-lg shadow-gray-900/10 border border-gray-300'
+                ? 'bg-gray-900/95 shadow-2xl shadow-black/40 border border-white/15'
+                : 'bg-white/95 shadow-xl shadow-gray-900/10 border border-gray-300'
               : isDark
-                ? 'bg-gray-800/60 hover:bg-gray-800/70 border border-gray-700/30 hover:border-gray-600/40'
-                : 'bg-white/60 hover:bg-white/80 border border-gray-200 hover:border-gray-300'
+                ? 'bg-gray-900/80 hover:bg-gray-900/90 border border-white/10 hover:border-white/15'
+                : 'bg-white/80 hover:bg-white/95 border border-gray-200 hover:border-gray-300'
           } ${isEditing ? (isDark ? '!border-blue-500/50' : '!border-blue-400') : ''}`}
           onSubmit={handleSubmit}
           onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
@@ -344,7 +344,7 @@ export const ChatInput = memo(() => {
             />
           )}
           {/* Textarea / Markdown preview */}
-          <div className="flex-1 min-w-0 flex items-center">
+          <div className="flex-[1_1_180px] min-w-0 flex items-center">
             {showPreview && input.trim() ? (
               <div
                 className={`w-full overflow-y-auto max-h-48 rounded-lg px-3 py-2 prose prose-sm max-w-none ${
@@ -395,10 +395,10 @@ export const ChatInput = memo(() => {
                 onBlur={() => setIsFocused(false)}
                 placeholder={isEditing ? 'Edit your message… (Enter to resend, Esc to cancel)' : 'Message AI…'}
                 rows={1}
-                className={`w-full bg-transparent border-none outline-none resize-none leading-relaxed text-sm py-0.5 max-h-32 focus:outline-none focus:ring-0 ${
+                className={`w-full bg-transparent border-none outline-none resize-none leading-relaxed text-base sm:text-sm py-1 max-h-32 focus:outline-none focus:ring-0 ${
                   isDark ? 'text-gray-100 placeholder:text-gray-500' : 'text-gray-900 placeholder:text-gray-400'
                 }`}
-                style={{ minHeight: '20px', maxHeight: '128px' }}
+                style={{ minHeight: '24px', maxHeight: '128px' }}
                 aria-label="Message input"
                 aria-multiline="true"
               />
@@ -462,7 +462,7 @@ export const ChatInput = memo(() => {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isStreaming || isProcessingDoc}
-              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${
+              className={`shrink-0 transition-colors duration-200 p-2 rounded-full flex items-center justify-center touch-target ${
                 isProcessingDoc
                   ? isDark ? 'text-indigo-400' : 'text-indigo-600'
                   : isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
@@ -484,7 +484,7 @@ export const ChatInput = memo(() => {
             ref={sendButtonRef}
             disabled={!canSubmit}
             className={[
-              'flex-shrink-0 p-2 md:p-2.5 rounded-full flex items-center justify-center',
+              'flex-shrink-0 p-2.5 md:p-2.5 rounded-full flex items-center justify-center touch-target shadow-sm transition-transform',
               canSubmit
                 ? 'bg-indigo-600 text-white hover:bg-indigo-500 active:scale-90'
                 : isDark
@@ -510,7 +510,7 @@ export const ChatInput = memo(() => {
                 setInput(lastSentMessage);
                 setTimeout(() => textareaRef.current?.focus(), 50);
               }}
-              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${isDark ? 'text-blue-400 hover:text-blue-300 hover:bg-gray-700/50' : 'text-blue-600 hover:text-blue-700 hover:bg-gray-100'}`}
+              className={`shrink-0 transition-colors duration-200 p-2 rounded-full flex items-center justify-center touch-target ${isDark ? 'text-blue-400 hover:text-blue-300 hover:bg-gray-700/50' : 'text-blue-600 hover:text-blue-700 hover:bg-gray-100'}`}
               aria-label="Edit last message"
               title="Edit your last message"
             >
@@ -523,7 +523,7 @@ export const ChatInput = memo(() => {
             <button
               type="button"
               onClick={retryLastMessage}
-              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${isDark ? 'text-red-400 hover:text-red-300 hover:bg-red-900/30' : 'text-red-600 hover:text-red-700 hover:bg-red-50'}`}
+              className={`shrink-0 transition-colors duration-200 p-2 rounded-full flex items-center justify-center touch-target ${isDark ? 'text-red-400 hover:text-red-300 hover:bg-red-900/30' : 'text-red-600 hover:text-red-700 hover:bg-red-50'}`}
               aria-label="Retry failed message"
               title="Retry failed message"
             >
@@ -536,7 +536,7 @@ export const ChatInput = memo(() => {
             <button
               type="button"
               onClick={() => setIsCompact(prev => !prev)}
-              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}
+              className={`shrink-0 transition-colors duration-200 p-2 rounded-full flex items-center justify-center touch-target ${isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}
               aria-label={isCompact ? 'Expand input area' : 'Compact input area'}
               title={isCompact ? 'Expand input area' : 'Compact input — more room for messages'}
             >
@@ -552,7 +552,7 @@ export const ChatInput = memo(() => {
               <button
                 type="button"
                 onClick={() => setShowSmartReply(prev => !prev)}
-                className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showSmartReply ? (isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200')}`}
+                className={`shrink-0 transition-colors duration-200 p-2 rounded-full flex items-center justify-center touch-target ${showSmartReply ? (isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200')}`}
                 aria-label="Smart Reply"
                 title="Khmer Smart Reply — bilingual quick responses"
               >
@@ -577,7 +577,7 @@ export const ChatInput = memo(() => {
               <button
                 type="button"
                 onClick={() => setShowKhmerPhrasebank(prev => !prev)}
-                className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showKhmerPhrasebank ? (isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200')}`}
+                className={`shrink-0 transition-colors duration-200 p-2 rounded-full flex items-center justify-center touch-target ${showKhmerPhrasebank ? (isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200')}`}
                 aria-label="Khmer Phrasebank"
                 title="Khmer Phrasebank — browse phrases in Khmer & English"
               >
@@ -601,7 +601,7 @@ export const ChatInput = memo(() => {
               <button
                 type="button"
                 onClick={() => setShowKhmerJobTermDictionary(prev => !prev)}
-                className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showKhmerJobTermDictionary ? (isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200')}`}
+                className={`shrink-0 transition-colors duration-200 p-2 rounded-full flex items-center justify-center touch-target ${showKhmerJobTermDictionary ? (isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200')}`}
                 aria-label="Khmer Job Term Dictionary"
                 title="Khmer Job Term Dictionary — understand Cambodian workplace abbreviations"
               >
@@ -625,7 +625,7 @@ export const ChatInput = memo(() => {
               <button
                 type="button"
                 onClick={() => setShowJobQuickReplies(prev => !prev)}
-                className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showJobQuickReplies ? (isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200')}`}
+                className={`shrink-0 transition-colors duration-200 p-2 rounded-full flex items-center justify-center touch-target ${showJobQuickReplies ? (isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200')}`}
                 aria-label="Khmer Job Quick Replies"
                 title="Khmer Job Quick Replies — one-tap professional phrases"
               >
@@ -697,7 +697,7 @@ export const ChatInput = memo(() => {
             <button
               type="button"
               onClick={() => setShowPreview(prev => !prev)}
-              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showPreview ? (isDark ? 'bg-gray-700/60 text-indigo-400' : 'bg-indigo-100 text-indigo-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200')}`}
+              className={`shrink-0 transition-colors duration-200 p-2 rounded-full flex items-center justify-center touch-target ${showPreview ? (isDark ? 'bg-gray-700/60 text-indigo-400' : 'bg-indigo-100 text-indigo-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200')}`}
               aria-label={showPreview ? 'Hide markdown preview' : 'Show markdown preview'}
               title={showPreview ? 'Hide preview (Ctrl+Shift+P)' : 'Preview markdown (Ctrl+Shift+P)'}
             >

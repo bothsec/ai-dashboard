@@ -879,7 +879,7 @@ export const ChatWindow: React.FC = () => {
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto py-6 md:py-8 lg:py-10 px-4 md:px-8 lg:px-12"
+        className="flex-1 overflow-y-auto py-4 sm:py-6 md:py-8 lg:py-10 px-3 sm:px-5 md:px-8 lg:px-12 scroll-touch"
         role="log"
         aria-live="polite"
         aria-label="Chat messages"
@@ -891,7 +891,7 @@ export const ChatWindow: React.FC = () => {
 
         {/* Export button — only shown when chat has messages */}
         {activeChat && activeChat.messages.length > 0 && (
-          <div className="max-w-4xl mx-auto flex justify-end gap-2 mb-2">
+          <div className="max-w-5xl mx-auto flex justify-end gap-2 mb-3 overflow-x-auto pb-1">
             <button
               onClick={() => setShowBookmarksPanel(prev => !prev)}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
@@ -980,17 +980,17 @@ export const ChatWindow: React.FC = () => {
           /* Empty state */
           <div 
             ref={emptyStateRef}
-            className="h-full flex flex-col items-center justify-center text-center pt-12 md:pt-20 pb-8"
+            className="min-h-full flex flex-col items-center justify-center text-center pt-20 md:pt-20 pb-8"
           >
             {/* Logo/Brand */}
-            <div className="relative mb-8">
-              <div className="w-20 h-20 md:w-24 md:h-24 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-3xl md:rounded-4xl flex items-center justify-center shadow-2xl shadow-indigo-500/30 animate-in zoom-in duration-500" role="img" aria-label="Khmer Career Assistant logo">
-                <span className="text-3xl md:text-4xl" aria-hidden="true">🎨</span>
+            <div className="relative mb-6 md:mb-8">
+              <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-3xl flex items-center justify-center shadow-2xl shadow-indigo-500/30 animate-in zoom-in duration-500" role="img" aria-label="Khmer Career Assistant logo">
+                <span className="text-2xl md:text-3xl" aria-hidden="true">🇰🇭</span>
               </div>
               <div className="absolute -inset-4 md:-inset-6 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-3xl md:rounded-4xl blur-2xl -z-10" aria-hidden="true" />
             </div>
             
-            <h2 className={`text-2xl md:text-4xl lg:text-5xl font-bold mb-3 md:mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            <h2 className={`text-2xl md:text-4xl lg:text-5xl font-semibold tracking-tight mb-3 md:mb-4 ${isDark ? 'text-white' : 'text-gray-950'}`}>
               Your Khmer Career Assistant
             </h2>
             <p className={`mb-8 md:mb-10 max-w-md text-base md:text-lg ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
@@ -1000,22 +1000,22 @@ export const ChatWindow: React.FC = () => {
             </p>
             
             {/* Quick suggestions */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 w-full max-w-2xl" role="list" aria-label="Suggested prompts">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 md:gap-3 w-full max-w-3xl" role="list" aria-label="Suggested prompts">
               {suggestions.map((suggestion, i) => (
                 <button
                   key={i}
                   onClick={() => handleSuggestionClick(suggestion.text)}
-                  className={`flex items-center gap-3 px-5 py-4 rounded-xl md:rounded-2xl text-sm md:text-base text-left transition-all duration-200 hover:-translate-y-1 ${
+                  className={`flex items-center gap-3 px-4 md:px-5 py-4 rounded-2xl text-sm md:text-base text-left transition-all duration-200 active:scale-[0.99] md:hover:-translate-y-0.5 ${
                     isDark
-                      ? 'bg-gray-800/60 hover:bg-gray-800 border border-gray-700/50 hover:border-gray-600 text-gray-300 hover:text-white hover:shadow-lg hover:shadow-black/30'
-                      : 'bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 text-gray-700 hover:text-gray-900 hover:shadow-lg hover:shadow-black/10'
+                      ? 'bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 hover:border-white/15 text-gray-300 hover:text-white shadow-sm shadow-black/20'
+                      : 'bg-white/80 hover:bg-white border border-gray-200/80 hover:border-gray-300 text-gray-700 hover:text-gray-950 shadow-sm shadow-gray-900/5'
                   }`}
                   style={{ animationDelay: `${i * 100}ms` }}
                   role="listitem"
                   aria-label={`${suggestion.icon} ${suggestion.text}`}
                 >
                   <span className="text-xl md:text-2xl" aria-hidden="true">{suggestion.icon}</span>
-                  <span className="font-medium">{suggestion.text}</span>
+                  <span className="font-semibold">{suggestion.text}</span>
                 </button>
               ))}
             </div>
@@ -1040,7 +1040,7 @@ export const ChatWindow: React.FC = () => {
           <>
             {/* In-chat search bar — shown when Ctrl+F has been pressed */}
             {(chatSearchQuery !== '' || (chatSearchQuery as string) === '__open__') && activeChat && activeChat.messages.length > 0 && (
-              <div className="max-w-4xl mx-auto mb-3 flex items-center gap-2 px-3 py-2 rounded-xl border shadow-lg z-10"
+              <div className="max-w-5xl mx-auto mb-3 flex items-center gap-2 px-3 py-2 rounded-2xl border shadow-lg z-10"
                 style={{
                   backgroundColor: isDark ? 'rgba(17,24,39,0.95)' : 'rgba(255,255,255,0.95)',
                   borderColor: isDark ? 'rgba(75,85,99,0.6)' : 'rgba(209,213,219,0.8)',
@@ -1107,7 +1107,7 @@ export const ChatWindow: React.FC = () => {
             )}
 
             {/* Messages list */}
-            <div className="max-w-4xl mx-auto" role="list" aria-label="Chat messages">
+            <div className="max-w-5xl mx-auto" role="list" aria-label="Chat messages">
             {activeChat?.messages.map((msg, index) => {
               const isLast = index === (activeChat?.messages.length ?? 0) - 1;
               const isMessageStreaming = isStreaming && isLast && msg.id === streamingMessageId;

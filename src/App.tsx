@@ -153,7 +153,7 @@ const AppInner = memo(function AppInner() {
   }
 
   return (
-    <div className="flex h-dvh md:h-screen overflow-hidden font-sans selection:bg-indigo-500/30">
+    <div className="flex h-dvh md:h-screen overflow-hidden font-sans selection:bg-indigo-500/30 bg-[var(--bg-primary)]">
       <ErrorBoundary
         fallback={
           <div className="w-80 h-screen flex items-center justify-center bg-gray-900 text-gray-400">
@@ -163,8 +163,8 @@ const AppInner = memo(function AppInner() {
       >
         <Sidebar />
       </ErrorBoundary>
-      <main className="flex-1 flex flex-col min-w-0 relative overflow-hidden">
-        <div className="flex-1 overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 relative overflow-hidden md:p-2 lg:p-3">
+        <div className="flex-1 overflow-hidden md:rounded-[1.75rem] md:border md:border-white/10 md:shadow-2xl md:shadow-black/10">
           <ChatWindow />
         </div>
 

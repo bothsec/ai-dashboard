@@ -266,10 +266,10 @@ export const Sidebar = memo(() => {
       {/* Mobile menu button */}
       <button
         onClick={toggleSidebar}
-        className={`fixed top-[calc(1rem+env(safe-area-inset-top,0px))] left-[calc(1rem+env(safe-area-inset-left,0px))] z-50 md:hidden p-2.5 backdrop-blur-xl border rounded-xl transition-all duration-200 ${
+        className={`fixed top-[calc(0.875rem+env(safe-area-inset-top,0px))] left-[calc(0.875rem+env(safe-area-inset-left,0px))] z-50 md:hidden p-3 backdrop-blur-xl border rounded-2xl shadow-lg transition-all duration-200 active:scale-95 ${
           isDark
-            ? 'bg-gray-900/90 border-gray-700/50 text-gray-400 hover:text-white hover:border-gray-600'
-            : 'bg-white/90 border-gray-200 text-gray-600 hover:text-gray-900 hover:border-gray-300'
+            ? 'bg-gray-950/90 border-white/10 text-gray-200 hover:text-white hover:border-white/20 shadow-black/30'
+            : 'bg-white/95 border-gray-200 text-gray-700 hover:text-gray-950 hover:border-gray-300 shadow-gray-900/10'
         }`}
         aria-label={isOpen ? 'Close sidebar' : 'Open sidebar'}
         aria-expanded={isOpen}
@@ -290,13 +290,13 @@ export const Sidebar = memo(() => {
       {/* Sidebar */}
       <aside
         id="sidebar"
-        className={`fixed md:relative inset-y-0 left-0 z-40 w-[85vw] sm:w-80 h-screen flex flex-col backdrop-blur-xl transition-all duration-300 ease-out md:translate-x-0 ${
+        className={`fixed md:relative inset-y-0 left-0 z-40 w-[92vw] max-w-[360px] md:w-80 lg:w-[22rem] md:max-w-none h-dvh flex flex-col backdrop-blur-xl transition-all duration-300 ease-out md:translate-x-0 shadow-2xl md:shadow-none ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         } ${sidebarBgClass} border-r ${sidebarBorderClass}`}
         aria-label="Chat sidebar"
       >
         {/* Header */}
-        <div className={`p-4 sm:p-5 pt-[calc(3rem+env(safe-area-inset-top,0px))] md:pt-[calc(1rem+env(safe-area-inset-top,0px))] pl-[calc(1rem+env(safe-area-inset-left,0px))] border-b ${sidebarHeaderBorder}`}>
+        <div className={`p-4 sm:p-5 pt-[calc(4.25rem+env(safe-area-inset-top,0px))] md:pt-[calc(1rem+env(safe-area-inset-top,0px))] pl-[calc(1rem+env(safe-area-inset-left,0px))] border-b ${sidebarHeaderBorder}`}>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20" aria-hidden="true">
               <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
@@ -305,6 +305,13 @@ export const Sidebar = memo(() => {
               <h1 className={`text-base sm:text-lg font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Khmer AI</h1>
               <p className={`text-[10px] sm:text-[11px] ${isDark ? 'text-gray-400' : 'text-gray-500'} truncate`}>Career & Productivity</p>
             </div>
+            <button
+              onClick={closeSidebar}
+              className={`md:hidden p-2 rounded-xl transition-colors ${isDark ? 'text-gray-400 hover:text-white hover:bg-white/10' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
+              aria-label="Close sidebar"
+            >
+              <X className="w-5 h-5" aria-hidden="true" />
+            </button>
           </div>
         </div>
 
@@ -312,7 +319,7 @@ export const Sidebar = memo(() => {
         <div className="p-3 sm:p-4 pl-[calc(0.75rem+env(safe-area-inset-left,0px))]">
           <button
             onClick={handleNewChat}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-3 sm:py-3 bg-gradient-to-r from-${themeAccent}-600 to-${themeAccent}-700 hover:from-${themeAccent}-500 hover:to-${themeAccent}-600 text-white rounded-xl transition-all duration-200 shadow-lg shadow-${themeAccent}-500/20 hover:shadow-${themeAccent}-500/30 font-medium text-sm sm:text-base active:scale-[0.98] touch-target`}
+            className={`w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-gradient-to-r from-${themeAccent}-600 to-${themeAccent}-700 hover:from-${themeAccent}-500 hover:to-${themeAccent}-600 text-white rounded-2xl transition-all duration-200 shadow-lg shadow-${themeAccent}-500/20 hover:shadow-${themeAccent}-500/30 font-semibold text-sm sm:text-base active:scale-[0.98] touch-target`}
             aria-label="Create new chat (Ctrl+N)"
           >
             <Plus className="w-4 h-4" aria-hidden="true" />
@@ -322,8 +329,8 @@ export const Sidebar = memo(() => {
 
         {/* Search bar */}
         {chats.length > 0 && (
-          <div className="px-2 mb-3">
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors ${
+          <div className="px-3 mb-3">
+            <div className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border transition-colors ${
               isDark
                 ? `bg-${themeAccent}-900/20 border-${themeAccent}-800/40 focus-within:border-${themeAccent}-500/50`
                 : `bg-${themeAccent}-50 border-${themeAccent}-200 focus-within:border-${themeAccent}-400`
@@ -334,7 +341,7 @@ export const Sidebar = memo(() => {
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search chats…"
-                className={`flex-1 bg-transparent text-xs outline-none ${isDark ? 'text-gray-100 placeholder:text-gray-500' : 'text-gray-900 placeholder:text-gray-500'}`}
+                className={`flex-1 bg-transparent text-sm outline-none ${isDark ? 'text-gray-100 placeholder:text-gray-500' : 'text-gray-900 placeholder:text-gray-500'}`}
                 aria-label="Search chat history"
               />
               {searchQuery && (
@@ -352,7 +359,7 @@ export const Sidebar = memo(() => {
 
         {/* Chat list */}
         <div
-          className="flex-1 overflow-y-auto px-2 sm:px-3 pl-[calc(0.5rem+env(safe-area-inset-left,0px))] py-2 space-y-1 scroll-touch"
+          className="flex-1 overflow-y-auto px-3 sm:px-4 pl-[calc(0.75rem+env(safe-area-inset-left,0px))] py-2 space-y-1.5 scroll-touch"
           role="navigation"
           aria-label="Chat history"
         >
@@ -363,7 +370,7 @@ export const Sidebar = memo(() => {
             filteredChats.map((chat) => (
               <div
                 key={chat.id}
-                className={`group flex items-center gap-3 px-3 py-2.5 sm:py-2.5 rounded-xl cursor-pointer border touch-target ${
+                className={`group flex items-center gap-3 px-3.5 py-3 rounded-2xl cursor-pointer border touch-target transition-colors ${
                   activeChatId === chat.id
                     ? activeChatClass
                     : isDark
@@ -401,7 +408,7 @@ export const Sidebar = memo(() => {
                       />
                     </form>
                   ) : (
-                    <p className={`text-sm font-medium truncate ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                    <p className={`text-sm font-semibold truncate ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
                       {chat.title || 'New Chat'}
                     </p>
                   )}
@@ -447,7 +454,7 @@ export const Sidebar = memo(() => {
         </div>
 
           {/* Footer */}
-        <div className={`p-3 sm:p-4 pl-[calc(0.75rem+env(safe-area-inset-left,0px))] border-t ${sidebarHeaderBorder}`}>
+        <div className={`p-3 sm:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] pl-[calc(0.75rem+env(safe-area-inset-left,0px))] border-t ${sidebarHeaderBorder}`}>
           <div className="flex items-center gap-2">
             <ThemeToggle />
             {isFeatureEnabled('khLangToggle') && (
