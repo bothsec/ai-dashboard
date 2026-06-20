@@ -12,10 +12,21 @@ import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'crypto';
 const DATA_DIR = join(process.cwd(), 'data');
 const USERS_FILE = join(DATA_DIR, 'users.json');
 const SESSIONS_FILE = join(DATA_DIR, 'sessions.json');
+const AUDIT_FILE = join(DATA_DIR, 'audit-log.json');
+const AUDIT_MAX_ENTRIES = 500;
 
 interface User { id: number; name: string; email: string; password_hash: string; role: string; features: string; created_at: string; }
 interface Session { id: string; user_id: number; expires_at: string; }
 interface PublicUser { id: number; name: string; email: string; role: string; features: Record<string, boolean>; created_at: string; }
+interface AuditEntry {
+  ts: string;
+  actor_id: number | null;
+  actor_email: string | null;
+  action: 'login_success' | 'login_failure' | 'logout' | 'user_created' | 'user_updated' | 'user_deleted';
+  target_id: number | null;
+  target_email: string | null;
+  details: string | null;
+}
 
 function readJson<T>(path: string, defaultVal: T): T {
   try {
@@ -44,6 +55,19 @@ function getUsers(): User[] { return readJson<User[]>(USERS_FILE, []); }
 function saveUsers(users: User[]) { writeJson(USERS_FILE, users); }
 function getSessions(): Session[] { return readJson<Session[]>(SESSIONS_FILE, []); }
 function saveSessions(sessions: Session[]) { writeJson(SESSIONS_FILE, sessions); }
+function getAuditLog(): AuditEntry[] { return readJson<AuditEntry[]>(AUDIT_FILE, []); }
+
+// Append a new audit entry. Caps log to AUDIT_MAX_ENTRIES newest-first.
+// Failures here must NEVER break the calling route — audit is best-effort
+// observability, not a critical-path operation.
+function recordAudit(entry: Omit<AuditEntry, 'ts'>): void {
+  try {
+    const log = getAuditLog();
+    log.unshift({ ts: new Date().toISOString(), ...entry });
+    if (log.length > AUDIT_MAX_ENTRIES) log.length = AUDIT_MAX_ENTRIES;
+    writeJson(AUDIT_FILE, log);
+  } catch { /* ignore audit write errors */ }
+}
 
 const PASSWORD_HASH_PREFIX = 'scrypt';
 const PASSWORD_KEYLEN = 64;
@@ -161,10 +185,16 @@ export function registerAdminRoutes(app: import('express').Application) {
   // Login
   admin.post('/login', requireLoginRateLimit, (req, res) => {
     const { email, password } = req.body as { email?: string; password?: string } || {};
-    if (!email || !password) { res.status(400).json({ error: { message: 'Email and password required.' } }); return; }
+    if (!email || !password) {
+      recordAudit({ actor_id: null, actor_email: email || null, action: 'login_failure', target_id: null, target_email: email || null, details: 'missing credentials' });
+      res.status(400).json({ error: { message: 'Email and password required.' } }); return;
+    }
     const users = getUsers();
     const user = users.find(u => u.email === email);
-    if (!user || !verifyPassword(password, user.password_hash)) { res.status(401).json({ error: { message: 'Invalid credentials.' } }); return; }
+    if (!user || !verifyPassword(password, user.password_hash)) {
+      recordAudit({ actor_id: null, actor_email: email, action: 'login_failure', target_id: user?.id ?? null, target_email: email, details: 'invalid credentials' });
+      res.status(401).json({ error: { message: 'Invalid credentials.' } }); return;
+    }
     if (!isPasswordHash(user.password_hash)) {
       user.password_hash = hashPassword(password);
       saveUsers(users);
@@ -175,16 +205,27 @@ export function registerAdminRoutes(app: import('express').Application) {
     sessions.push({ id: sessionId, user_id: user.id, expires_at: expiresAt });
     saveSessions(sessions);
     res.setHeader('Set-Cookie', adminCookie(sessionId, 7 * 24 * 60 * 60));
+    recordAudit({ actor_id: user.id, actor_email: user.email, action: 'login_success', target_id: user.id, target_email: user.email, details: null });
     res.json({ user: toPublicUser(user) });
   });
 
   // Logout
   admin.post('/logout', (req, res) => {
     const sid = getSessionCookie(req.headers.cookie);
+    let actorId: number | null = null;
+    let actorEmail: string | null = null;
     if (sid) {
-      saveSessions(getSessions().filter(s => s.id !== sid));
+      const sessions = getSessions();
+      const sess = sessions.find(s => s.id === sid);
+      if (sess) {
+        actorId = sess.user_id;
+        const actor = getUsers().find(u => u.id === sess.user_id);
+        actorEmail = actor?.email ?? null;
+      }
+      saveSessions(sessions.filter(s => s.id !== sid));
     }
     res.setHeader('Set-Cookie', adminCookie('', 0));
+    recordAudit({ actor_id: actorId, actor_email: actorEmail, action: 'logout', target_id: actorId, target_email: actorEmail, details: null });
     res.json({ ok: true });
   });
 
@@ -229,6 +270,7 @@ export function registerAdminRoutes(app: import('express').Application) {
     };
     users.push(newUser);
     saveUsers(users);
+    recordAudit({ actor_id: val.userId, actor_email: val.user.email, action: 'user_created', target_id: newUser.id, target_email: newUser.email, details: `role=${newUser.role}` });
     res.json({ user: toPublicUser(newUser) });
   });
 
@@ -243,12 +285,21 @@ export function registerAdminRoutes(app: import('express').Application) {
     const idx = users.findIndex(u => u.id === id);
     if (idx === -1) { res.status(404).json({ error: { message: 'User not found.' } }); return; }
     const body = req.body as Record<string, unknown>;
-    if (body.name !== undefined) users[idx].name = String(body.name);
-    if (body.email !== undefined) users[idx].email = String(body.email);
-    if (body.password !== undefined) users[idx].password_hash = hashPassword(String(body.password));
-    if (body.role !== undefined) users[idx].role = body.role === 'admin' ? 'admin' : 'user';
-    if (body.features !== undefined) users[idx].features = stringifyFeatures(body.features);
+    const changes: string[] = [];
+    if (body.name !== undefined) { changes.push(`name`); users[idx].name = String(body.name); }
+    if (body.email !== undefined) { changes.push('email'); users[idx].email = String(body.email); }
+    if (body.password !== undefined) { changes.push('password'); users[idx].password_hash = hashPassword(String(body.password)); }
+    if (body.role !== undefined) { changes.push(`role:${body.role}`); users[idx].role = body.role === 'admin' ? 'admin' : 'user'; }
+    if (body.features !== undefined) {
+      const before = parseFeatures(users[idx].features);
+      const after = parseFeatures(body.features);
+      const added = Object.keys(after).filter(k => after[k] === true && before[k] !== true);
+      const removed = Object.keys(before).filter(k => before[k] === true && after[k] !== true);
+      if (added.length || removed.length) changes.push(`features:+${added.join(',') || ''}${removed.length ? '-' + removed.join(',') : ''}`);
+      users[idx].features = stringifyFeatures(body.features);
+    }
     saveUsers(users);
+    recordAudit({ actor_id: val.userId, actor_email: val.user.email, action: 'user_updated', target_id: users[idx].id, target_email: users[idx].email, details: changes.join(' ') || 'no-op' });
     res.json({ user: toPublicUser(users[idx]) });
   });
 
@@ -261,10 +312,23 @@ export function registerAdminRoutes(app: import('express').Application) {
     const id = Number(req.params.id);
     if (id === val.userId) { res.status(400).json({ error: { message: 'Cannot delete yourself.' } }); return; }
     const users = getUsers();
+    const target = users.find(u => u.id === id);
     const filtered = users.filter(u => u.id !== id);
     saveUsers(filtered);
     saveSessions(getSessions().filter(s => s.user_id !== id));
+    if (target) recordAudit({ actor_id: val.userId, actor_email: val.user.email, action: 'user_deleted', target_id: target.id, target_email: target.email, details: null });
     res.json({ ok: true });
+  });
+
+  // Audit log (admin only) — returns the most recent entries, newest first.
+  admin.get('/audit-logs', (req, res) => {
+    const sid = getSessionCookie(req.headers.cookie);
+    if (!sid) { res.status(401).json({ error: { message: 'Not authenticated.' } }); return; }
+    const val = validateSession(sid);
+    if (!val || !val.user || val.user.role !== 'admin') { res.status(403).json({ error: { message: 'Forbidden.' } }); return; }
+    const limit = Math.max(1, Math.min(Number(req.query.limit) || 100, AUDIT_MAX_ENTRIES));
+    const entries = getAuditLog().slice(0, limit);
+    res.json({ entries });
   });
 
   app.use('/api/admin', admin);

@@ -1,5 +1,5 @@
 import React, { memo, useState, useEffect, useCallback } from 'react';
-import { X, UserPlus, Trash2, Edit2, Check, Loader2, LogOut, Users, Shield } from 'lucide-react';
+import { X, UserPlus, Trash2, Edit2, Check, Loader2, LogOut, Users, Shield, Clock } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 
 const FEATURE_FLAGS = [
@@ -46,6 +46,34 @@ interface User {
   features: Record<string, boolean>;
 }
 
+interface AuditEntry {
+  ts: string;
+  actor_id: number | null;
+  actor_email: string | null;
+  action: 'login_success' | 'login_failure' | 'logout' | 'user_created' | 'user_updated' | 'user_deleted';
+  target_id: number | null;
+  target_email: string | null;
+  details: string | null;
+}
+
+const ACTION_LABEL: Record<AuditEntry['action'], string> = {
+  login_success: 'login',
+  login_failure: 'login failed',
+  logout: 'logout',
+  user_created: 'created user',
+  user_updated: 'updated user',
+  user_deleted: 'deleted user',
+};
+
+const ACTION_TONE: Record<AuditEntry['action'], string> = {
+  login_success: 'text-green-400 bg-green-500/10 border-green-500/20',
+  login_failure: 'text-red-400 bg-red-500/10 border-red-500/20',
+  logout: 'text-gray-400 bg-gray-500/10 border-gray-500/20',
+  user_created: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+  user_updated: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20',
+  user_deleted: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+};
+
 interface Props { onClose: () => void; }
 
 export const AdminDashboard = memo(function AdminDashboard({ onClose }: Props) {
@@ -62,8 +90,35 @@ export const AdminDashboard = memo(function AdminDashboard({ onClose }: Props) {
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editFeatures, setEditFeatures] = useState<Record<string, boolean>>({});
+  const [view, setView] = useState<'users' | 'audit'>('users');
+  const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState('');
 
   const t = (en: string, kh?: string) => (khLang && kh ? kh : en);
+
+  const fetchAudit = useCallback(async () => {
+    setAuditLoading(true);
+    setAuditError('');
+    try {
+      const r = await fetch('/api/admin/audit-logs?limit=100', { credentials: 'include' });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error?.message || `HTTP ${r.status}`);
+      const data = await r.json() as { entries: AuditEntry[] };
+      setAuditEntries(data.entries || []);
+    } catch (e: unknown) { setAuditError((e as Error).message); }
+    finally { setAuditLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    if (view === 'audit' && user) { void fetchAudit(); }
+  }, [view, user, fetchAudit]);
+
+  const formatTs = (iso: string) => {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    } catch { return iso; }
+  };
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -229,14 +284,31 @@ export const AdminDashboard = memo(function AdminDashboard({ onClose }: Props) {
         </div>
 
         <div className={`flex items-center justify-between px-6 py-3 border-b ${borderClass}`}>
-          <div className="flex items-center gap-2">
-            <Users className="w-4 h-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-300">{users.length} user(s)</span>
+          <div className="flex items-center gap-3">
+            <div className="inline-flex rounded-lg bg-gray-800/70 border border-gray-700/50 p-0.5">
+              <button onClick={() => setView('users')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${view === 'users' ? 'bg-gray-700 text-gray-100' : 'text-gray-400 hover:text-gray-200'}`}>
+                <Users className="w-3.5 h-3.5" />Users
+                <span className={`text-[10px] ${view === 'users' ? 'text-gray-400' : 'text-gray-600'}`}>{users.length}</span>
+              </button>
+              <button onClick={() => setView('audit')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${view === 'audit' ? 'bg-gray-700 text-gray-100' : 'text-gray-400 hover:text-gray-200'}`}>
+                <Clock className="w-3.5 h-3.5" />Audit Log
+              </button>
+            </div>
           </div>
-          <button onClick={() => setShowCreate(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-indigo-600 text-white hover:bg-indigo-500 transition-colors font-medium">
-            <UserPlus className="w-3.5 h-3.5" />Add User
-          </button>
+          {view === 'users' && (
+            <button onClick={() => setShowCreate(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-indigo-600 text-white hover:bg-indigo-500 transition-colors font-medium">
+              <UserPlus className="w-3.5 h-3.5" />Add User
+            </button>
+          )}
+          {view === 'audit' && (
+            <button onClick={() => { void fetchAudit(); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors font-medium">
+              Refresh
+            </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -272,58 +344,110 @@ export const AdminDashboard = memo(function AdminDashboard({ onClose }: Props) {
             </div>
           )}
 
-          <div className="p-6 space-y-3">
-            {users.map(u => (
-              <div key={u.id} className="rounded-xl border border-gray-700/50 bg-gray-800/30 p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-200">{u.name}</p>
-                    <p className="text-xs text-gray-500">{u.email}</p>
-                    <span className={`inline-flex items-center mt-1 px-2 py-0.5 rounded text-[10px] font-medium ${u.role === 'admin' ? 'bg-amber-500/20 text-amber-300' : 'bg-gray-500/20 text-gray-400'}`}>
-                      {u.role}
-                    </span>
+          {view === 'users' && (
+            <div className="p-6 space-y-3">
+              {users.map(u => (
+                <div key={u.id} className="rounded-xl border border-gray-700/50 bg-gray-800/30 p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-200">{u.name}</p>
+                      <p className="text-xs text-gray-500">{u.email}</p>
+                      <span className={`inline-flex items-center mt-1 px-2 py-0.5 rounded text-[10px] font-medium ${u.role === 'admin' ? 'bg-amber-500/20 text-amber-300' : 'bg-gray-500/20 text-gray-400'}`}>
+                        {u.role}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {editingId === u.id ? (
+                        <>
+                          <button onClick={() => saveEdit(u.id)} className="p-1.5 rounded-lg bg-green-600/20 text-green-400 hover:bg-green-600/30 transition-colors" title="Save"><Check className="w-3.5 h-3.5" /></button>
+                          <button onClick={cancelEdit} className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-700 transition-colors" title="Cancel"><X className="w-3.5 h-3.5" /></button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => startEdit(u)} className="p-1.5 rounded-lg text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 transition-colors" title="Edit features"><Edit2 className="w-3.5 h-3.5" /></button>
+                          {user.id !== u.id && (
+                            <button onClick={() => deleteUser(u.id)} className="p-1.5 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    {editingId === u.id ? (
-                      <>
-                        <button onClick={() => saveEdit(u.id)} className="p-1.5 rounded-lg bg-green-600/20 text-green-400 hover:bg-green-600/30 transition-colors" title="Save"><Check className="w-3.5 h-3.5" /></button>
-                        <button onClick={cancelEdit} className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-700 transition-colors" title="Cancel"><X className="w-3.5 h-3.5" /></button>
-                      </>
-                    ) : (
-                      <>
-                        <button onClick={() => startEdit(u)} className="p-1.5 rounded-lg text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 transition-colors" title="Edit features"><Edit2 className="w-3.5 h-3.5" /></button>
-                        {user.id !== u.id && (
-                          <button onClick={() => deleteUser(u.id)} className="p-1.5 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
 
-                {editingId === u.id ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {FEATURE_FLAGS.map(flag => (
-                      <button key={flag.key} onClick={() => toggleFeature(flag.key)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${editFeatures[flag.key]
-                          ? 'bg-green-500/15 border-green-500/30 text-green-300' : 'bg-gray-700/50 border-gray-600/50 text-gray-400'}`}>
-                        {editFeatures[flag.key] && <Check className="w-3 h-3" />}
-                        {flag.label}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {FEATURE_FLAGS.filter(f => u.features?.[f.key]).map(flag => (
-                      <span key={flag.key} className="px-2 py-0.5 rounded text-[10px] bg-green-500/15 text-green-300 border border-green-500/20">{flag.label}</span>
-                    ))}
-                    {Object.values(u.features || {}).every(v => !v) && (
-                      <span className="text-xs text-gray-600">— All features disabled</span>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+                  {editingId === u.id ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {FEATURE_FLAGS.map(flag => (
+                        <button key={flag.key} onClick={() => toggleFeature(flag.key)}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${editFeatures[flag.key]
+                            ? 'bg-green-500/15 border-green-500/30 text-green-300' : 'bg-gray-700/50 border-gray-600/50 text-gray-400'}`}>
+                          {editFeatures[flag.key] && <Check className="w-3 h-3" />}
+                          {flag.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {FEATURE_FLAGS.filter(f => u.features?.[f.key]).map(flag => (
+                        <span key={flag.key} className="px-2 py-0.5 rounded text-[10px] bg-green-500/15 text-green-300 border border-green-500/20">{flag.label}</span>
+                      ))}
+                      {Object.values(u.features || {}).every(v => !v) && (
+                        <span className="text-xs text-gray-600">— All features disabled</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {view === 'audit' && (
+            <div className="p-6">
+              {auditError && (
+                <div className="mb-4 px-4 py-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg">
+                  {auditError} <button onClick={() => setAuditError('')} className="ml-2 underline">dismiss</button>
+                </div>
+              )}
+              {auditLoading && auditEntries.length === 0 ? (
+                <div className="flex items-center justify-center py-12 text-gray-500 text-xs">
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin text-indigo-400" />Loading audit log…
+                </div>
+              ) : auditEntries.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-500 text-xs">
+                  <Clock className="w-6 h-6 mb-2 text-gray-600" />
+                  <p>No audit events recorded yet.</p>
+                  <p className="text-[10px] mt-1 text-gray-600">Login, user creation, role changes, and feature flag toggles appear here.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-gray-700/50">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-900/60 text-gray-400">
+                      <tr>
+                        <th className="text-left font-medium px-3 py-2">When</th>
+                        <th className="text-left font-medium px-3 py-2">Actor</th>
+                        <th className="text-left font-medium px-3 py-2">Action</th>
+                        <th className="text-left font-medium px-3 py-2">Target</th>
+                        <th className="text-left font-medium px-3 py-2">Details</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {auditEntries.map((entry, i) => (
+                        <tr key={`${entry.ts}-${i}`} className="border-t border-gray-700/40 hover:bg-gray-800/40 transition-colors">
+                          <td className="px-3 py-2 text-gray-400 whitespace-nowrap" title={entry.ts}>{formatTs(entry.ts)}</td>
+                          <td className="px-3 py-2 text-gray-300 whitespace-nowrap">{entry.actor_email ?? <span className="text-gray-600">—</span>}</td>
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded border text-[10px] font-medium ${ACTION_TONE[entry.action]}`}>
+                              {ACTION_LABEL[entry.action]}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-gray-300 whitespace-nowrap">{entry.target_email ?? <span className="text-gray-600">—</span>}</td>
+                          <td className="px-3 py-2 text-gray-500 break-all">{entry.details ?? <span className="text-gray-700">—</span>}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
