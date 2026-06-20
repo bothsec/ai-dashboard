@@ -468,7 +468,7 @@ export const ChatInput = memo(() => {
                 isProcessingDoc
                   ? isDark ? 'text-indigo-400' : 'text-indigo-600'
                   : isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
-              }}
+              }`}
               aria-label="Attach PDF or DOCX document"
               title="Attach PDF or DOCX document"
             >
