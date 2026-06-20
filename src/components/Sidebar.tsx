@@ -334,7 +334,7 @@ export const Sidebar = memo(() => {
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search chats…"
-                className={`flex-1 bg-transparent text-xs outline-none placeholder:text-indigo-400/70 text-indigo-200`}
+                className={`flex-1 bg-transparent text-xs outline-none ${isDark ? 'text-gray-100 placeholder:text-gray-500' : 'text-gray-900 placeholder:text-gray-500'}`}
                 aria-label="Search chat history"
               />
               {searchQuery && (
@@ -413,21 +413,21 @@ export const Sidebar = memo(() => {
                   <>
                     <button
                       onClick={(e) => handleStartRename(e, chat)}
-                      className={`opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all duration-200 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-500/10 dark:hover:bg-blue-500/10`}
+                      className={`opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 rounded-lg transition-all duration-200 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-500/10 dark:hover:bg-blue-500/10`}
                       aria-label={`Rename chat: ${chat.title || 'New Chat'}`}
                     >
                       <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
                     </button>
                     <button
                       onClick={(e) => handleTogglePin(e, chat.id)}
-                      className={`opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all duration-200 ${chat.pinned ? 'opacity-100' : ''} ${isDark ? 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10' : 'text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50'}`}
+                      className={`opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 rounded-lg transition-all duration-200 ${chat.pinned ? 'sm:opacity-100' : ''} ${isDark ? 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10' : 'text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50'}`}
                       aria-label={chat.pinned ? `Unpin chat: ${chat.title || 'New Chat'}` : `Pin chat: ${chat.title || 'New Chat'}`}
                     >
                       <Pin className={`w-3.5 h-3.5 ${chat.pinned ? 'fill-current' : ''}`} aria-hidden="true" />
                     </button>
                     <button
                       onClick={(e) => handleDeleteChat(e, chat.id)}
-                      className={`opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all duration-200 text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 dark:hover:bg-red-500/10`}
+                      className={`opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 rounded-lg transition-all duration-200 text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 dark:hover:bg-red-500/10`}
                       aria-label={`Delete chat: ${chat.title || 'New Chat'}`}
                     >
                       <Trash className="w-3.5 h-3.5" aria-hidden="true" />

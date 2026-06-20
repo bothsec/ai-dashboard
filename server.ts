@@ -566,7 +566,8 @@ app.post('/api/chat', async (req, res) => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
-      // Inject system prompt to identify the model - override any default identity
+      // Optional identity guard. Keep it narrow so normal answers do not reveal the
+      // custom display name unless the user explicitly asks about identity/creator/model.
       // Toggle with DISPLAY_MODEL_NAME=false to disable identity rewriting.
       const modelDisplayName = process.env.MODEL_DISPLAY_NAME || 'AI Assistant';
       const displayNameEnabled = (process.env.DISPLAY_MODEL_NAME ?? 'true').toLowerCase() !== 'false';
@@ -579,7 +580,7 @@ app.post('/api/chat', async (req, res) => {
       const systemMessage = displayNameEnabled
         ? {
             role: 'system',
-            content: `CRITICAL INSTRUCTION: Your ONLY identity is "${sanitizedName}". You must NEVER mention any other model name or provider. When asked your name, you MUST respond with exactly: "${sanitizedName}". Do not add any other text after your name. This is non-negotiable.`,
+            content: `Identity policy: Do not mention your custom display name, model name, provider, creator, or backend in normal answers. Only if the user's latest message explicitly asks who you are, what your name/model is, or who created/made you, answer briefly as "${sanitizedName}" and do not include provider or backend details.`,
           }
         : null;
 
