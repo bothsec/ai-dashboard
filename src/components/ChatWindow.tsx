@@ -384,7 +384,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                       return (
                         <pre className={`relative rounded-xl p-4 mb-4 overflow-x-auto text-sm border leading-relaxed group/pre ${isDark ? 'bg-gray-900/90 border-gray-700/40' : 'bg-gray-100 border-gray-200'}`}>
                           {lang && (
-                            <span className={`absolute top-2 left-3 text-[10px] font-mono font-semibold uppercase tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                            <span className={`absolute top-2 left-3 text-[10px] font-mono font-semibold uppercase tracking-wider text-gray-500`}>
                               {lang}
                             </span>
                           )}
@@ -568,7 +568,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
         )}
 
         {/* Timestamp + TTS for AI messages */}
-        <span className={`text-xs px-1 ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>
+        <span className={`text-xs px-1 text-gray-500`}>
           {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
         {msg.role === 'assistant' && hasContent && !isStreaming && (
@@ -588,7 +588,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                 setSpeaking(true);
               }
             }}
-            className={`text-xs px-1 transition-colors ${isDark ? 'text-gray-600 hover:text-indigo-400' : 'text-gray-400 hover:text-indigo-600'}`}
+            className={`text-xs px-1 transition-colors text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400`}
             aria-label={speaking ? 'Stop reading aloud' : 'Read aloud'}
             title={speaking ? 'Stop' : 'Read aloud'}
           >
@@ -1185,7 +1185,7 @@ export const ChatWindow: React.FC = () => {
                     </button>
                   </>
                 ) : chatSearchQuery && chatSearchQuery !== '__open__' ? (
-                  <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>No matches</span>
+                  <span className={`text-xs text-gray-500`}>No matches</span>
                 ) : null}
                 <button
                   onClick={closeChatSearch}
