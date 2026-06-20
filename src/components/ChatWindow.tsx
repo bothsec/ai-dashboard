@@ -1,5 +1,4 @@
 /* eslint-disable react-refresh/only-export-components */
-/* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable react-hooks/preserve-manual-memoization */
 import { useRef, useEffect, memo, useMemo, useCallback, useState } from 'react';
 import { useChat } from '../context/ChatContext';
@@ -8,7 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Trash, Quote, Play, Search, Sparkles, MoreHorizontal, Edit2 } from 'lucide-react';
+import { Bot, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, Trash, Quote, Play, Search, Sparkles, MoreHorizontal, Edit2 } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 
@@ -505,13 +504,11 @@ const MessageSkeleton = memo(() => {
 });
 
 export const ChatWindow: React.FC = () => {
-  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, sendMessage, dismissError, lastSentMessage, lastUserMessage, regenerateLastResponse, deleteChat, continueResponse } = useChat();
+  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, sendMessage, dismissError, lastSentMessage, deleteChat, continueResponse } = useChat();
   const { settings, isFeatureEnabled } = useSettings();
   const scrollRef = useRef<HTMLDivElement>(null);
   const emptyStateRef = useRef<HTMLDivElement>(null);
   const [isPinned, setIsPinned] = useState(true);
-  // Show regenerate button briefly after a response completes
-  const [showRegenerate, setShowRegenerate] = useState(false);
   const [chatCopied, setChatCopied] = useState(false);
   const [showMobileChatMenu, setShowMobileChatMenu] = useState(false);
   const [chatSearchQuery, setChatSearchQuery] = useState<string>('');
@@ -540,20 +537,6 @@ export const ChatWindow: React.FC = () => {
     [chats, activeChatId]
   );
 
-  // Show regenerate briefly when streaming ends with a successful response
-  useEffect(() => {
-    if (isStreaming) return;
-    if (lastUserMessage && activeChat?.messages.some(m => m.role === 'assistant')) {
-      setShowRegenerate(true);
-      const t = setTimeout(() => setShowRegenerate(false), 8000);
-      return () => clearTimeout(t);
-    }
-  }, [isStreaming, lastUserMessage, activeChat?.messages]);
-
-  // Hide regenerate when user starts typing a new message
-  useEffect(() => {
-    if (lastSentMessage) setShowRegenerate(false);
-  }, [lastSentMessage]);
 
   // Check if the last assistant message looks truncated (ends mid-sentence)
   const lastAssistantLooksTruncated = useMemo(() => {
@@ -1129,42 +1112,20 @@ export const ChatWindow: React.FC = () => {
         </div>
       )}
 
-      {/* Regenerate / Continue Reading bar — shown briefly after a successful response */}
-      {((showRegenerate && !isStreaming) || (lastAssistantLooksTruncated && !isStreaming)) && activeChat && activeChat.messages.length > 0 && (
+      {/* Continue Reading bar — shown only when a response appears cut off */}
+      {lastAssistantLooksTruncated && !isStreaming && activeChat && activeChat.messages.length > 0 && (
         <div
           className={`absolute bottom-0 left-0 right-0 flex items-center justify-center py-3 gap-3 ${isDark ? 'bg-gradient-to-t from-gray-950 to-transparent' : 'bg-gradient-to-t from-white to-transparent'}`}
         >
-          {lastAssistantLooksTruncated && (
-            <button
-              onClick={() => continueResponse()}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/30 transition-colors text-sm font-medium"
-              aria-label="Continue reading"
-              title="Continue the response from where it was cut off"
-            >
-              <Play className="w-4 h-4" aria-hidden="true" />
-              Continue reading
-            </button>
-          )}
-          {showRegenerate && (
-            <>
-              <button
-                onClick={() => regenerateLastResponse()}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-500/30 transition-colors text-sm font-medium"
-                aria-label="Regenerate last response"
-                title="Generate a new response to your last message"
-              >
-                <RotateCw className="w-4 h-4" aria-hidden="true" />
-                Regenerate
-              </button>
-              <button
-                onClick={() => setShowRegenerate(false)}
-                className="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs transition-colors text-gray-500 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-gray-800"
-                aria-label="Dismiss"
-              >
-                <X className="w-3.5 h-3.5" aria-hidden="true" />
-              </button>
-            </>
-          )}
+          <button
+            onClick={() => continueResponse()}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/30 transition-colors text-sm font-medium"
+            aria-label="Continue reading"
+            title="Continue the response from where it was cut off"
+          >
+            <Play className="w-4 h-4" aria-hidden="true" />
+            Continue reading
+          </button>
         </div>
       )}
     </div>
