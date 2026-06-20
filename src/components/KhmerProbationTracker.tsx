@@ -133,12 +133,12 @@ export const KhmerProbationTracker = memo(function KhmerProbationTracker({
               <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">
                 Probation Tracker
               </h2>
-              <p className="text-[10px] text-gray-400">Khmer Labor Law</p>
+              <p className="text-[10px] text-gray-500 dark:text-gray-400">Khmer Labor Law</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
           >
             <X size={16} />
           </button>
@@ -148,7 +148,7 @@ export const KhmerProbationTracker = memo(function KhmerProbationTracker({
           {/* Inputs */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] text-gray-400 mb-1">Start Date</label>
+              <label className="block text-[10px] text-gray-500 dark:text-gray-400 mb-1">Start Date</label>
               <input
                 type="date"
                 value={startDate}
@@ -157,7 +157,7 @@ export const KhmerProbationTracker = memo(function KhmerProbationTracker({
               />
             </div>
             <div>
-              <label className="block text-[10px] text-gray-400 mb-1">Monthly Salary ($)</label>
+              <label className="block text-[10px] text-gray-500 dark:text-gray-400 mb-1">Monthly Salary ($)</label>
               <input
                 type="number"
                 min={0}
@@ -175,13 +175,13 @@ export const KhmerProbationTracker = memo(function KhmerProbationTracker({
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Progress</p>
-                  <p className="text-[10px] text-gray-400">{statusLabel} · {statusLabelKh}</p>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400">{statusLabel} · {statusLabelKh}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-bold font-mono text-violet-600 dark:text-violet-400">
                     {result.daysRemaining > 0 ? `${result.daysRemaining}d left` : 'Done!'}
                   </p>
-                  <p className="text-[10px] text-gray-400">{result.daysElapsed}d elapsed</p>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400">{result.daysElapsed}d elapsed</p>
                 </div>
               </div>
 
@@ -198,7 +198,7 @@ export const KhmerProbationTracker = memo(function KhmerProbationTracker({
                 {[33, 66, 100].map((pct, i) => (
                   <div key={i} className="absolute top-0" style={{ left: `${pct}%`, transform: 'translateX(-50%)' }}>
                     <div className="w-0.5 h-2 bg-gray-300 dark:bg-gray-600 mx-auto" />
-                    <p className="text-[8px] text-gray-400 text-center mt-0.5 -translate-x-1/2">{[30, 60, 90][i]}d</p>
+                    <p className="text-[8px] text-gray-500 dark:text-gray-400 text-center mt-0.5 -translate-x-1/2">{[30, 60, 90][i]}d</p>
                   </div>
                 ))}
               </div>
@@ -225,7 +225,7 @@ export const KhmerProbationTracker = memo(function KhmerProbationTracker({
                     ) : m.status === 'active' ? (
                       <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
                     ) : (
-                      <Clock className="w-3.5 h-3.5 text-gray-400" />
+                      <Clock className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -238,17 +238,17 @@ export const KhmerProbationTracker = memo(function KhmerProbationTracker({
                     }`}>
                       Day {m.day} — {m.label}
                     </p>
-                    <p className="text-[10px] text-gray-400 mb-1">{m.labelKh}</p>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-1">{m.labelKh}</p>
                     <p className={`text-[10px] leading-relaxed ${
                       m.status === 'passed'
                         ? 'text-emerald-600/70 dark:text-emerald-400/60'
                         : m.status === 'active'
                         ? 'text-amber-600/70 dark:text-amber-400/60'
-                        : 'text-gray-400'
+                        : 'text-gray-500 dark:text-gray-400'
                     }`}>
                       {m.status === 'active' ? '⚡ ' : ''}{m.message}
                     </p>
-                    <p className="text-[9px] text-gray-400 leading-relaxed">
+                    <p className="text-[9px] text-gray-500 dark:text-gray-400 leading-relaxed">
                       {m.status === 'active' ? '⚡ ' : ''}{m.messageKh}
                     </p>
                   </div>
