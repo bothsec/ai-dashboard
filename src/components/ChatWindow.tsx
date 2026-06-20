@@ -490,7 +490,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
               <div className="absolute -bottom-8 left-0 flex items-center gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
                 <button
                   onClick={() => setReaction(prev => prev === 'up' ? null : 'up')}
-                  className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${reaction === 'up' ? 'text-green-400' : 'text-gray-500'}`}
+                  className={`p-1 rounded ${isDark ? 'hover:bg-gray-700/50' : 'hover:bg-gray-100'} transition-colors ${reaction === 'up' ? 'text-green-400' : isDark ? 'text-gray-400' : 'text-gray-500'}`}
                   aria-label={reaction === 'up' ? 'Remove thumbs up' : 'Thumbs up'}
                   title={reaction === 'up' ? 'Remove' : 'Helpful'}
                 >
@@ -498,7 +498,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                 </button>
                 <button
                   onClick={() => setReaction(prev => prev === 'down' ? null : 'down')}
-                  className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${reaction === 'down' ? 'text-red-400' : 'text-gray-500'}`}
+                  className={`p-1 rounded ${isDark ? 'hover:bg-gray-700/50' : 'hover:bg-gray-100'} transition-colors ${reaction === 'down' ? 'text-red-400' : isDark ? 'text-gray-400' : 'text-gray-500'}`}
                   aria-label={reaction === 'down' ? 'Remove thumbs down' : 'Thumbs down'}
                   title={reaction === 'down' ? 'Remove' : 'Not helpful'}
                 >
@@ -506,7 +506,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                 </button>
                 <button
                   onClick={() => setIsBookmarked(prev => !prev)}
-                  className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${isBookmarked ? 'text-amber-400' : 'text-gray-500'}`}
+                  className={`p-1 rounded ${isDark ? 'hover:bg-gray-700/50' : 'hover:bg-gray-100'} transition-colors ${isBookmarked ? 'text-amber-400' : isDark ? 'text-gray-400' : 'text-gray-500'}`}
                   aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark message'}
                   title={isBookmarked ? 'Remove bookmark' : 'Bookmark'}
                 >
@@ -516,7 +516,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                 <div className="relative">
                   <button
                     onClick={() => { setShowLabelMenu(prev => !prev); }}
-                    className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${messageLabel ? 'text-amber-400' : 'text-gray-500'}`}
+                    className={`p-1 rounded ${isDark ? 'hover:bg-gray-700/50' : 'hover:bg-gray-100'} transition-colors ${messageLabel ? 'text-amber-400' : isDark ? 'text-gray-400' : 'text-gray-500'}`}
                     aria-label={messageLabel ? `Label: ${messageLabel}` : 'Add label'}
                     title={messageLabel ? `Label: ${messageLabel}` : 'Label message'}
                   >
@@ -556,7 +556,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                       detail: { id: msg.id, content: msg.content, role: msg.role },
                     }));
                   }}
-                  className={`p-1 rounded hover:bg-gray-700/50 transition-colors text-gray-500`}
+                  className={`p-1 rounded ${isDark ? 'hover:bg-gray-700/50' : 'hover:bg-gray-100'} transition-colors ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
                   aria-label="Quote this message"
                   title="Quote in reply"
                 >
@@ -906,7 +906,7 @@ export const ChatWindow: React.FC = () => {
           <h3 className={`text-lg font-semibold mb-2 ${isNetworkError ? 'text-amber-400' : 'text-red-400'}`} role="alert">
             {isNetworkError ? 'You appear to be offline' : 'Something went wrong'}
           </h3>
-          <p className="text-gray-400 mb-6 text-sm leading-relaxed">{error}</p>
+          <p className={`${isDark ? 'text-gray-400' : 'text-gray-500'} mb-6 text-sm leading-relaxed`}>{error}</p>
           <div className="flex items-center justify-center gap-3 flex-wrap">
             {lastSentMessage && (
               <button
