@@ -485,13 +485,14 @@ export const ChatInput = memo(() => {
             type="submit"
             ref={sendButtonRef}
             disabled={!canSubmit}
-            className={`flex-shrink-0 p-2 md:p-2.5 rounded-full transition-all duration-300 flex items-center justify-center ${
+            className={[
+              'flex-shrink-0 p-2 md:p-2.5 rounded-full flex items-center justify-center',
               canSubmit
                 ? 'bg-indigo-600 text-white hover:bg-indigo-500 active:scale-90'
                 : isDark
                   ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
                   : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-            }`}
+            ].join(' ')}
             aria-label={isStreaming ? 'Cancel' : 'Send message'}
             aria-disabled={!canSubmit}
           >
