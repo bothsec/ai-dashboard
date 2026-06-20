@@ -17,6 +17,7 @@ interface ChatContextType extends ChatState {
   regenerateLastResponse: () => void;
   retryLastMessage: () => void;
   editLastMessage: (newContent: string) => void;
+  editMessage: (messageId: string, newContent: string) => void;
   sendMessage: (content: string) => Promise<void>;
   createNewChat: () => void;
   switchChat: (chatId: string) => void;
@@ -427,6 +428,109 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setTimeout(() => sendMessage(newContent), 0);
   }, [state.activeChatId, sendMessage]);
 
+  // Edit any sent user message, trim following messages, then regenerate from that point.
+  const editMessage = useCallback((messageId: string, newContent: string) => {
+    const trimmed = newContent.trim();
+    const currentChatId = state.activeChatId;
+    if (!trimmed || !currentChatId || state.isStreaming) return;
+
+    const chat = state.chats.find(c => c.id === currentChatId);
+    if (!chat) return;
+
+    const messageIndex = chat.messages.findIndex(m => m.id === messageId && m.role === 'user');
+    if (messageIndex === -1) return;
+
+    const editedContent = settings.khLang && !trimmed.startsWith('[Respond in Khmer]')
+      ? `[Respond in Khmer] ${trimmed}`
+      : trimmed;
+    const editedMessage: Message = {
+      ...chat.messages[messageIndex],
+      content: editedContent,
+      timestamp: Date.now(),
+    };
+    const assistantMessageId = generateId();
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+    };
+    const history = [...chat.messages.slice(0, messageIndex), editedMessage];
+
+    abortControllerRef.current?.abort();
+    setState(prev => ({
+      ...prev,
+      isStreaming: true,
+      error: null,
+      chats: prev.chats.map(c => c.id === currentChatId
+        ? { ...c, messages: [...history, assistantMessage] }
+        : c
+      ),
+    }));
+
+    setStreamingMessageId(assistantMessageId);
+    setStreamingContent('');
+    setTokensPerSecond(0);
+    setLastSentMessage(editedContent);
+    setLastUserMessage(editedContent);
+    streamingStartRef.current = Date.now();
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    service.generateStream(
+      history,
+      settings,
+      {
+        onChunk: (chunk) => {
+          setStreamingContent(prev => {
+            const next = prev + chunk;
+            const elapsed = (Date.now() - streamingStartRef.current) / 1000;
+            if (elapsed > 0.5) {
+              const approxTokens = next.length / 4;
+              setTokensPerSecond(Math.round((approxTokens / elapsed) * 10) / 10);
+            }
+            return next;
+          });
+        },
+        onComplete: (fullContent) => {
+          const addedTokens = Math.round(fullContent.length / 4);
+          setState(prev => ({
+            ...prev,
+            isStreaming: false,
+            chats: prev.chats.map(c => c.id === currentChatId
+              ? {
+                  ...c,
+                  totalTokens: (c.totalTokens || 0) + addedTokens,
+                  messages: c.messages.map(m => m.id === assistantMessageId ? { ...m, content: fullContent } : m),
+                }
+              : c
+            ),
+          }));
+          setStreamingMessageId(null);
+          setStreamingContent('');
+          setLastSentMessage(null);
+        },
+        onError: (err) => {
+          setState(prev => ({ ...prev, isStreaming: false, error: err.message }));
+          setStreamingMessageId(null);
+          setStreamingContent('');
+          setTokensPerSecond(0);
+        },
+      },
+      controller.signal,
+    ).catch(error => {
+      setState(prev => ({
+        ...prev,
+        isStreaming: false,
+        error: error instanceof Error ? error.message : 'Failed to edit message',
+      }));
+      setStreamingMessageId(null);
+      setStreamingContent('');
+      setTokensPerSecond(0);
+    });
+  }, [state.activeChatId, state.chats, state.isStreaming, service, settings]);
+
   // Retry the last failed message: remove failed assistant response and resend the same user content
   const retryLastMessage = useCallback(() => {
     const msgToResend = lastSentMessage;
@@ -547,6 +651,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       regenerateLastResponse,
       retryLastMessage,
       editLastMessage,
+      editMessage,
       sendMessage,
       createNewChat,
       switchChat,
@@ -558,7 +663,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       togglePinChat,
       branchChat,
       continueResponse,
-    }), [state, streamingMessageId, streamingContent, tokensPerSecond, lastSentMessage, lastUserMessage, regenerateLastResponse, retryLastMessage, editLastMessage, sendMessage, createNewChat, switchChat, deleteChat, renameChat, clearMessages, cancelStream, dismissError, togglePinChat, branchChat, continueResponse]);
+    }), [state, streamingMessageId, streamingContent, tokensPerSecond, lastSentMessage, lastUserMessage, regenerateLastResponse, retryLastMessage, editLastMessage, editMessage, sendMessage, createNewChat, switchChat, deleteChat, renameChat, clearMessages, cancelStream, dismissError, togglePinChat, branchChat, continueResponse]);
 
   return (
     <ChatContext.Provider value={contextValue}>

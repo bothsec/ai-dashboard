@@ -8,11 +8,9 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, Quote, Gauge, GitBranch, Play, Search, Sparkles, MoreHorizontal } from 'lucide-react';
+import { Bot, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Trash, Quote, Play, Search, Sparkles, MoreHorizontal, Edit2 } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
-import { BookmarkPanel } from './BookmarkPanel';
-import type { BookmarkedMessage } from './BookmarkPanel';
 
 // Stable — no component-state dependency
 const SUGGESTIONS = [
@@ -74,24 +72,13 @@ interface MessageItemProps {
   isLast: boolean;
   streamingContent: string;
   chatTheme: ChatTheme;
-  activeChatId: string;
 }
 
-const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatTheme, activeChatId }: MessageItemProps) => {
+const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatTheme }: MessageItemProps) => {
   const { settings } = useSettings();
+  const { editMessage } = useChat();
   const [speaking, setSpeaking] = useState(false);
   const [copied, setCopied] = useState(false);
-
-  const [isBookmarked, setIsBookmarked] = useState<boolean>(() => {
-    try {
-      const stored = localStorage.getItem('bookmarked_messages');
-      if (stored) {
-        const bookmarks: BookmarkedMessage[] = JSON.parse(stored);
-        return bookmarks.some(b => b.id === msg.id);
-      }
-    } catch { /* ignore */ }
-    return false;
-  });
 
   const [messageLabel, setMessageLabel] = useState<MessageLabel>(() => {
     try {
@@ -105,35 +92,6 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
   });
 
   const [showActionsMenu, setShowActionsMenu] = useState(false);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('bookmarked_messages');
-      const bookmarks: BookmarkedMessage[] = stored ? JSON.parse(stored) : [];
-      const chatTitle = document.querySelector('[data-chat-title]')?.textContent ?? 'Untitled chat';
-      if (isBookmarked) {
-        // Avoid duplicates
-        if (!bookmarks.some(b => b.id === msg.id)) {
-          bookmarks.unshift({
-            id: msg.id,
-            chatId: activeChatId,
-            role: msg.role,
-            content: msg.content,
-            timestamp: msg.timestamp,
-            chatTitle,
-          });
-        }
-      } else {
-        const filtered = bookmarks.filter(b => b.id !== msg.id);
-        if (filtered.length !== bookmarks.length) {
-          localStorage.setItem('bookmarked_messages', JSON.stringify(filtered));
-          window.dispatchEvent(new CustomEvent('bookmarks:refresh'));
-        }
-        return;
-      }
-      localStorage.setItem('bookmarked_messages', JSON.stringify(bookmarks));
-    } catch { /* ignore */ }
-  }, [isBookmarked, msg.id, msg.role, msg.content, msg.timestamp, activeChatId]);
 
   // Persist message label to localStorage
   useEffect(() => {
@@ -426,6 +384,21 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
           <span className="text-xs text-gray-500">
             {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </span>
+          {msg.role === 'user' && hasContent && !isStreaming && (
+            <button
+              onClick={() => {
+                const next = window.prompt('Edit message and regenerate response:', msg.content);
+                if (next !== null && next.trim() && next !== msg.content) {
+                  editMessage(msg.id, next);
+                }
+              }}
+              className="text-xs px-1 transition-colors text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400"
+              aria-label="Edit message and regenerate response"
+              title="Edit and regenerate"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+            </button>
+          )}
           {msg.role === 'assistant' && hasContent && !isStreaming && (
             <>
               <button
@@ -466,13 +439,6 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                     aria-hidden="true"
                   />
                   <div className={`absolute bottom-full left-12 mb-1 z-50 rounded-lg border shadow-xl py-1 min-w-[150px] ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-                    <button
-                      onClick={() => { setIsBookmarked(prev => !prev); setShowActionsMenu(false); }}
-                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 transition-colors ${isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}
-                    >
-                      <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-current text-amber-400' : ''}`} />
-                      {isBookmarked ? 'Remove bookmark' : 'Bookmark'}
-                    </button>
                     <div className={`px-3 pt-2 pb-1 text-[10px] uppercase tracking-wide ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Label</div>
                     <button
                       onClick={() => { setMessageLabel(null); setShowActionsMenu(false); }}
@@ -538,64 +504,14 @@ const MessageSkeleton = memo(() => {
   );
 });
 
-// Context window usage indicator — estimates how much of the 128k NVIDIA context is used
-const CONTEXT_WINDOW_TOKENS = 128_000;
-
-const ContextWindowBar = memo(({ totalTokens }: { totalTokens: number }) => {
-  const { settings } = useSettings();
-  const isDark = settings.theme === 'dark';
-
-  // totalTokens is already in token units (approx chars/4 from server). We also need
-  // to account for the tokens that will be sent as part of the next request
-  // (system prompt + history). Use a conservative 500-token overhead estimate.
-  const estimatedTokens = totalTokens + 500;
-  const pct = Math.min((estimatedTokens / CONTEXT_WINDOW_TOKENS) * 100, 100);
-
-  // Color coding: green < 60%, amber 60-85%, red > 85%
-  const barColor = pct >= 85
-    ? 'bg-red-500'
-    : pct >= 60
-      ? 'bg-amber-500'
-      : 'bg-emerald-500';
-
-  const textColor = pct >= 85
-    ? 'text-red-400'
-    : pct >= 60
-      ? 'text-amber-400'
-      : 'text-emerald-400';
-
-  // Format large numbers
-  const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
-
-  return (
-    <div
-      className={`max-w-4xl mx-auto flex items-center gap-3 px-1 mb-2`}
-      title={`Estimated context usage: ~${fmt(estimatedTokens)} / 128k tokens`}
-      aria-label={`Context window: ${fmt(estimatedTokens)} of 128k tokens used`}
-    >
-      <Gauge className={`w-3.5 h-3.5 shrink-0 ${textColor}`} aria-hidden="true" />
-      <div className={`flex-1 h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`} role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <span className={`text-[10px] font-mono font-medium ${textColor}`}>
-        {fmt(estimatedTokens)} / 128k
-      </span>
-    </div>
-  );
-});
-
 export const ChatWindow: React.FC = () => {
-  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, sendMessage, dismissError, lastSentMessage, lastUserMessage, regenerateLastResponse, deleteChat, branchChat, continueResponse } = useChat();
+  const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, sendMessage, dismissError, lastSentMessage, lastUserMessage, regenerateLastResponse, deleteChat, continueResponse } = useChat();
   const { settings, isFeatureEnabled } = useSettings();
   const scrollRef = useRef<HTMLDivElement>(null);
   const emptyStateRef = useRef<HTMLDivElement>(null);
   const [isPinned, setIsPinned] = useState(true);
   // Show regenerate button briefly after a response completes
   const [showRegenerate, setShowRegenerate] = useState(false);
-  const [showBookmarksPanel, setShowBookmarksPanel] = useState(false);
   const [chatCopied, setChatCopied] = useState(false);
   const [chatSearchQuery, setChatSearchQuery] = useState<string>('');
   const [chatSearchIndex, setChatSearchIndex] = useState(0);
@@ -884,47 +800,9 @@ export const ChatWindow: React.FC = () => {
         aria-live="polite"
         aria-label="Chat messages"
       >
-        {/* Context window usage indicator */}
-        {activeChat && (activeChat.totalTokens ?? 0) > 0 && (
-          <ContextWindowBar totalTokens={activeChat.totalTokens!} />
-        )}
-
         {/* Export button — only shown when chat has messages */}
         {activeChat && activeChat.messages.length > 0 && (
           <div className="max-w-5xl mx-auto flex justify-end gap-2 mb-3 overflow-x-auto pb-1">
-            <button
-              onClick={() => setShowBookmarksPanel(prev => !prev)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                showBookmarksPanel
-                  ? isDark ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-amber-50 text-amber-600 border border-amber-200'
-                  : isDark
-                    ? 'text-gray-500 hover:text-amber-400 hover:bg-gray-800'
-                    : 'text-gray-500 hover:text-amber-600 hover:bg-gray-100'
-              }`}
-              aria-label="Toggle bookmarks panel"
-              aria-pressed={showBookmarksPanel}
-              title="Bookmarks"
-            >
-              <Bookmark className={`w-3.5 h-3.5 ${showBookmarksPanel ? 'fill-current' : ''}`} />
-              Bookmarks
-            </button>
-            <button
-              onClick={() => {
-                if (activeChatId) {
-                  branchChat(activeChatId);
-                }
-              }}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                isDark
-                  ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
-                  : 'text-gray-500 hover:text-gray-600 hover:bg-gray-100'
-              }`}
-              aria-label="Branch conversation"
-              title="Create a branch copy of this conversation"
-            >
-              <GitBranch className="w-3.5 h-3.5" aria-hidden="true" />
-              Branch
-            </button>
             <button
               onClick={handleExportChat}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
@@ -1120,7 +998,6 @@ export const ChatWindow: React.FC = () => {
                   isLast={isLast}
                   streamingContent={isMessageStreaming ? streamingContent : ''}
                   chatTheme={chatTheme}
-                  activeChatId={activeChatId ?? ''}
                 />
                 </div>
               );
@@ -1208,9 +1085,6 @@ export const ChatWindow: React.FC = () => {
           )}
         </div>
       )}
-
-      {/* Bookmarks panel */}
-      {showBookmarksPanel && <BookmarkPanel onClose={() => setShowBookmarksPanel(false)} />}
     </div>
   );
 };
