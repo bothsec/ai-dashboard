@@ -33,6 +33,7 @@ ecosystem.config.cjs
 data/*.json
 data/*.db
 admin.db
+.hermes/qa_state.json
 
 # Dev output
 nohup.out
