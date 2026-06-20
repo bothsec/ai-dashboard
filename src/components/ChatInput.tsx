@@ -1,12 +1,10 @@
 import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
-import { Send, Loader2, Link, Sparkles, Edit2, RefreshCw, MessageSquare, X, Minimize2, Maximize2, Eye, EyeOff, FileText, MessageSquarePlus, BookOpen, Briefcase, HelpCircle } from 'lucide-react';
+import { Send, Loader2, Link, Edit2, RefreshCw, MessageSquare, X, Minimize2, Maximize2, Eye, EyeOff, FileText, MessageSquarePlus, BookOpen, Briefcase, HelpCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
-import PromptEngineer from './PromptEngineer';
-import { StreamingHUD } from './StreamingHUD';
 import { SmartReplyPopover } from './SmartReplyPopover';
 import { KhmerPhrasebank } from './KhmerPhrasebank';
 import { KhmerJobTermDictionary } from './KhmerJobTermDictionary';
@@ -49,7 +47,6 @@ export const ChatInput = memo(() => {
   const [isFocused, setIsFocused] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
-  const [showPromptEngineer, setShowPromptEngineer] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isProcessingDoc, setIsProcessingDoc] = useState(false);
   const [docError, setDocError] = useState<string | null>(null);
@@ -115,16 +112,10 @@ export const ChatInput = memo(() => {
       }
     };
 
-    // Listen for pe:close event dispatched by App.tsx Escape handler
-    const handlePeClose = () => setShowPromptEngineer(false);
-
     window.addEventListener('keydown', handleGlobalKeyDown);
-    window.addEventListener('pe:close', handlePeClose);
-    return () => {
-      window.removeEventListener('keydown', handleGlobalKeyDown);
-      window.removeEventListener('pe:close', handlePeClose);
-    };
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [isStreaming, cancelStream]);
+
 
   // Listen for quote events from ChatWindow message bubbles
   useEffect(() => {
@@ -232,7 +223,6 @@ export const ChatInput = memo(() => {
 
     setInput('');
     setQuotedMessage(null);
-    setShowPromptEngineer(false);
     try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
     setIsEditing(false);
@@ -283,21 +273,6 @@ export const ChatInput = memo(() => {
   return (
     <div className={`shrink-0 px-3 md:px-6 lg:px-12 ${isCompact ? 'py-1 md:py-1.5 lg:py-2' : 'py-2 md:py-3 lg:py-4'} ${isDark ? '' : 'bg-white/50'}`}>
       <div className="max-w-3xl lg:max-w-2xl mx-auto">
-        {/* Prompt Engineer panel */}
-        {showPromptEngineer && (
-          <div className="mb-3">
-            <PromptEngineer
-              onUse={(prompt) => {
-                setInput(prompt);
-                setShowPromptEngineer(false);
-                setTimeout(() => textareaRef.current?.focus(), 50);
-              }}
-              onClose={() => setShowPromptEngineer(false)}
-              disabled={isStreaming}
-            />
-          </div>
-        )}
-
         {/* Quoted message preview — shown when user clicked Quote on a message */}
         {quotedMessage && (
           <div className="mb-2 flex items-start gap-2 px-3 py-2 rounded-xl border border-indigo-500/30 bg-indigo-500/10">
@@ -313,7 +288,7 @@ export const ChatInput = memo(() => {
             <button
               type="button"
               onClick={handleClearQuote}
-              className={`shrink-0 p-1 rounded-lg transition-colors ${isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200'}`}
+              className={`shrink-0 p-1 rounded-lg transition-colors ${isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}
               aria-label="Remove quoted message"
               title="Remove quote"
             >
@@ -370,17 +345,6 @@ export const ChatInput = memo(() => {
               aria-hidden="true"
             />
           )}
-          {/* Prompt Engineer button */}
-          <button
-            type="button"
-            onClick={() => setShowPromptEngineer(prev => !prev)}
-            className={`transition-colors duration-200 p-1 rounded-full flex items-center justify-center shrink-0 ${isDark ? 'text-violet-400 hover:text-violet-300 hover:bg-gray-700/50' : 'text-violet-600 hover:text-violet-700 hover:bg-gray-100'} ${showPromptEngineer ? (isDark ? 'bg-gray-700/60 text-violet-300' : 'bg-violet-100 text-violet-700') : ''}`}
-            aria-label="Prompt Engineer"
-            title="Prompt Engineer — craft better prompts"
-          >
-            <Sparkles className="w-4 h-4 md:w-5 md:h-5" />
-          </button>
-
           {/* Textarea / Markdown preview */}
           <div className="flex-1 min-w-0 flex items-center">
             {showPreview && input.trim() ? (
@@ -503,8 +467,8 @@ export const ChatInput = memo(() => {
               className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${
                 isProcessingDoc
                   ? isDark ? 'text-indigo-400' : 'text-indigo-600'
-                  : isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200'
-              }`}
+                  : isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
+              }}
               aria-label="Attach PDF or DOCX document"
               title="Attach PDF or DOCX document"
             >
@@ -526,7 +490,7 @@ export const ChatInput = memo(() => {
                 ? 'bg-indigo-600 text-white hover:bg-indigo-500 active:scale-90'
                 : isDark
                   ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-gray-200 text-gray-500 cursor-not-allowed'
             }`}
             aria-label={isStreaming ? 'Cancel' : 'Send message'}
             aria-disabled={!canSubmit}
@@ -573,7 +537,7 @@ export const ChatInput = memo(() => {
             <button
               type="button"
               onClick={() => setIsCompact(prev => !prev)}
-              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200'}`}
+              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}
               aria-label={isCompact ? 'Expand input area' : 'Compact input area'}
               title={isCompact ? 'Expand input area' : 'Compact input — more room for messages'}
             >
@@ -589,7 +553,7 @@ export const ChatInput = memo(() => {
               <button
                 type="button"
                 onClick={() => setShowSmartReply(prev => !prev)}
-                className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showSmartReply ? (isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200')}`}
+                className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showSmartReply ? (isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200')}`}
                 aria-label="Smart Reply"
                 title="Khmer Smart Reply — bilingual quick responses"
               >
@@ -614,7 +578,7 @@ export const ChatInput = memo(() => {
               <button
                 type="button"
                 onClick={() => setShowKhmerPhrasebank(prev => !prev)}
-                className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showKhmerPhrasebank ? (isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200')}`}
+                className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showKhmerPhrasebank ? (isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200')}`}
                 aria-label="Khmer Phrasebank"
                 title="Khmer Phrasebank — browse phrases in Khmer & English"
               >
@@ -638,7 +602,7 @@ export const ChatInput = memo(() => {
               <button
                 type="button"
                 onClick={() => setShowKhmerJobTermDictionary(prev => !prev)}
-                className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showKhmerJobTermDictionary ? (isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200')}`}
+                className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showKhmerJobTermDictionary ? (isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200')}`}
                 aria-label="Khmer Job Term Dictionary"
                 title="Khmer Job Term Dictionary — understand Cambodian workplace abbreviations"
               >
@@ -662,7 +626,7 @@ export const ChatInput = memo(() => {
               <button
                 type="button"
                 onClick={() => setShowJobQuickReplies(prev => !prev)}
-                className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showJobQuickReplies ? (isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200')}`}
+                className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showJobQuickReplies ? (isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200')}`}
                 aria-label="Khmer Job Quick Replies"
                 title="Khmer Job Quick Replies — one-tap professional phrases"
               >
@@ -734,7 +698,7 @@ export const ChatInput = memo(() => {
             <button
               type="button"
               onClick={() => setShowPreview(prev => !prev)}
-              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showPreview ? (isDark ? 'bg-gray-700/60 text-indigo-400' : 'bg-indigo-100 text-indigo-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200')}`}
+              className={`shrink-0 transition-colors duration-200 p-1 rounded-full flex items-center justify-center ${showPreview ? (isDark ? 'bg-gray-700/60 text-indigo-400' : 'bg-indigo-100 text-indigo-600') : (isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200')}`}
               aria-label={showPreview ? 'Hide markdown preview' : 'Show markdown preview'}
               title={showPreview ? 'Hide preview (Ctrl+Shift+P)' : 'Preview markdown (Ctrl+Shift+P)'}
             >
@@ -748,7 +712,7 @@ export const ChatInput = memo(() => {
           {input.length > 0 && (
             <span
               className={`shrink-0 text-[10px] md:text-[11px] font-mono leading-none ${
-                isDark ? 'text-gray-500' : 'text-gray-400'
+                isDark ? 'text-gray-500' : 'text-gray-500'
               }`}
               aria-live="polite"
               aria-label={`${charCount} characters, ${wordCount} words`}
@@ -761,9 +725,6 @@ export const ChatInput = memo(() => {
             </span>
           )}
         </form>
-
-        {/* Streaming stats HUD — shown while AI is responding */}
-        <StreamingHUD />
 
         {/* URL summary error */}
         {summaryError && (

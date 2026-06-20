@@ -61,7 +61,6 @@ const AppInner = memo(function AppInner() {
         if (isStreaming) {
           cancelStream();
         } else {
-          window.dispatchEvent(new CustomEvent('pe:close'));
         }
         return;
       }

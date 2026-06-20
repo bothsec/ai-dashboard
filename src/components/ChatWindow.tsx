@@ -243,39 +243,15 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
 
   return (
     <div 
-      className={`flex gap-4 md:gap-5 group animate-in slide-in-from-bottom-4 fade-in duration-300 py-2 ${
+      className={`flex gap-0 group animate-in slide-in-from-bottom-4 fade-in duration-300 py-2 ${
         msg.role === 'user' ? 'flex-row-reverse' : ''
       }`}
       role="listitem"
       aria-label={`${msg.role === 'user' ? 'You' : 'Assistant'} message`}
     >
-      {/* Avatar */}
-      <div
-        className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110 ${
-          msg.role === 'user'
-            ? `bg-gradient-to-br ${userAccent.avatar} text-white`
-            : isDark
-              ? `bg-gradient-to-br from-gray-800 to-gray-900 ${aiAccentColor} border border-gray-700/50 shadow-lg shadow-black/20`
-              : activeChatTheme === 'midnight'
-              ? `bg-gradient-to-br from-blue-100 to-indigo-100 ${aiAccentColor} border border-blue-200 shadow-md`
-              : activeChatTheme === 'ocean'
-              ? `bg-gradient-to-br from-cyan-100 to-teal-100 ${aiAccentColor} border border-cyan-200 shadow-md`
-              : activeChatTheme === 'forest'
-              ? `bg-gradient-to-br from-green-100 to-emerald-100 ${aiAccentColor} border border-green-200 shadow-md`
-              : activeChatTheme === 'sunset'
-              ? `bg-gradient-to-br from-orange-100 to-rose-100 ${aiAccentColor} border border-orange-200 shadow-md`
-              : activeChatTheme === 'minimal'
-              ? `bg-gradient-to-br from-neutral-100 to-neutral-200 ${aiAccentColor} border border-neutral-200 shadow-md`
-              : 'bg-gray-100 text-indigo-600 border border-gray-200 shadow-md shadow-black/10'
-        }`}
-        aria-hidden="true"
-      >
-        {msg.role === 'user' ? <User className="w-5 h-5 md:w-6 md:h-6" /> : <Bot className="w-6 h-6 md:w-7 md:h-7" />}
-      </div>
-
       <div className={`flex flex-col space-y-2 ${
-        msg.role === 'assistant' ? 'w-full' : 'w-fit'
-      } max-w-[92%] sm:max-w-[85%] md:max-w-[75%] lg:max-w-[70%] ${
+        msg.role === 'assistant' ? 'w-full max-w-full' : 'w-fit max-w-[92%] sm:max-w-[85%] md:max-w-[75%] lg:max-w-[70%]'
+      } ${
         msg.role === 'user' ? 'items-end' : ''
       }`}>
 
@@ -332,10 +308,10 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
               );
             })()}
             <div
-              className={`px-5 py-4 rounded-2xl shadow-sm transition-all duration-200 ${
+              className={`px-5 py-4 duration-200 ${
                 msg.role === 'user'
-                  ? `bg-gradient-to-br ${userAccent.bubble} text-white rounded-tr-md`
-                  : aiBubbleClass + ' text-gray-100 rounded-tl-md shadow-xl shadow-black/30'
+                  ? `bg-gradient-to-br ${userAccent.bubble} text-white rounded-2xl rounded-tr-md`
+                  : aiBubbleClass + ' text-gray-100 rounded-none shadow-xl shadow-black/30'
               }`}
             >
               <div className={`text-[15px] md:text-[15px] leading-[1.75] ${
@@ -615,15 +591,10 @@ const MessageSkeleton = memo(() => {
   const isDark = settings.theme === 'dark';
   
   return (
-    <div className="flex gap-4 md:gap-5 py-2" role="status" aria-label="Loading message">
-      {/* Avatar skeleton */}
-      <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full shrink-0 ${
-        isDark ? 'bg-gray-800' : 'bg-gray-200'
-      } animate-pulse`} aria-hidden="true" />
-      
-      <div className="flex flex-col space-y-2 w-full max-w-[92%] sm:max-w-[85%] md:max-w-[75%] lg:max-w-[70%]">
+    <div className="flex gap-0 py-2" role="status" aria-label="Loading message">
+      <div className="flex flex-col space-y-2 w-full max-w-full">
         {/* Bubble skeleton */}
-        <div className={`w-full px-4 md:px-5 py-4 rounded-2xl rounded-tl-md ${
+        <div className={`w-full px-4 md:px-5 py-4 rounded-none ${
           isDark ? 'bg-gray-800' : 'bg-gray-200'
         } animate-pulse`}>
           <div className="flex flex-col gap-2">
