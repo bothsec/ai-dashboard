@@ -5,7 +5,7 @@
 import { Router } from 'express';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'crypto';
 
@@ -26,7 +26,18 @@ function readJson<T>(path: string, defaultVal: T): T {
 
 function writeJson(path: string, data: unknown) {
   if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
-  writeFileSync(path, JSON.stringify(data, null, 2));
+  // Atomic write: serialize to <path>.tmp, fsync via close, then rename over the target.
+  // POSIX rename is atomic on the same filesystem, so a crash mid-write leaves the previous
+  // good file intact instead of corrupting it with a partial JSON body.
+  const tmp = `${path}.tmp`;
+  try {
+    writeFileSync(tmp, JSON.stringify(data, null, 2));
+    renameSync(tmp, path);
+  } catch (err) {
+    // Best-effort cleanup of the partial tmp file so we don't accumulate orphans.
+    try { if (existsSync(tmp)) unlinkSync(tmp); } catch { /* ignore */ }
+    throw err;
+  }
 }
 
 function getUsers(): User[] { return readJson<User[]>(USERS_FILE, []); }
