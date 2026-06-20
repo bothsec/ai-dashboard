@@ -8,7 +8,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
-import { Bot, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, ThumbsUp, ThumbsDown, Quote, Tag, Gauge, GitBranch, Play, Search, Sparkles } from 'lucide-react';
+import { Bot, Loader2, RefreshCw, X, WifiOff, Download, Volume2, VolumeX, Copy, Check, ChevronDown, RotateCw, Bookmark, Trash, Quote, Gauge, GitBranch, Play, Search, Sparkles, MoreHorizontal } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import type { Message, ChatTheme } from '../types/chat';
 import { BookmarkPanel } from './BookmarkPanel';
@@ -93,17 +93,6 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
     return false;
   });
 
-  const [reaction, setReaction] = useState<'up' | 'down' | null>(() => {
-    try {
-      const stored = localStorage.getItem('message_reactions');
-      if (stored) {
-        const reactions = JSON.parse(stored) as Record<string, 'up' | 'down'>;
-        return reactions[msg.id] ?? null;
-      }
-    } catch { /* ignore */ }
-    return null;
-  });
-
   const [messageLabel, setMessageLabel] = useState<MessageLabel>(() => {
     try {
       const stored = localStorage.getItem(LABEL_STORAGE_KEY);
@@ -115,7 +104,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
     return null;
   });
 
-  const [showLabelMenu, setShowLabelMenu] = useState(false);
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
 
   useEffect(() => {
     try {
@@ -160,27 +149,6 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
     } catch { /* ignore */ }
   }, [messageLabel, msg.id]);
 
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('message_reactions');
-      const reactions: Record<string, 'up' | 'down'> = stored ? JSON.parse(stored) : {};
-      if (reaction) {
-        reactions[msg.id] = reaction;
-      } else {
-        delete reactions[msg.id];
-      }
-      localStorage.setItem('message_reactions', JSON.stringify(reactions));
-    } catch { /* ignore */ }
-  }, [reaction, msg.id]);
-
-  // Auto-clear reaction after 5 seconds (satisfies noUnusedParameters)
-  useEffect(() => {
-    if (reaction) {
-      const timer = setTimeout(() => setReaction(null), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [reaction, setReaction]);
-
   const isDark = msg.role === 'user' ? true : settings.theme === 'dark';
   const activeChatTheme = chatTheme ?? settings.chatTheme;
 
@@ -218,20 +186,8 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
     bubble: 'from-indigo-600 to-indigo-700 shadow-indigo-500/20',
   };
 
-  // AI bubble: complete class names per theme + dark/light
-  const aiBubbleClass = activeChatTheme === 'midnight'
-    ? isDark ? 'from-blue-950/90 to-indigo-950/90 border-blue-800/40' : 'bg-blue-50 border-blue-200 text-blue-900'
-    : activeChatTheme === 'ocean'
-    ? isDark ? 'from-cyan-950/90 to-teal-950/90 border-cyan-800/40' : 'bg-cyan-50 border-cyan-200 text-cyan-900'
-    : activeChatTheme === 'forest'
-    ? isDark ? 'from-green-950/90 to-emerald-950/90 border-green-800/40' : 'bg-green-50 border-green-200 text-green-900'
-    : activeChatTheme === 'sunset'
-    ? isDark ? 'from-orange-950/90 to-rose-950/90 border-orange-800/40' : 'bg-orange-50 border-orange-200 text-orange-900'
-    : activeChatTheme === 'minimal'
-    ? isDark ? 'from-neutral-900/95 to-neutral-950/95 border-neutral-700/40' : 'bg-neutral-100 border-neutral-300 text-neutral-900'
-    : isDark
-    ? 'from-gray-800/95 to-gray-900/95 border-gray-700/50'
-    : 'bg-white border-gray-200 text-gray-900';
+  // Assistant responses are intentionally flat: no border, no shadow, no bubble chrome.
+  const assistantResponseClass = isDark ? 'text-gray-100 rounded-none' : 'text-gray-900 rounded-none';
 
   return (
     <div 
@@ -303,7 +259,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
               className={`px-5 py-4 duration-200 ${
                 msg.role === 'user'
                   ? `bg-gradient-to-br ${userAccent.bubble} text-white rounded-2xl rounded-tr-md`
-                  : aiBubbleClass + ' text-gray-100 rounded-none shadow-xl shadow-black/30'
+                  : assistantResponseClass
               }`}
             >
               <div className={`text-[15px] md:text-[15px] leading-[1.75] ${
@@ -462,116 +418,96 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
               {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
             </button>
 
-            {/* Reaction buttons — shown on hover for AI messages */}
-            {msg.role === 'assistant' && !isStreaming && (
-              <div className="absolute -bottom-8 left-0 flex items-center gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
-                <button
-                  onClick={() => setReaction(prev => prev === 'up' ? null : 'up')}
-                  className={`p-1 rounded ${isDark ? 'hover:bg-gray-700/50' : 'hover:bg-gray-100'} transition-colors ${reaction === 'up' ? 'text-green-400' : isDark ? 'text-gray-400' : 'text-gray-500'}`}
-                  aria-label={reaction === 'up' ? 'Remove thumbs up' : 'Thumbs up'}
-                  title={reaction === 'up' ? 'Remove' : 'Helpful'}
-                >
-                  <ThumbsUp className={`w-3.5 h-3.5 ${reaction === 'up' ? 'fill-current' : ''}`} />
-                </button>
-                <button
-                  onClick={() => setReaction(prev => prev === 'down' ? null : 'down')}
-                  className={`p-1 rounded ${isDark ? 'hover:bg-gray-700/50' : 'hover:bg-gray-100'} transition-colors ${reaction === 'down' ? 'text-red-400' : isDark ? 'text-gray-400' : 'text-gray-500'}`}
-                  aria-label={reaction === 'down' ? 'Remove thumbs down' : 'Thumbs down'}
-                  title={reaction === 'down' ? 'Remove' : 'Not helpful'}
-                >
-                  <ThumbsDown className={`w-3.5 h-3.5 ${reaction === 'down' ? 'fill-current' : ''}`} />
-                </button>
-                <button
-                  onClick={() => setIsBookmarked(prev => !prev)}
-                  className={`p-1 rounded ${isDark ? 'hover:bg-gray-700/50' : 'hover:bg-gray-100'} transition-colors ${isBookmarked ? 'text-amber-400' : isDark ? 'text-gray-400' : 'text-gray-500'}`}
-                  aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark message'}
-                  title={isBookmarked ? 'Remove bookmark' : 'Bookmark'}
-                >
-                  <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-current' : ''}`} />
-                </button>
-                {/* Label selector */}
-                <div className="relative">
-                  <button
-                    onClick={() => { setShowLabelMenu(prev => !prev); }}
-                    className={`p-1 rounded ${isDark ? 'hover:bg-gray-700/50' : 'hover:bg-gray-100'} transition-colors ${messageLabel ? 'text-amber-400' : isDark ? 'text-gray-400' : 'text-gray-500'}`}
-                    aria-label={messageLabel ? `Label: ${messageLabel}` : 'Add label'}
-                    title={messageLabel ? `Label: ${messageLabel}` : 'Label message'}
-                  >
-                    <Tag className={`w-3.5 h-3.5 ${messageLabel ? 'fill-current' : ''}`} />
-                  </button>
-                  {showLabelMenu && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setShowLabelMenu(false)}
-                        aria-hidden="true"
-                      />
-                      <div className={`absolute bottom-full left-0 mb-1 z-50 rounded-lg border shadow-xl py-1 min-w-[110px] ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-                        <button
-                          onClick={() => { setMessageLabel(null); setShowLabelMenu(false); }}
-                          className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${isDark ? 'text-gray-400 hover:bg-gray-700 hover:text-gray-200' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
-                        >
-                          No label
-                        </button>
-                        {LABEL_OPTIONS.map(opt => (
-                          <button
-                            key={opt.value!}
-                            onClick={() => { setMessageLabel(opt.value); setShowLabelMenu(false); }}
-                            className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 transition-colors ${isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} ${messageLabel === opt.value ? opt.textClass : isDark ? 'text-gray-300' : 'text-gray-700'}`}
-                          >
-                            <span className={`w-2 h-2 rounded-full ${opt.color.replace('text-', 'bg-')}`} aria-hidden="true" />
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-                <button
-                  onClick={() => {
-                    window.dispatchEvent(new CustomEvent('chat:quote', {
-                      detail: { id: msg.id, content: msg.content, role: msg.role },
-                    }));
-                  }}
-                  className={`p-1 rounded ${isDark ? 'hover:bg-gray-700/50' : 'hover:bg-gray-100'} transition-colors ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
-                  aria-label="Quote this message"
-                  title="Quote in reply"
-                >
-                  <Quote className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
           </div>
         )}
 
-        {/* Timestamp + TTS for AI messages */}
-        <span className={`text-xs px-1 text-gray-500`}>
-          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </span>
-        {msg.role === 'assistant' && hasContent && !isStreaming && (
-          <button
-            onClick={() => {
-              if (speaking) {
-                speechSynthesis.cancel();
-                setSpeaking(false);
-              } else {
-                const utterance = new SpeechSynthesisUtterance(displayContent.replace(/[#*_`~[\]]/g, ''));
-                utterance.rate = 1.1;
-                utterance.pitch = 1;
-                utterance.onend = () => setSpeaking(false);
-                utterance.onerror = () => setSpeaking(false);
-                speechSynthesis.cancel();
-                speechSynthesis.speak(utterance);
-                setSpeaking(true);
-              }
-            }}
-            className={`text-xs px-1 transition-colors text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400`}
-            aria-label={speaking ? 'Stop reading aloud' : 'Read aloud'}
-            title={speaking ? 'Stop' : 'Read aloud'}
-          >
-            {speaking ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
-          </button>
-        )}
+        {/* Timestamp + TTS + assistant actions */}
+        <div className="relative flex items-center gap-1 px-1">
+          <span className="text-xs text-gray-500">
+            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
+          {msg.role === 'assistant' && hasContent && !isStreaming && (
+            <>
+              <button
+                onClick={() => {
+                  if (speaking) {
+                    speechSynthesis.cancel();
+                    setSpeaking(false);
+                  } else {
+                    const utterance = new SpeechSynthesisUtterance(displayContent.replace(/[#*_`~[\]]/g, ''));
+                    utterance.rate = 1.1;
+                    utterance.pitch = 1;
+                    utterance.onend = () => setSpeaking(false);
+                    utterance.onerror = () => setSpeaking(false);
+                    speechSynthesis.cancel();
+                    speechSynthesis.speak(utterance);
+                    setSpeaking(true);
+                  }
+                }}
+                className="text-xs px-1 transition-colors text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400"
+                aria-label={speaking ? 'Stop reading aloud' : 'Read aloud'}
+                title={speaking ? 'Stop' : 'Read aloud'}
+              >
+                {speaking ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+              </button>
+              <button
+                onClick={() => setShowActionsMenu(prev => !prev)}
+                className="text-xs px-1 transition-colors text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400"
+                aria-label="More message actions"
+                title="More"
+              >
+                <MoreHorizontal className="w-3.5 h-3.5" />
+              </button>
+              {showActionsMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowActionsMenu(false)}
+                    aria-hidden="true"
+                  />
+                  <div className={`absolute bottom-full left-12 mb-1 z-50 rounded-lg border shadow-xl py-1 min-w-[150px] ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+                    <button
+                      onClick={() => { setIsBookmarked(prev => !prev); setShowActionsMenu(false); }}
+                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 transition-colors ${isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-current text-amber-400' : ''}`} />
+                      {isBookmarked ? 'Remove bookmark' : 'Bookmark'}
+                    </button>
+                    <div className={`px-3 pt-2 pb-1 text-[10px] uppercase tracking-wide ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Label</div>
+                    <button
+                      onClick={() => { setMessageLabel(null); setShowActionsMenu(false); }}
+                      className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${isDark ? 'text-gray-400 hover:bg-gray-700 hover:text-gray-200' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
+                    >
+                      No label
+                    </button>
+                    {LABEL_OPTIONS.map(opt => (
+                      <button
+                        key={opt.value!}
+                        onClick={() => { setMessageLabel(opt.value); setShowActionsMenu(false); }}
+                        className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 transition-colors ${isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} ${messageLabel === opt.value ? opt.textClass : isDark ? 'text-gray-300' : 'text-gray-700'}`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${opt.color.replace('text-', 'bg-')}`} aria-hidden="true" />
+                        {opt.label}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => {
+                        window.dispatchEvent(new CustomEvent('chat:quote', {
+                          detail: { id: msg.id, content: msg.content, role: msg.role },
+                        }));
+                        setShowActionsMenu(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 transition-colors ${isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      <Quote className="w-3.5 h-3.5" />
+                      Quote
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
