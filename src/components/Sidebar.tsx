@@ -264,19 +264,21 @@ export const Sidebar = memo(() => {
   return (
     <>
       {/* Mobile menu button */}
-      <button
-        onClick={toggleSidebar}
-        className={`fixed top-[calc(0.875rem+env(safe-area-inset-top,0px))] left-[calc(0.875rem+env(safe-area-inset-left,0px))] z-50 md:hidden p-3 backdrop-blur-xl border rounded-2xl shadow-lg transition-all duration-200 active:scale-95 ${
-          isDark
-            ? 'bg-gray-950/90 border-white/10 text-gray-200 hover:text-white hover:border-white/20 shadow-black/30'
-            : 'bg-white/95 border-gray-200 text-gray-700 hover:text-gray-950 hover:border-gray-300 shadow-gray-900/10'
-        }`}
-        aria-label={isOpen ? 'Close sidebar' : 'Open sidebar'}
-        aria-expanded={isOpen}
-        aria-controls="sidebar"
-      >
-        {isOpen ? <X className="w-5 h-5" aria-hidden="true" /> : <Menu className="w-5 h-5" aria-hidden="true" />}
-      </button>
+      {!isOpen && (
+        <button
+          onClick={toggleSidebar}
+          className={`fixed top-[calc(0.875rem+env(safe-area-inset-top,0px))] left-[calc(0.875rem+env(safe-area-inset-left,0px))] z-50 md:hidden w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-xl border shadow-sm transition-all duration-200 active:scale-95 ${
+            isDark
+              ? 'bg-gray-950/80 border-white/10 text-gray-300 hover:text-white hover:bg-gray-900/90'
+              : 'bg-white/90 border-gray-200 text-gray-700 hover:text-gray-950 hover:bg-white'
+          }`}
+          aria-label="Open sidebar"
+          aria-expanded={false}
+          aria-controls="sidebar"
+        >
+          <Menu className="w-5 h-5" aria-hidden="true" />
+        </button>
+      )}
 
       {/* Backdrop */}
       {isOpen && (
@@ -296,7 +298,7 @@ export const Sidebar = memo(() => {
         aria-label="Chat sidebar"
       >
         {/* Header */}
-        <div className={`p-4 sm:p-5 pt-[calc(4.25rem+env(safe-area-inset-top,0px))] md:pt-[calc(1rem+env(safe-area-inset-top,0px))] pl-[calc(1rem+env(safe-area-inset-left,0px))] border-b ${sidebarHeaderBorder}`}>
+        <div className={`p-4 sm:p-5 pt-[calc(1rem+env(safe-area-inset-top,0px))] pl-[calc(1rem+env(safe-area-inset-left,0px))] border-b ${sidebarHeaderBorder}`}>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20" aria-hidden="true">
               <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />

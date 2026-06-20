@@ -513,12 +513,27 @@ export const ChatWindow: React.FC = () => {
   // Show regenerate button briefly after a response completes
   const [showRegenerate, setShowRegenerate] = useState(false);
   const [chatCopied, setChatCopied] = useState(false);
+  const [showMobileChatMenu, setShowMobileChatMenu] = useState(false);
   const [chatSearchQuery, setChatSearchQuery] = useState<string>('');
   const [chatSearchIndex, setChatSearchIndex] = useState(0);
   const chatSearchInputRef = useRef<HTMLInputElement>(null);
 
   const isDark = settings.theme === 'dark';
   const chatTheme = settings.chatTheme;
+
+  useEffect(() => {
+    if (!showMobileChatMenu) return;
+    const close = () => setShowMobileChatMenu(false);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+    window.addEventListener('resize', close);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('resize', close);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [showMobileChatMenu]);
 
   const activeChat = useMemo(() =>
     chats.find(c => c.id === activeChatId),
@@ -795,14 +810,81 @@ export const ChatWindow: React.FC = () => {
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto py-4 sm:py-6 md:py-8 lg:py-10 px-3 sm:px-5 md:px-8 lg:px-12 scroll-touch"
+        className="flex-1 overflow-y-auto pt-16 pb-4 sm:pt-16 sm:pb-6 md:py-8 lg:py-10 px-3 sm:px-5 md:px-8 lg:px-12 scroll-touch"
         role="log"
         aria-live="polite"
         aria-label="Chat messages"
       >
+        {activeChat && activeChat.messages.length > 0 && (
+          <div className="fixed top-[calc(0.875rem+env(safe-area-inset-top,0px))] right-[calc(0.875rem+env(safe-area-inset-right,0px))] z-30 md:hidden">
+            <button
+              type="button"
+              onClick={() => setShowMobileChatMenu(prev => !prev)}
+              className={`w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-xl border shadow-sm transition-all active:scale-95 ${
+                isDark
+                  ? 'bg-gray-950/80 border-white/10 text-gray-300 hover:text-white hover:bg-gray-900/90'
+                  : 'bg-white/90 border-gray-200 text-gray-700 hover:text-gray-950 hover:bg-white'
+              }`}
+              aria-label="Chat actions"
+              aria-expanded={showMobileChatMenu}
+              aria-haspopup="menu"
+            >
+              <MoreHorizontal className="w-5 h-5" aria-hidden="true" />
+            </button>
+            {showMobileChatMenu && (
+              <>
+                <div
+                  className="fixed inset-0 z-30"
+                  onClick={() => setShowMobileChatMenu(false)}
+                  aria-hidden="true"
+                />
+                <div
+                  className={`absolute right-0 top-12 z-40 w-44 overflow-hidden rounded-2xl border shadow-2xl ${
+                    isDark ? 'bg-gray-950/95 border-white/10 shadow-black/40' : 'bg-white/95 border-gray-200 shadow-gray-900/15'
+                  }`}
+                  role="menu"
+                >
+                  <button
+                    type="button"
+                    onClick={() => { setShowMobileChatMenu(false); handleExportChat(); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors ${isDark ? 'text-gray-200 hover:bg-white/10' : 'text-gray-800 hover:bg-gray-100'}`}
+                    role="menuitem"
+                  >
+                    <Download className="w-4 h-4" aria-hidden="true" />
+                    Export
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowMobileChatMenu(false); handleCopyChat(); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors ${isDark ? 'text-gray-200 hover:bg-white/10' : 'text-gray-800 hover:bg-gray-100'}`}
+                    role="menuitem"
+                  >
+                    {chatCopied ? <Check className="w-4 h-4 text-green-500" aria-hidden="true" /> : <Copy className="w-4 h-4" aria-hidden="true" />}
+                    {chatCopied ? 'Copied' : 'Copy'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMobileChatMenu(false);
+                      if (window.confirm('Delete this chat? This cannot be undone.')) {
+                        deleteChat(activeChatId ?? '');
+                      }
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors ${isDark ? 'text-red-300 hover:bg-red-500/10' : 'text-red-600 hover:bg-red-50'}`}
+                    role="menuitem"
+                  >
+                    <Trash className="w-4 h-4" aria-hidden="true" />
+                    Delete
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Export button — only shown when chat has messages */}
         {activeChat && activeChat.messages.length > 0 && (
-          <div className="max-w-5xl mx-auto flex justify-end gap-2 mb-3 overflow-x-auto pb-1">
+          <div className="max-w-5xl mx-auto hidden md:flex justify-end gap-2 mb-3 overflow-x-auto pb-1">
             <button
               onClick={handleExportChat}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
