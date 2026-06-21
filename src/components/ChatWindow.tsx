@@ -895,7 +895,7 @@ export const ChatWindow: React.FC = () => {
         )}
 
         {modelsLoaded && availableModels.length > 1 && (
-          <div className="fixed top-6 right-8 z-30 hidden md:flex lg:right-12">
+          <div className="fixed top-6 left-[calc(20rem+1.5rem)] z-30 hidden md:flex lg:left-[calc(22rem+2rem)] xl:left-[calc(22rem+3rem)]">
             <label className={`min-w-0 w-[14rem] lg:w-[16rem] h-10 inline-flex items-center gap-2 px-3 rounded-xl border backdrop-blur-xl shadow-sm ${
               isDark
                 ? 'bg-gray-950/70 border-white/10 text-gray-200'
@@ -921,7 +921,7 @@ export const ChatWindow: React.FC = () => {
 
         {/* Export button — only shown when chat has messages */}
         {activeChat && activeChat.messages.length > 0 && (
-          <div className="max-w-5xl mx-auto hidden md:flex items-center justify-end gap-2 mb-3 overflow-x-auto pb-1">
+          <div className="fixed top-6 right-8 z-30 hidden md:flex items-center gap-2 lg:right-12">
             <button
               onClick={handleExportChat}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${

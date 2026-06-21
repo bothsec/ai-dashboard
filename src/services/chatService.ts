@@ -30,7 +30,7 @@ export class ChatService implements AIService {
             signal,
             body: JSON.stringify({
               messages: messages.map(({ role, content }) => ({ role, content })),
-              model: _settings.model,
+              model: _settings.model.api,
             }),
           });
 
