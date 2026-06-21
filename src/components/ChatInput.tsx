@@ -64,8 +64,10 @@ export const ChatInput = memo(() => {
   const [showContractAnalyzer, setShowContractAnalyzer] = useState(false);
   const [detectedCurrencies, setDetectedCurrencies] = useState<DetectedCurrency[]>([]);
   const { sendMessage, isStreaming, cancelStream, createNewChat, clearMessages, editLastMessage, lastSentMessage, error, retryLastMessage } = useChat();
-  const { settings, isFeatureEnabled } = useSettings();
+  const { settings, isFeatureEnabled, updateModel } = useSettings();
   const isDark = settings.theme === 'dark';
+  const [availableModels, setAvailableModels] = useState<Array<{ id: string; label: string; provider: string; enabled: boolean }>>([]);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -91,6 +93,33 @@ export const ChatInput = memo(() => {
       setDetectedCurrencies(detected);
     } catch { setDetectedCurrencies([]); }
   }, [input]);
+
+  // Load enabled models for user selector
+  useEffect(() => {
+    let cancelled = false;
+    const loadModels = async () => {
+      try {
+        const res = await fetch('/api/models');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json() as {
+          models?: Array<{ id: string; label: string; provider: string; enabled: boolean }>;
+          default?: string;
+        };
+        if (cancelled) return;
+        const models = data.models ?? [];
+        setAvailableModels(models);
+        if ((!settings.model.api || !models.some(m => m.id === settings.model.api)) && data.default) {
+          updateModel('api', data.default);
+        }
+      } catch {
+        if (!cancelled) setAvailableModels([]);
+      } finally {
+        if (!cancelled) setModelsLoaded(true);
+      }
+    };
+    void loadModels();
+    return () => { cancelled = true; };
+  }, [settings.model.api, updateModel]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -705,6 +734,26 @@ export const ChatInput = memo(() => {
                 ? <EyeOff className="w-3.5 h-3.5" />
                 : <Eye className="w-3.5 h-3.5" />}
             </button>
+          )}
+
+          {/* Model selector — shown when admin enabled multiple models */}
+          {modelsLoaded && availableModels.length > 1 && (
+            <label className={`shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-[10px] md:text-[11px] ${isDark ? 'bg-gray-800/80 border-gray-700 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-700'}`}>
+              <span className="font-medium">Model</span>
+              <select
+                value={settings.model.api || ''}
+                onChange={(e) => updateModel('api', e.target.value)}
+                className={`bg-transparent outline-none text-[10px] md:text-[11px] max-w-[170px] ${isDark ? 'text-gray-200' : 'text-gray-800'}`}
+                aria-label="Select AI model"
+                title="Select model"
+              >
+                {availableModels.map((model) => (
+                  <option key={model.id} value={model.id} className="text-gray-900">
+                    {model.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
 
           {/* Character / word count — visible when input has content */}

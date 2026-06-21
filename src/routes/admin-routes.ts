@@ -13,6 +13,7 @@ const DATA_DIR = join(process.cwd(), 'data');
 const USERS_FILE = join(DATA_DIR, 'users.json');
 const SESSIONS_FILE = join(DATA_DIR, 'sessions.json');
 const AUDIT_FILE = join(DATA_DIR, 'audit-log.json');
+const CONFIG_FILE = join(DATA_DIR, 'config.json');
 const AUDIT_MAX_ENTRIES = 500;
 
 interface User { id: number; name: string; email: string; password_hash: string; role: string; features: string; created_at: string; }
@@ -27,6 +28,26 @@ interface AuditEntry {
   target_email: string | null;
   details: string | null;
 }
+
+export interface ModelConfig {
+  id: string;       // e.g. "meta/llama-3.3-70b-instruct"
+  label: string;    // e.g. "Llama 3.3 70B"
+  provider: string; // e.g. "nvidia"
+  enabled: boolean;
+}
+
+interface ServerConfig {
+  models: ModelConfig[];
+}
+
+const DEFAULT_MODELS: ModelConfig[] = [
+  { id: 'meta/llama-3.3-70b-instruct', label: 'Llama 3.3 70B', provider: 'nvidia', enabled: true },
+  { id: 'nvidia/nemotron-3-super-120b-a12b', label: 'Nemotron 3 Super 120B', provider: 'nvidia', enabled: true },
+  { id: 'minimaxai/minimax-m2.7-8k', label: 'MiniMax M2.7', provider: 'nvidia', enabled: true },
+  { id: 'deepseek-ai/deepseek-llama-70b-instruct', label: 'DeepSeek Llama 70B', provider: 'nvidia', enabled: true },
+  { id: 'mistralai/mixtral-8x22b-instruct', label: 'Mixtral 8x22B', provider: 'nvidia', enabled: true },
+  { id: 'meta/llama-4-scout-17b-16e-instruct', label: 'Llama 4 Scout', provider: 'nvidia', enabled: true },
+];
 
 function readJson<T>(path: string, defaultVal: T): T {
   try {
@@ -56,6 +77,30 @@ function saveUsers(users: User[]) { writeJson(USERS_FILE, users); }
 function getSessions(): Session[] { return readJson<Session[]>(SESSIONS_FILE, []); }
 function saveSessions(sessions: Session[]) { writeJson(SESSIONS_FILE, sessions); }
 function getAuditLog(): AuditEntry[] { return readJson<AuditEntry[]>(AUDIT_FILE, []); }
+
+function getServerConfig(): ServerConfig {
+  return readJson<ServerConfig>(CONFIG_FILE, { models: DEFAULT_MODELS });
+}
+
+function saveServerConfig(cfg: ServerConfig) {
+  writeJson(CONFIG_FILE, cfg);
+}
+
+// Re-export so server.ts can read enabled model IDs without importing the whole router
+export function getEnabledModelIds(): string[] {
+  return getServerConfig().models.filter(m => m.enabled).map(m => m.id);
+}
+
+function getDefaultModel(): string {
+  // Return the first enabled model, or the NVIDIA_MODEL env var, or the default
+  const envModel = process.env.NVIDIA_MODEL;
+  const enabled = getEnabledModelIds();
+  if (envModel && enabled.includes(envModel)) return envModel;
+  return enabled[0] || 'meta/llama-3.3-70b-instruct';
+}
+
+// Expose default model getter so server.ts can call it after admin routes are registered
+export function getDefaultModelId(): string { return getDefaultModel(); }
 
 // Append a new audit entry. Caps log to AUDIT_MAX_ENTRIES newest-first.
 // Failures here must NEVER break the calling route — audit is best-effort
@@ -331,5 +376,42 @@ export function registerAdminRoutes(app: import('express').Application) {
     res.json({ entries });
   });
 
+  // --- Model Config (admin only) ---
+  // GET /api/admin/config/models → full model list with enabled status
+  admin.get('/config/models', (req, res) => {
+    const sid = getSessionCookie(req.headers.cookie);
+    if (!sid) { res.status(401).json({ error: { message: 'Not authenticated.' } }); return; }
+    const val = validateSession(sid);
+    if (!val || !val.user || val.user.role !== 'admin') { res.status(403).json({ error: { message: 'Forbidden.' } }); return; }
+    res.json({ models: getServerConfig().models });
+  });
+
+  // PUT /api/admin/config/models → replace full model list
+  admin.put('/config/models', (req, res) => {
+    const sid = getSessionCookie(req.headers.cookie);
+    if (!sid) { res.status(401).json({ error: { message: 'Not authenticated.' } }); return; }
+    const val = validateSession(sid);
+    if (!val || !val.user || val.user.role !== 'admin') { res.status(403).json({ error: { message: 'Forbidden.' } }); return; }
+    const { models } = req.body as { models?: ModelConfig[] };
+    if (!Array.isArray(models)) { res.status(400).json({ error: { message: 'models array required' } }); return; }
+    // Validate each entry has required fields
+    for (const m of models) {
+      if (!m.id || !m.label || !m.provider || typeof m.enabled !== 'boolean') {
+        res.status(400).json({ error: { message: 'Each model needs id, label, provider, and enabled' } }); return;
+      }
+    }
+    const cfg: ServerConfig = { models };
+    saveServerConfig(cfg);
+    recordAudit({ actor_id: val.userId, actor_email: val.user.email, action: 'user_updated', target_id: null, target_email: null, details: `models config updated (${models.length} models)` });
+    res.json({ models });
+  });
+
   app.use('/api/admin', admin);
+
+  // --- Public endpoints (no auth required) ---
+  // GET /api/models → list of enabled models (for user model selector)
+  app.get('/api/models', (_req, res) => {
+    const enabled = getServerConfig().models.filter(m => m.enabled);
+    res.json({ models: enabled, default: getDefaultModel() });
+  });
 }

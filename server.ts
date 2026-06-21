@@ -9,7 +9,7 @@ import rateLimit from 'express-rate-limit';
 import { summarizeUrl } from './src/services/urlSummarizer';
 import { parseDocument } from './src/services/documentParser';
 import { generateResumePDF } from './src/services/resumeGenerator';
-import { registerAdminRoutes } from './src/routes/admin-routes';
+import { registerAdminRoutes, getDefaultModelId, getEnabledModelIds } from './src/routes/admin-routes';
 dotenv.config({ override: true });
 
 const __filename = fileURLToPath(import.meta.url);
@@ -475,7 +475,7 @@ if (process.env.ANTHROPIC_API_KEY) {
 const MAX_MESSAGES = 200; // Cap array length to avoid quota abuse
 
 app.post('/api/chat', async (req, res) => {
-  const { messages } = req.body;
+  const { messages, model: clientModel } = req.body as { messages?: unknown; model?: string };
 
   // Validate input shape & length
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
@@ -527,7 +527,9 @@ app.post('/api/chat', async (req, res) => {
     return;
   }
 
-  const model = process.env.NVIDIA_MODEL || 'meta/llama-3.3-70b-instruct';
+  // Resolve effective model: client pick if allowed, else default
+  const allowed = getEnabledModelIds();
+  const effectiveModel = (clientModel && allowed.includes(clientModel)) ? clientModel : getDefaultModelId();
 
   // Bail early if misconfigured (no keys) — don't fall through to misleading 429
   if (nvidiaApiKeys.length === 0) {
@@ -599,7 +601,7 @@ app.post('/api/chat', async (req, res) => {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            model, // Set by server, not exposed to client
+            model: effectiveModel, // Set by server, validated against allowed list
             messages: finalMessages,
             stream: true,
           }),

@@ -56,6 +56,13 @@ interface AuditEntry {
   details: string | null;
 }
 
+interface ModelConfig {
+  id: string;
+  label: string;
+  provider: string;
+  enabled: boolean;
+}
+
 const ACTION_LABEL: Record<AuditEntry['action'], string> = {
   login_success: 'login',
   login_failure: 'login failed',
@@ -90,10 +97,13 @@ export const AdminDashboard = memo(function AdminDashboard({ onClose }: Props) {
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editFeatures, setEditFeatures] = useState<Record<string, boolean>>({});
-  const [view, setView] = useState<'users' | 'audit'>('users');
+  const [view, setView] = useState<'users' | 'audit' | 'models'>('users');
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState('');
+  const [modelConfigs, setModelConfigs] = useState<ModelConfig[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelsSaving, setModelsSaving] = useState(false);
 
   const t = (en: string, kh?: string) => (khLang && kh ? kh : en);
 
@@ -109,9 +119,24 @@ export const AdminDashboard = memo(function AdminDashboard({ onClose }: Props) {
     finally { setAuditLoading(false); }
   }, []);
 
+  const fetchModels = useCallback(async () => {
+    setModelsLoading(true);
+    try {
+      const r = await fetch('/api/admin/config/models', { credentials: 'include' });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error?.message || `HTTP ${r.status}`);
+      const data = await r.json() as { models: ModelConfig[] };
+      setModelConfigs(data.models || []);
+    } catch (e: unknown) {
+      setError((e as Error).message);
+    } finally {
+      setModelsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (view === 'audit' && user) { void fetchAudit(); }
-  }, [view, user, fetchAudit]);
+    if (view === 'models' && user) { void fetchModels(); }
+  }, [view, user, fetchAudit, fetchModels]);
 
   const formatTs = (iso: string) => {
     try {
@@ -214,6 +239,41 @@ export const AdminDashboard = memo(function AdminDashboard({ onClose }: Props) {
     } catch (e: unknown) { setError((e as Error).message); }
   };
 
+  const updateModelConfig = (index: number, patch: Partial<ModelConfig>) => {
+    setModelConfigs(prev => prev.map((m, i) => i === index ? { ...m, ...patch } : m));
+  };
+
+  const addModelConfig = () => {
+    setModelConfigs(prev => [...prev, { id: '', label: '', provider: 'nvidia', enabled: true }]);
+  };
+
+  const removeModelConfig = (index: number) => {
+    setModelConfigs(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const saveModels = async () => {
+    setModelsSaving(true);
+    setError('');
+    try {
+      const cleaned = modelConfigs
+        .map(m => ({ ...m, id: m.id.trim(), label: m.label.trim(), provider: m.provider.trim() || 'nvidia' }))
+        .filter(m => m.id && m.label && m.provider);
+      const r = await fetch('/api/admin/config/models', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ models: cleaned }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error?.message || `HTTP ${r.status}`);
+      const data = await r.json() as { models: ModelConfig[] };
+      setModelConfigs(data.models || []);
+    } catch (e: unknown) {
+      setError((e as Error).message);
+    } finally {
+      setModelsSaving(false);
+    }
+  };
+
   const panelClass = 'bg-gray-900 border border-gray-700/50 text-gray-200';
   const inputClass = 'bg-gray-800 border-gray-700 text-gray-200 focus:border-indigo-500 focus:outline-none';
   const borderClass = 'border-gray-700/50';
@@ -295,6 +355,10 @@ export const AdminDashboard = memo(function AdminDashboard({ onClose }: Props) {
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${view === 'audit' ? 'bg-gray-700 text-gray-100' : 'text-gray-400 hover:text-gray-200'}`}>
                 <Clock className="w-3.5 h-3.5" />Audit Log
               </button>
+              <button onClick={() => setView('models')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${view === 'models' ? 'bg-gray-700 text-gray-100' : 'text-gray-400 hover:text-gray-200'}`}>
+                <Shield className="w-3.5 h-3.5" />Models
+              </button>
             </div>
           </div>
           {view === 'users' && (
@@ -308,6 +372,18 @@ export const AdminDashboard = memo(function AdminDashboard({ onClose }: Props) {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors font-medium">
               Refresh
             </button>
+          )}
+          {view === 'models' && (
+            <div className="flex items-center gap-2">
+              <button onClick={addModelConfig}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-gray-300 hover:text-white hover:bg-gray-800 transition-colors font-medium">
+                <UserPlus className="w-3.5 h-3.5" />Add Model
+              </button>
+              <button onClick={() => { void saveModels(); }} disabled={modelsSaving}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-indigo-600 text-white hover:bg-indigo-500 transition-colors font-medium disabled:opacity-60">
+                {modelsSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}Save Models
+              </button>
+            </div>
           )}
         </div>
 
@@ -396,6 +472,65 @@ export const AdminDashboard = memo(function AdminDashboard({ onClose }: Props) {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {view === 'models' && (
+            <div className="p-6 space-y-4">
+              <div className="rounded-xl border border-gray-700/50 bg-gray-800/30 p-4 text-xs text-gray-400">
+                Configure which models users can select on the website. Only enabled models appear in the chat dropdown.
+              </div>
+              {modelsLoading ? (
+                <div className="flex items-center justify-center py-12 text-gray-500 text-xs">
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin text-indigo-400" />Loading models…
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {modelConfigs.map((model, index) => (
+                    <div key={`${model.id || 'new'}-${index}`} className="rounded-xl border border-gray-700/50 bg-gray-800/30 p-4">
+                      <div className="grid grid-cols-1 md:grid-cols-[1.7fr_1fr_120px_auto] gap-3 items-center">
+                        <input
+                          type="text"
+                          placeholder="Model ID (meta/llama-3.3-70b-instruct)"
+                          value={model.id}
+                          onChange={(e) => updateModelConfig(index, { id: e.target.value })}
+                          className={`px-3 py-2 rounded-lg text-sm border ${inputClass}`}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Label"
+                          value={model.label}
+                          onChange={(e) => updateModelConfig(index, { label: e.target.value })}
+                          className={`px-3 py-2 rounded-lg text-sm border ${inputClass}`}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Provider"
+                          value={model.provider}
+                          onChange={(e) => updateModelConfig(index, { provider: e.target.value })}
+                          className={`px-3 py-2 rounded-lg text-sm border ${inputClass}`}
+                        />
+                        <div className="flex items-center justify-end gap-2">
+                          <label className="inline-flex items-center gap-2 text-xs text-gray-300 whitespace-nowrap">
+                            <input
+                              type="checkbox"
+                              checked={model.enabled}
+                              onChange={(e) => updateModelConfig(index, { enabled: e.target.checked })}
+                            />
+                            Enabled
+                          </label>
+                          <button onClick={() => removeModelConfig(index)} className="p-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors" title="Remove model">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {modelConfigs.length === 0 && (
+                    <div className="text-xs text-gray-500">No models configured yet. Click Add Model.</div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
