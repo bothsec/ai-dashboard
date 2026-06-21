@@ -310,7 +310,7 @@ export const Sidebar = memo(() => {
             <Menu className="w-5 h-5" aria-hidden="true" />
           </button>
           {modelsLoaded && availableModels.length > 1 && (
-            <label className={`min-w-0 h-11 max-w-[min(16rem,calc(100vw-5.75rem))] inline-flex items-center gap-2 px-3 rounded-full border backdrop-blur-xl shadow-sm ${
+            <label className={`min-w-0 h-11 w-[7.5rem] inline-flex items-center gap-2 px-3 rounded-full border backdrop-blur-xl shadow-sm ${
               isDark
                 ? 'bg-gray-950/80 border-white/10 text-gray-200'
                 : 'bg-white/90 border-gray-200 text-gray-800'
@@ -319,13 +319,13 @@ export const Sidebar = memo(() => {
               <select
                 value={settings.model.api || ''}
                 onChange={(e) => updateModel('api', e.target.value)}
-                className={`min-w-0 flex-1 bg-transparent outline-none text-xs pr-2 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}
+                className={`min-w-0 w-full flex-1 bg-transparent outline-none text-xs pr-4 truncate ${isDark ? 'text-gray-100' : 'text-gray-900'}`}
                 aria-label="Select AI model"
                 title="Select AI model"
               >
                 {availableModels.map((model) => (
                   <option key={model.id} value={model.id} className="text-gray-900">
-                    {model.label}
+                    {(model.label || model.id).split(' ').slice(0, 2).join(' ')}
                   </option>
                 ))}
               </select>
