@@ -506,14 +506,16 @@ const MessageSkeleton = memo(() => {
 
 export const ChatWindow: React.FC = () => {
   const { chats, activeChatId, isStreaming, error, streamingMessageId, streamingContent, sendMessage, dismissError, lastSentMessage, deleteChat, continueResponse } = useChat();
-  const { settings, isFeatureEnabled } = useSettings();
+  const { settings, isFeatureEnabled, updateModel } = useSettings();
   const scrollRef = useRef<HTMLDivElement>(null);
   const emptyStateRef = useRef<HTMLDivElement>(null);
   const [isPinned, setIsPinned] = useState(true);
   const [chatCopied, setChatCopied] = useState(false);
   const [showMobileChatMenu, setShowMobileChatMenu] = useState(false);
-  const [chatSearchQuery, setChatSearchQuery] = useState<string>('');
+  const [chatSearchQuery, setChatSearchQuery] = useState('');
   const [chatSearchIndex, setChatSearchIndex] = useState(0);
+  const [availableModels, setAvailableModels] = useState<Array<{ id: string; label: string; provider: string; enabled: boolean }>>([]);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
   const chatSearchInputRef = useRef<HTMLInputElement>(null);
 
   const isDark = settings.theme === 'dark';
@@ -532,6 +534,32 @@ export const ChatWindow: React.FC = () => {
       document.removeEventListener('keydown', onKeyDown);
     };
   }, [showMobileChatMenu]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadModels = async () => {
+      try {
+        const res = await fetch('/api/models');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json() as {
+          models?: Array<{ id: string; label: string; provider: string; enabled: boolean }>;
+          default?: string;
+        };
+        if (cancelled) return;
+        const models = data.models ?? [];
+        setAvailableModels(models);
+        if ((!settings.model.api || !models.some(m => m.id === settings.model.api)) && data.default) {
+          updateModel('api', data.default);
+        }
+      } catch {
+        if (!cancelled) setAvailableModels([]);
+      } finally {
+        if (!cancelled) setModelsLoaded(true);
+      }
+    };
+    void loadModels();
+    return () => { cancelled = true; };
+  }, [settings.model.api, updateModel]);
 
   const activeChat = useMemo(() =>
     chats.find(c => c.id === activeChatId),
@@ -866,9 +894,34 @@ export const ChatWindow: React.FC = () => {
           </div>
         )}
 
+        {modelsLoaded && availableModels.length > 1 && (
+          <div className="fixed top-6 right-8 z-30 hidden md:flex lg:right-12">
+            <label className={`min-w-0 w-[14rem] lg:w-[16rem] h-10 inline-flex items-center gap-2 px-3 rounded-xl border backdrop-blur-xl shadow-sm ${
+              isDark
+                ? 'bg-gray-950/70 border-white/10 text-gray-200'
+                : 'bg-white/85 border-gray-200 text-gray-800'
+            }`}>
+              <Sparkles className={`w-3.5 h-3.5 shrink-0 ${isDark ? 'text-indigo-300' : 'text-indigo-500'}`} aria-hidden="true" />
+              <select
+                value={settings.model.api || ''}
+                onChange={(e) => updateModel('api', e.target.value)}
+                className={`min-w-0 w-full flex-1 bg-transparent outline-none text-xs pr-3 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}
+                aria-label="Select AI model"
+                title="Select AI model"
+              >
+                {availableModels.map((model) => (
+                  <option key={model.id} value={model.id} className="text-gray-900">
+                    {model.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
+
         {/* Export button — only shown when chat has messages */}
         {activeChat && activeChat.messages.length > 0 && (
-          <div className="max-w-5xl mx-auto hidden md:flex justify-end gap-2 mb-3 overflow-x-auto pb-1">
+          <div className="max-w-5xl mx-auto hidden md:flex items-center justify-end gap-2 mb-3 overflow-x-auto pb-1">
             <button
               onClick={handleExportChat}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
