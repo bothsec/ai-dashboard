@@ -28,9 +28,11 @@ const formatTime = (timestamp: number) => {
 };
 
 export const Sidebar = memo(() => {
-  const { settings, khLang, toggleKhLang, isFeatureEnabled } = useSettings();
+  const { settings, khLang, toggleKhLang, isFeatureEnabled, updateModel } = useSettings();
   const { chats, activeChatId, createNewChat, switchChat, deleteChat, togglePinChat, renameChat } = useChat();
   const [isOpen, setIsOpen] = useState(false);
+  const [availableModels, setAvailableModels] = useState<Array<{ id: string; label: string; provider: string; enabled: boolean }>>([]);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showThemesModal, setShowThemesModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
@@ -55,6 +57,33 @@ export const Sidebar = memo(() => {
     document.addEventListener('keydown', escHandler);
     return () => { document.removeEventListener('mousedown', handler); document.removeEventListener('keydown', escHandler); };
   }, [showToolsMenu]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadModels = async () => {
+      try {
+        const res = await fetch('/api/models');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json() as {
+          models?: Array<{ id: string; label: string; provider: string; enabled: boolean }>;
+          default?: string;
+        };
+        if (cancelled) return;
+        const models = data.models ?? [];
+        setAvailableModels(models);
+        if ((!settings.model.api || !models.some(m => m.id === settings.model.api)) && data.default) {
+          updateModel('api', data.default);
+        }
+      } catch {
+        if (!cancelled) setAvailableModels([]);
+      } finally {
+        if (!cancelled) setModelsLoaded(true);
+      }
+    };
+    void loadModels();
+    return () => { cancelled = true; };
+  }, [settings.model.api, updateModel]);
+
   const [renamingChatId, setRenamingChatId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
 
@@ -266,19 +295,43 @@ export const Sidebar = memo(() => {
     <>
       {/* Mobile menu button */}
       {!isOpen && (
-        <button
-          onClick={toggleSidebar}
-          className={`fixed top-[calc(0.875rem+env(safe-area-inset-top,0px))] left-[calc(0.875rem+env(safe-area-inset-left,0px))] z-50 md:hidden w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-xl border shadow-sm transition-all duration-200 active:scale-95 ${
-            isDark
-              ? 'bg-gray-950/80 border-white/10 text-gray-300 hover:text-white hover:bg-gray-900/90'
-              : 'bg-white/90 border-gray-200 text-gray-700 hover:text-gray-950 hover:bg-white'
-          }`}
-          aria-label="Open sidebar"
-          aria-expanded={false}
-          aria-controls="sidebar"
-        >
-          <Menu className="w-5 h-5" aria-hidden="true" />
-        </button>
+        <div className="fixed top-[calc(0.875rem+env(safe-area-inset-top,0px))] left-[calc(0.875rem+env(safe-area-inset-left,0px))] z-50 md:hidden flex items-center gap-2 max-w-[calc(100vw-1.75rem-env(safe-area-inset-left,0px)-env(safe-area-inset-right,0px))]">
+          <button
+            onClick={toggleSidebar}
+            className={`w-11 h-11 rounded-full shrink-0 flex items-center justify-center backdrop-blur-xl border shadow-sm transition-all duration-200 active:scale-95 ${
+              isDark
+                ? 'bg-gray-950/80 border-white/10 text-gray-300 hover:text-white hover:bg-gray-900/90'
+                : 'bg-white/90 border-gray-200 text-gray-700 hover:text-gray-950 hover:bg-white'
+            }`}
+            aria-label="Open sidebar"
+            aria-expanded={false}
+            aria-controls="sidebar"
+          >
+            <Menu className="w-5 h-5" aria-hidden="true" />
+          </button>
+          {modelsLoaded && availableModels.length > 1 && (
+            <label className={`min-w-0 h-11 max-w-[min(16rem,calc(100vw-5.75rem))] inline-flex items-center gap-2 px-3 rounded-full border backdrop-blur-xl shadow-sm ${
+              isDark
+                ? 'bg-gray-950/80 border-white/10 text-gray-200'
+                : 'bg-white/90 border-gray-200 text-gray-800'
+            }`}>
+              <Sparkles className={`w-3.5 h-3.5 shrink-0 ${isDark ? 'text-indigo-300' : 'text-indigo-500'}`} aria-hidden="true" />
+              <select
+                value={settings.model.api || ''}
+                onChange={(e) => updateModel('api', e.target.value)}
+                className={`min-w-0 flex-1 bg-transparent outline-none text-xs pr-2 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}
+                aria-label="Select AI model"
+                title="Select AI model"
+              >
+                {availableModels.map((model) => (
+                  <option key={model.id} value={model.id} className="text-gray-900">
+                    {model.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
       )}
 
       {/* Backdrop */}
