@@ -595,21 +595,26 @@ app.post('/api/chat', async (req, res) => {
         ? [systemMessage, ...userMessages]
         : userMessages;
 
-      let response: Response;
-      try {
-        response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            model: effectiveModel, // Set by server, validated against allowed list
-            messages: finalMessages,
-            stream: true,
-          }),
-          signal: controller.signal,
-        });
-      } finally {
-        clearTimeout(timeout);
-      }
+      const requestModel = async (modelId: string) => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
+        try {
+          return await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              model: modelId,
+              messages: finalMessages,
+              stream: true,
+            }),
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeout);
+        }
+      };
+
+      let response = await requestModel(effectiveModel);
 
       // Track per-key usage
       if (keyRateLimitStore.has(apiKey)) {
@@ -621,6 +626,10 @@ app.post('/api/chat', async (req, res) => {
       if (response.status === 429) {
         // Upstream rate-limited this request; rotate silently.
         continue;
+      }
+
+      if ((response.status === 400 || response.status === 404) && effectiveModel !== getDefaultModelId()) {
+        response = await requestModel(getDefaultModelId());
       }
 
       if (!response.ok) {
