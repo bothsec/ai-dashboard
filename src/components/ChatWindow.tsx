@@ -272,6 +272,8 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                       const langMatch = langClass.match(/language-(\w+)/);
                       const lang = langMatch ? langMatch[1] : '';
                       const codeText = codeEl?.props?.children ?? '';
+                      const btnRef = useRef<HTMLButtonElement>(null);
+                      const [copied, setCopied] = useState(false);
                       return (
                         <pre className={`relative rounded-xl p-4 mb-4 overflow-x-auto text-sm border leading-relaxed group/pre ${isDark ? 'bg-gray-900/90 border-gray-700/40' : 'bg-gray-100 border-gray-200'}`}>
                           {lang && (
@@ -281,15 +283,15 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                           )}
                           {children}
                           <button
+                            ref={btnRef}
                             onClick={() => {
+                              const pre = btnRef.current?.closest('pre');
                               navigator.clipboard.writeText(typeof codeText === 'string' ? codeText : String(codeText)).then(() => {
-                                const btn = window.event?.target as HTMLElement;
-                                const pre = btn?.closest('pre');
                                 if (pre) pre.setAttribute('data-copied', 'true');
+                                setCopied(true);
                                 setTimeout(() => {
-                                  const btn2 = window.event?.target as HTMLElement;
-                                  const pre2 = btn2?.closest('pre');
-                                  if (pre2) pre2.removeAttribute('data-copied');
+                                  if (pre) pre.removeAttribute('data-copied');
+                                  setCopied(false);
                                 }, 2000);
                               });
                             }}
@@ -297,7 +299,7 @@ const MessageItem = memo(({ msg, isStreaming, isLast, streamingContent, chatThem
                             aria-label="Copy code"
                             title="Copy code"
                           >
-                            {((window.event?.target as HTMLElement)?.closest('pre')?.getAttribute('data-copied') === 'true')
+                            {copied
                               ? <Check className="w-3.5 h-3.5" />
                               : <Copy className="w-3.5 h-3.5" />}
                           </button>

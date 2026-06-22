@@ -42,8 +42,10 @@ export class ChatService implements AIService {
 
           await parseSSEStream(response, callbacks, {
             extractContent: (data: unknown) => {
-              const d = data as { choices?: Array<{ delta?: { content?: string } }> };
-              return d.choices?.[0]?.delta?.content || '';
+              // Support both standard content and NVExt reasoning_content (minimax/flash model)
+              const d = data as { choices?: Array<{ delta?: { content?: string; reasoning_content?: string } }> };
+              const delta = d.choices?.[0]?.delta;
+              return (delta?.content || '') + (delta?.reasoning_content || '');
             },
             signal,
           });
