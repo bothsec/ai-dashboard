@@ -43,7 +43,7 @@ export async function withRetry<T>(
     onRetry,
   } = options;
 
-  let lastError: Error;
+  let lastError: Error | undefined = undefined;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -65,5 +65,5 @@ export async function withRetry<T>(
     }
   }
 
-  throw lastError!;
+  throw lastError!;  // lastError is always set when the loop exits normally
 }

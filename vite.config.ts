@@ -32,6 +32,7 @@ return {
   server: {
     host: '0.0.0.0',
     port: 8080,
+    allowedHosts: ['ai.khmerjob.tech', 'ai.khmerjob.tech.'],
     proxy: {
       '/api/auth/me':         proxyBackend(),
       '/api/chat':            proxyBackend(),

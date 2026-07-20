@@ -9,7 +9,8 @@ import rateLimit from 'express-rate-limit';
 import { summarizeUrl } from './src/services/urlSummarizer';
 import { parseDocument } from './src/services/documentParser';
 import { generateResumePDF } from './src/services/resumeGenerator';
-import { registerAdminRoutes, getDefaultModelId, getEnabledModelIds } from './src/routes/admin-routes';
+import { registerAdminRoutes, getDefaultModelId } from './src/routes/admin-routes';
+import { getLiteLLMBackendConfig } from './src/services/litellmBackend';
 dotenv.config({ override: true });
 
 const __filename = fileURLToPath(import.meta.url);
@@ -39,25 +40,22 @@ const KEY_RATE_LIMIT_WINDOW = 60000; // 1 minute window
 const KEY_RATE_LIMIT_MAX = 10; // NVIDIA limit per key per minute
 
 const app = express();
+app.set('trust proxy', 1); // Trust Caddy proxy for X-Forwarded-For / client IP
 
-// Security headers — CSP set explicitly via HTTP header (not meta tag) to support nonce
 app.use(helmet({
-  contentSecurityPolicy: {
-    useDefaults: false,
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"], // 'unsafe-inline' required for React SPA
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'", 'https://integrate.api.nvidia.com'],
-      frameAncestors: ["'none'"],
-      upgradeInsecureRequests: [],
-    },
-  },
-  frameguard: { action: 'deny' },
-  xContentTypeOptions: true,
-  referrerPolicy: { policy: 'same-origin' }, // strictest — no referrer leaks
+  contentSecurityPolicy: false,
+  frameguard: false,
+  xContentTypeOptions: false,
+  referrerPolicy: false,
+  hsts: false,
 }));
+
+// Remove X-XSS-Protection from Express — Caddy sets it correctly at the edge.
+// Not removing it causes duplicate headers (Caddy: 1; mode=block + Express: 0).
+app.use((_req, res, next) => {
+  res.removeHeader('X-XSS-Protection');
+  next();
+});
 
 // --- Auth: bearer token validation ---
 const AUTH_SECRET = process.env.AUTH_SECRET_TOKEN;
@@ -96,8 +94,37 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
 }
 
 // --- Auth routes (must be defined BEFORE the auth middleware) ---
+function getClientIp(req: express.Request): string {
+  let clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+  if (TRUSTED_PROXIES.includes(clientIp) && req.headers['x-forwarded-for']) {
+    const forwarded = (req.headers['x-forwarded-for'] as string).split(',')[0].trim();
+    if (forwarded) clientIp = forwarded;
+  }
+  return clientIp;
+}
+
+function enforceLoginPreflight(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  const clientIp = getClientIp(req);
+  const rateLimit = checkLoginRateLimit(clientIp);
+  if (!rateLimit.allowed) {
+    res.setHeader('Retry-After', rateLimit.retryAfter || 60);
+    res.status(429).json({ error: { message: `Too many login attempts. Please wait ${rateLimit.retryAfter} seconds.`, type: 'rate_limit_exceeded' } });
+    return;
+  }
+
+  // Reject non-JSON content types before the JSON parser runs, so raw SQL probes
+  // like `' OR 1=1--` are handled cleanly and do not produce parser error logs.
+  const ct = req.headers['content-type'] || '';
+  if (!ct.includes('application/json')) {
+    res.status(415).json({ error: { message: 'Content-Type must be application/json', type: 'unsupported_media_type' } });
+    return;
+  }
+
+  next();
+}
+
 // POST /api/auth/login  { username, password }  →  Set-Cookie + { ok: true }
-app.post('/api/auth/login', express.json(), (req, res) => {
+app.post('/api/auth/login', enforceLoginPreflight, express.json({ limit: '10kb' }), (req, res) => {
   if (!AUTH_SECRET) {
     res.json({ ok: true, authEnabled: false });
     return;
@@ -121,6 +148,14 @@ app.post('/api/auth/login', express.json(), (req, res) => {
   res.setHeader('Set-Cookie',
     `${AUTH_COOKIE_NAME}=${AUTH_SECRET}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${AUTH_COOKIE_MAXAGE}${cookieDomain}${mainSecure}`);
   res.json({ ok: true, authEnabled: true });
+});
+
+app.use((err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (req.path === '/api/auth/login' && err instanceof SyntaxError) {
+    res.status(400).json({ error: { message: 'Invalid JSON body', type: 'invalid_json' } });
+    return;
+  }
+  next(err);
 });
 
 // GET /api/auth/status → { authRequired: boolean } (unauthenticated)
@@ -161,7 +196,9 @@ app.post('/api/resume', express.json({ limit: '1mb' }), async (req, res) => {
   try {
     const pdfBytes = await generateResumePDF({ name, email, phone, linkedin, summary, experience, skills, education, template: template as 'modern' | 'classic' });
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${name.replace(/\s+/g, '_')}_Resume.pdf"`);
+    // Sanitize filename: strip path traversal and control chars
+    const safeName = name.replace(/[^a-zA-Z0-9_\u1780-\u17FF\u19E0-\u19FF\s.,-]/g, '').replace(/\s+/g, '_').slice(0, 100);
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}_Resume.pdf"`);
     res.setHeader('Content-Length', pdfBytes.length);
     res.status(200).send(Buffer.from(pdfBytes));
   } catch (err) {
@@ -193,10 +230,10 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 app.use(cors({
   origin: (origin, callback) => {
     // Allow:
-    //  - null origin (stealth/sandbox browsers, file:// pages)
     //  - no origin header (native same-origin fetch)
     //  - any allowlisted origin
-    if (!origin || origin === 'null' || allowedOrigins.includes(origin)) {
+    // Note: 'null' (file:// pages) is deliberately rejected — no legitimate need for that
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(null, false);
@@ -221,6 +258,9 @@ app.use(expressFileUpload({
 
 // Rate limit tracking (simple in-memory, use Redis for production)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+const loginRateLimitStore = new Map<string, { count: number; resetTime: number }>();
+const LOGIN_RATE_LIMIT_WINDOW = 60000; // 1 minute
+const LOGIN_RATE_LIMIT_MAX = 5; // 5 attempts per minute per IP
 const RATE_LIMIT_WINDOW = 60000; // 1 minute window
 
 // Periodic cleanup to prevent memory growth from expired entries
@@ -231,6 +271,9 @@ setInterval(() => {
   }
   for (const [k, v] of keyRateLimitStore.entries()) {
     if (now > v.resetTime) keyRateLimitStore.delete(k);
+  }
+  for (const [k, v] of loginRateLimitStore.entries()) {
+    if (now > v.resetTime) loginRateLimitStore.delete(k);
   }
 }, RATE_LIMIT_WINDOW);
 
@@ -243,11 +286,7 @@ function checkRateLimit(provider: string, ip: string): { allowed: boolean; retry
   const key = `${ip}:${provider}`;
   const record = rateLimitStore.get(key);
 
-  // Clean up expired entries to prevent memory growth
-  for (const [k, v] of rateLimitStore.entries()) {
-    if (now > v.resetTime) rateLimitStore.delete(k);
-  }
-
+  // If no record or window expired, start fresh
   if (!record || now > record.resetTime) {
     rateLimitStore.set(key, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
     return { allowed: true };
@@ -267,6 +306,26 @@ function checkRateLimit(provider: string, ip: string): { allowed: boolean; retry
   }
 
   record.count++;
+  return { allowed: true };
+}
+
+function checkLoginRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
+  const now = Date.now();
+  const key = `login:${ip}`;
+  const entry = loginRateLimitStore.get(key);
+
+  if (!entry || now > entry.resetTime) {
+    loginRateLimitStore.set(key, { count: 1, resetTime: now + LOGIN_RATE_LIMIT_WINDOW });
+    return { allowed: true };
+  }
+
+  entry.count++;
+
+  if (entry.count > LOGIN_RATE_LIMIT_MAX) {
+    const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
+    return { allowed: false, retryAfter };
+  }
+
   return { allowed: true };
 }
 
@@ -316,7 +375,7 @@ function createProxyWithRetry(
       // Check rate limit
       const rateLimit = checkRateLimit(provider, clientIp);
       if (!rateLimit.allowed) {
-        console.log(`[${provider}] Rate limited. Retry after ${rateLimit.retryAfter}s`);
+        console.warn(`[${provider}] Rate limited. Retry after ${rateLimit.retryAfter}s`);
         res.setHeader('Retry-After', rateLimit.retryAfter || 60);
         res.setHeader('X-RateLimit-Reset', rateLimit.retryAfter ? Date.now() + rateLimit.retryAfter * 1000 : Date.now() + 60000);
         res.status(429).json({
@@ -332,43 +391,55 @@ function createProxyWithRetry(
       let retries = 0;
       let lastError: Error | null = null;
 
+      const PROXY_TIMEOUT = 30_000; // 30s per upstream request — prevents slow-loris
+
       while (retries < MAX_RETRIES) {
         try {
+          // Per-attempt timeout to prevent hanging connections
+          const ac = new AbortController();
+          const timeout = setTimeout(() => ac.abort(), PROXY_TIMEOUT);
+
           // Build headers - convert express headers to fetch Headers
           const headers = new Headers();
           headers.set('Content-Type', 'application/json');
           headers.set('Accept', 'text/event-stream');
-        
-        // Add API key if provided
-        if (apiKeyHeader && apiKey) {
-          // For Authorization headers, format as "Bearer <token>"
-          if (apiKeyHeader.toLowerCase() === 'authorization') {
-            headers.set(apiKeyHeader, `Bearer ${apiKey}`);
-          } else {
-            headers.set(apiKeyHeader, apiKey);
-          }
-        }
-        
-        // Copy relevant headers from original request
-        const skipHeaders = ['host', 'content-length', 'content-type', 'accept', 'connection'];
-        for (const [key, value] of Object.entries(req.headers)) {
-          if (!skipHeaders.includes(key.toLowerCase()) && value) {
-            if (Array.isArray(value)) {
-              value.forEach(v => headers.append(key, v));
+
+          // Add API key if provided
+          if (apiKeyHeader && apiKey) {
+            // For Authorization headers, format as "Bearer <token>"
+            if (apiKeyHeader.toLowerCase() === 'authorization') {
+              headers.set(apiKeyHeader, `Bearer ${apiKey}`);
             } else {
-              headers.set(key, value);
+              headers.set(apiKeyHeader, apiKey);
             }
           }
-        }
 
-        // Make the actual proxy request
-        const response = await fetch(`${target}${req.url}`, {
-          method: req.method,
-          headers,
-          body: req.method === 'POST' || req.method === 'PUT' 
-            ? JSON.stringify(req.body) 
-            : undefined,
-        });
+          // Copy relevant headers from original request
+          const skipHeaders = ['host', 'content-length', 'content-type', 'accept', 'connection'];
+          for (const [key, value] of Object.entries(req.headers)) {
+            if (!skipHeaders.includes(key.toLowerCase()) && value) {
+              if (Array.isArray(value)) {
+                value.forEach(v => headers.append(key, v));
+              } else {
+                headers.set(key, value);
+              }
+            }
+          }
+
+          // Make the actual proxy request
+          let response: Response;
+          try {
+            response = await fetch(`${target}${req.url}`, {
+              method: req.method,
+              headers,
+              body: req.method === 'POST' || req.method === 'PUT'
+                ? JSON.stringify(req.body)
+                : undefined,
+              signal: ac.signal,
+            });
+          } finally {
+            clearTimeout(timeout);
+          }
 
         // Handle rate limiting from provider (429)
         if (response.status === 429) {
@@ -376,7 +447,7 @@ function createProxyWithRetry(
           if (retries < MAX_RETRIES) {
             const retryAfter = parseInt(response.headers.get('retry-after') || '1', 10);
             const delay = Math.min(retryAfter * 1000, BASE_RETRY_DELAY * Math.pow(2, retries));
-            console.log(`[${provider}] Rate limited by provider (429). Retry ${retries}/${MAX_RETRIES} in ${delay}ms`);
+            console.warn(`[${provider}] Rate limited by provider (429). Retry ${retries}/${MAX_RETRIES} in ${delay}ms`);
             await sleep(delay);
             continue;
           }
@@ -471,11 +542,11 @@ if (process.env.ANTHROPIC_API_KEY) {
   if (anthropicProxy) app.use('/api/proxy/anthropic', anthropicProxy);
 }
 
-// --- NVIDIA Chat Proxy with Key Rotation ---
+// --- Website Chat via local LiteLLM proxy ---
 const MAX_MESSAGES = 200; // Cap array length to avoid quota abuse
 
 app.post('/api/chat', async (req, res) => {
-  const { messages, model: clientModel } = req.body as { messages?: unknown; model?: string };
+  const { messages } = req.body as { messages?: unknown; model?: string };
 
   // Validate input shape & length
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
@@ -527,184 +598,109 @@ app.post('/api/chat', async (req, res) => {
     return;
   }
 
-  // Resolve effective model: client pick if allowed, else default
-  const allowed = getEnabledModelIds();
-  const effectiveModel = (clientModel && allowed.includes(clientModel)) ? clientModel : getDefaultModelId();
+  // Resolve effective model: always use the top/default model exposed to end users.
+  // This prevents stale browser localStorage or crafted requests from selecting hidden models.
+  const effectiveModel = getDefaultModelId();
 
-  // Bail early if misconfigured (no keys) — don't fall through to misleading 429
-  if (nvidiaApiKeys.length === 0) {
-    res.status(500).json({ error: { message: 'No NVIDIA API keys configured', type: 'configuration_error' } });
+  const { chatCompletionsUrl, apiKey } = getLiteLLMBackendConfig();
+  if (!apiKey) {
+    res.status(500).json({ error: { message: 'LiteLLM backend is not configured', type: 'configuration_error' } });
     return;
   }
 
-  const maxRetries = nvidiaApiKeys.length; // Retry with different key each time
+  // Optional identity guard. Keep it narrow so normal answers do not reveal the
+  // custom display name unless the user explicitly asks about identity/creator/model.
+  const modelDisplayName = process.env.MODEL_DISPLAY_NAME || 'AI Assistant';
+  const displayNameEnabled = (process.env.DISPLAY_MODEL_NAME ?? 'true').toLowerCase() !== 'false';
+  const sanitizedName = modelDisplayName
+    .slice(0, 60)
+    .replace(/[^a-zA-Z0-9 _.,-]/g, '');
+  const systemMessage = displayNameEnabled
+    ? {
+        role: 'system',
+        content: `Identity policy: Do not mention your custom display name, model name, provider, creator, or backend in normal answers. Only if the user's latest message explicitly asks who you are, what your name/model is, or who created/made you, answer briefly as "${sanitizedName}" and do not include provider or backend details.`,
+      }
+    : null;
 
-  // Clean up expired key rate limit entries
-  const now = Date.now();
-  for (const [k, v] of keyRateLimitStore.entries()) {
-    if (now > v.resetTime) keyRateLimitStore.delete(k);
-  }
+  // Strip client-supplied system messages, then prepend the server policy.
+  const userMessages = messages
+    .filter((m: { role: string }) => m.role !== 'system')
+    .map(({ role, content }: { role: string; content: string }) => ({ role, content }));
+  const finalMessages = systemMessage ? [systemMessage, ...userMessages] : userMessages;
 
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    const apiKey = getNextNvidiaApiKey();
-    if (!apiKey) {
-      res.status(500).json({ error: { message: 'No NVIDIA API keys configured', type: 'configuration_error' } });
-      return;
-    }
-
-    // Check per-key rate limit
-    const keyRecord = keyRateLimitStore.get(apiKey);
-    if (keyRecord && now < keyRecord.resetTime && keyRecord.count >= KEY_RATE_LIMIT_MAX) {
-      // Selected key is locally rate-limited; rotate silently.
-      continue;
-    }
-
-    const headers = new Headers();
-    headers.set('Content-Type', 'application/json');
-    headers.set('Authorization', `Bearer ${apiKey}`);
-    headers.set('Accept', 'text/event-stream');
-
+  try {
+    const controller = new AbortController();
+    // LiteLLM handles provider retries and key rotation; allow its 60s upstream timeout to finish.
+    const timeout = setTimeout(() => controller.abort(), 75000);
+    let response: Response;
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
-
-      // Optional identity guard. Keep it narrow so normal answers do not reveal the
-      // custom display name unless the user explicitly asks about identity/creator/model.
-      // Toggle with DISPLAY_MODEL_NAME=false to disable identity rewriting.
-      const modelDisplayName = process.env.MODEL_DISPLAY_NAME || 'AI Assistant';
-      const displayNameEnabled = (process.env.DISPLAY_MODEL_NAME ?? 'true').toLowerCase() !== 'false';
-      // Sanitize: limit length and strip characters that could break the system prompt
-      // (quotes, newlines, backslashes) to prevent prompt injection via MODEL_DISPLAY_NAME
-      const sanitizedName = modelDisplayName
-              .slice(0, 60)
-              // Allowlist: only safe alphanumeric, spaces, underscores, hyphens, periods, commas
-              .replace(/[^a-zA-Z0-9 _.,-]/g, '');
-      const systemMessage = displayNameEnabled
-        ? {
-            role: 'system',
-            content: `Identity policy: Do not mention your custom display name, model name, provider, creator, or backend in normal answers. Only if the user's latest message explicitly asks who you are, what your name/model is, or who created/made you, answer briefly as "${sanitizedName}" and do not include provider or backend details.`,
-          }
-        : null;
-
-      // Strip any client-supplied system messages, then prepend ours (if enabled)
-      const userMessages = messages
-        .filter((m: { role: string }) => m.role !== 'system')
-        .map(({ role, content }: { role: string; content: string }) => ({ role, content }));
-
-      const finalMessages = systemMessage
-        ? [systemMessage, ...userMessages]
-        : userMessages;
-
-      const requestModel = async (modelId: string) => {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
-        try {
-          return await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              model: modelId,
-              messages: finalMessages,
-              stream: true,
-            }),
-            signal: controller.signal,
-          });
-        } finally {
-          clearTimeout(timeout);
-        }
-      };
-
-      let response = await requestModel(effectiveModel);
-
-      // Track per-key usage
-      if (keyRateLimitStore.has(apiKey)) {
-        keyRateLimitStore.get(apiKey)!.count++;
-      } else {
-        keyRateLimitStore.set(apiKey, { count: 1, resetTime: now + KEY_RATE_LIMIT_WINDOW });
-      }
-
-      if (response.status === 429) {
-        // Upstream rate-limited this request; rotate silently.
-        continue;
-      }
-
-      if ((response.status === 400 || response.status === 404) && effectiveModel !== getDefaultModelId()) {
-        response = await requestModel(getDefaultModelId());
-      }
-
-      if (!response.ok) {
-        // Return generic error — do NOT forward upstream error body (could leak infra details)
-        res.status(response.status).json({
-          error: { message: 'AI service request failed. Please try again.', type: 'api_error' }
-        });
-        return;
-      }
-
-      // Forward response headers
-      res.status(response.status);
-      response.headers.forEach((value, key) => {
-        if (!['content-encoding', 'transfer-encoding', 'connection'].includes(key.toLowerCase())) {
-          res.setHeader(key, value);
-        }
+      response = await fetch(chatCompletionsUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: effectiveModel,
+          messages: finalMessages,
+          stream: true,
+        }),
+        signal: controller.signal,
       });
+    } finally {
+      clearTimeout(timeout);
+    }
 
-      // Stream the response back to client
-      if (response.body) {
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              if (buffer) res.write(buffer);
-              break;
-            }
-            buffer += decoder.decode(value, { stream: true });
-            
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-            
-            for (const line of lines) {
-              if (line.trim()) res.write(line + '\n');
-            }
-          }
-        } finally {
-          reader.releaseLock();
-        }
-      }
-
-      res.end();
+    if (!response.ok) {
+      // Do not forward LiteLLM/provider error bodies because they may contain infrastructure details.
+      const retryAfter = response.headers.get('retry-after');
+      if (retryAfter) res.setHeader('Retry-After', retryAfter);
+      res.status(response.status).json({
+        error: { message: 'AI service request failed. Please try again.', type: 'api_error' }
+      });
       return;
-
-    } catch (error) {
-      console.error(`[/api/chat] Error with key ${attempt + 1}:`, error);
-      if (attempt === maxRetries - 1) {
-        if (!res.headersSent) {
-          res.status(500).json({ error: { message: 'Failed to connect to AI service', type: 'proxy_error' } });
-        }
-        return;
-      }
     }
-  }
 
-  // All keys exhausted — return 429 without queuing
-  if (!res.headersSent) {
-    let maxResetMs = KEY_RATE_LIMIT_WINDOW;
-    for (const v of keyRateLimitStore.values()) {
-      const remaining = v.resetTime - Date.now();
-      if (remaining > maxResetMs) maxResetMs = remaining;
-    }
-    const retryAfter = Math.ceil(maxResetMs / 1000);
-    res.setHeader('Retry-After', retryAfter);
-    res.status(429).json({
-      error: {
-        message: `All API keys are rate limited. Please try again in ${retryAfter} seconds.`,
-        type: 'rate_limit_exceeded',
-        retryAfter,
+    res.status(response.status);
+    response.headers.forEach((value, key) => {
+      if (!['content-encoding', 'transfer-encoding', 'connection'].includes(key.toLowerCase())) {
+        res.setHeader(key, value);
       }
     });
+
+    if (response.body) {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            if (buffer) res.write(buffer);
+            break;
+          }
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            if (line.trim()) res.write(line + '\n');
+          }
+        }
+      } finally {
+        clearTimeout(timeout);  // always clear — prevents leaked timers on disconnect/normal close
+        reader.releaseLock();
+      }
+    } else {
+      clearTimeout(timeout);
+    }
+
+    res.end();
+  } catch (error) {
+    console.error('[/api/chat] LiteLLM request failed:', error);
+    if (!res.headersSent) {
+      res.status(502).json({ error: { message: 'Failed to connect to AI service', type: 'proxy_error' } });
+    }
   }
 });
 
@@ -730,7 +726,7 @@ app.get('/health/live', (_req, res) => {
 
 app.get('/health/ready', (_req, res) => {
   // Check basic readiness — don't disclose which keys are configured (security: no recon)
-  const ready = nvidiaApiKeys.length > 0 || !!process.env.OPENAI_API_KEY || !!process.env.ANTHROPIC_API_KEY;
+  const ready = !!getLiteLLMBackendConfig().apiKey || !!process.env.OPENAI_API_KEY || !!process.env.ANTHROPIC_API_KEY;
   res.status(ready ? 200 : 503).json({
     status: ready ? 'ready' : 'not_ready',
     timestamp: new Date().toISOString(),
@@ -739,7 +735,7 @@ app.get('/health/ready', (_req, res) => {
 
 // Mirrored at /api/health/ready for Caddy proxy compatibility
 app.get('/api/health/ready', (_req, res) => {
-  const ready = nvidiaApiKeys.length > 0 || !!process.env.OPENAI_API_KEY || !!process.env.ANTHROPIC_API_KEY;
+  const ready = !!getLiteLLMBackendConfig().apiKey || !!process.env.OPENAI_API_KEY || !!process.env.ANTHROPIC_API_KEY;
   res.status(ready ? 200 : 503).json({
     status: ready ? 'ready' : 'not_ready',
     timestamp: new Date().toISOString(),
@@ -747,25 +743,17 @@ app.get('/api/health/ready', (_req, res) => {
 });
 
 app.get('/health', (_req, res) => {
-  const now = Date.now();
-
-  // Snapshot of queue and key rate-limit state (non-sensitive)
-  const keysTotal = nvidiaApiKeys.length;
-  const keysRateLimited = [...keyRateLimitStore.entries()]
-    .filter(([, v]) => now < v.resetTime && v.count >= KEY_RATE_LIMIT_MAX)
-    .length;
-
+  // Generic health — no internal metrics disclosure
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '1.0.0',
-    nvidiaKeysTotal: keysTotal,
-    nvidiaKeysRateLimited: keysRateLimited,
   });
 });
 
-// --- Secure Settings API ---
-app.get('/api/settings', (_req, res) => {
+// --- Settings API (requires authentication) ---
+// Returns minimal public-facing config so the client can render model labels.
+// Anything sensitive (API keys, secret model IDs, internal config) must NOT live here.
+app.get('/api/settings', requireAuth, (_req, res) => {
   const settings = {
     model: {
       openai: process.env.OPENAI_MODEL || 'gpt-4o',
@@ -880,8 +868,23 @@ app.post('/api/document', async (req, res) => {
     return;
   }
 
+  // Reject unexpected MIME types — client-reported mimetype can't be trusted blindly
+  const allowedMimeTypes = [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ];
+  if (!allowedMimeTypes.includes(fileData.mimetype)) {
+    res.status(400).json({ error: { message: 'Unsupported file type. Upload a PDF or Word document.', type: 'invalid_request' } });
+    return;
+  }
+
   try {
     const text = await parseDocument(Buffer.from(fileData.data), fileData.mimetype);
+    // Validate that parsed content is non-empty and the file wasn't just noise/malformed
+    if (!text || text.trim().length === 0) {
+      res.status(422).json({ error: { message: 'Could not extract text from file — it may be corrupted or password-protected', type: 'parse_error' } });
+      return;
+    }
     res.json({
       text,
       fileName: fileData.name,
@@ -907,19 +910,39 @@ const spaFallbackRateLimit = rateLimit({
   message: { error: { message: 'Too many requests', type: 'rate_limited' } },
 });
 
-if (!isDev) {
-  app.use(express.static(join(__dirname, 'dist')));
+// --- SPA static file serving (always registered — dist exists after build) ---
+app.use(express.static(join(__dirname, 'dist')));
 
-  // SPA fallback - serve index.html for all non-API routes
-  app.use(spaFallbackRateLimit, (_req, res) => {
-    res.sendFile(join(__dirname, 'dist', 'index.html'));
+// SPA fallback - serve index.html for all non-API routes
+app.use(spaFallbackRateLimit, (_req, res) => {
+  res.sendFile(join(__dirname, 'dist', 'index.html'));
+});
+
+const PORT = Number(process.env.PORT || 3000);
+const BIND_HOST = process.env.BIND_HOST || '127.0.0.1'; // localhost only — reverse proxy handles external access
+
+// Graceful shutdown — drain in-flight requests before exiting
+let isShuttingDown = false;
+function gracefulShutdown(signal: string) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log(`[server] Received ${signal}, shutting down gracefully...`);
+  server.close(() => {
+    console.log('[server] HTTP server closed');
+    process.exit(0);
   });
+  // Force exit after 10s if requests are still hanging
+  setTimeout(() => {
+    console.error('[server] Forced exit after graceful shutdown timeout');
+    process.exit(1);
+  }, 10_000);
 }
 
-const PORT = process.env.PORT || 3000;
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, BIND_HOST, () => {
   const env = isDev ? 'development' : 'production';
-  console.log(`[server] Khmer AI running in ${env} mode on port ${PORT}`);
+  console.log(`[server] Khmer AI running in ${env} mode on ${BIND_HOST}:${PORT}`);
   console.log('[server] Health check: GET /health');
 });

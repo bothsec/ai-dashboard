@@ -23,7 +23,7 @@ interface AuditEntry {
   ts: string;
   actor_id: number | null;
   actor_email: string | null;
-  action: 'login_success' | 'login_failure' | 'logout' | 'user_created' | 'user_updated' | 'user_deleted';
+  action: 'login_success' | 'login_failure' | 'logout' | 'user_created' | 'user_updated' | 'user_deleted' | 'config_updated';
   target_id: number | null;
   target_email: string | null;
   details: string | null;
@@ -38,6 +38,7 @@ export interface ModelConfig {
 
 interface ServerConfig {
   models: ModelConfig[];
+  default?: string;
 }
 
 const DEFAULT_MODELS: ModelConfig[] = [
@@ -92,9 +93,11 @@ export function getEnabledModelIds(): string[] {
 }
 
 function getDefaultModel(): string {
-  // Return the first enabled model, or the NVIDIA_MODEL env var, or the default
+  // Prefer the configured default if it is enabled, then env fallback, then first enabled.
+  const cfg = getServerConfig();
+  const enabled = cfg.models.filter(m => m.enabled).map(m => m.id);
+  if (cfg.default && enabled.includes(cfg.default)) return cfg.default;
   const envModel = process.env.NVIDIA_MODEL;
-  const enabled = getEnabledModelIds();
   if (envModel && enabled.includes(envModel)) return envModel;
   return enabled[0] || 'meta/llama-3.3-70b-instruct';
 }
@@ -176,16 +179,30 @@ function toPublicUser(user: User): PublicUser {
   };
 }
 
-// Init default admin user
+// ADMIN_PASSWORD is required when initialising the default admin.
+// If users.json already exists with a valid admin, the existing credentials are preserved
+// and ADMIN_PASSWORD is not needed (even if unset). This avoids forcing a password reset
+// on every server that already has users.
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+const ADMIN_NAME = process.env.ADMIN_NAME || 'admin';
+
 function initDefault() {
   const users = getUsers();
   if (users.length === 0) {
-    const defaultPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    if (!ADMIN_PASSWORD) {
+      console.error('[admin] ADMIN_PASSWORD env var is required to initialise the first admin user');
+      process.exit(1);
+    }
+    if (!ADMIN_EMAIL) {
+      console.error('[admin] ADMIN_EMAIL env var is required to initialise the first admin user');
+      process.exit(1);
+    }
     saveUsers([{
       id: 1,
-      name: process.env.ADMIN_NAME || 'vorreakboth',
-      email: process.env.ADMIN_EMAIL || 'vorreakboth@admin.local',
-      password_hash: hashPassword(defaultPassword),
+      name: ADMIN_NAME,
+      email: ADMIN_EMAIL,
+      password_hash: hashPassword(ADMIN_PASSWORD),
       role: 'admin',
       features: '{}',
       created_at: new Date().toISOString()
@@ -231,13 +248,15 @@ export function registerAdminRoutes(app: import('express').Application) {
   admin.post('/login', requireLoginRateLimit, (req, res) => {
     const { email, password } = req.body as { email?: string; password?: string } || {};
     if (!email || !password) {
-      recordAudit({ actor_id: null, actor_email: email || null, action: 'login_failure', target_id: null, target_email: email || null, details: 'missing credentials' });
       res.status(400).json({ error: { message: 'Email and password required.' } }); return;
     }
+    // Look up user and verify password. Always perform the same steps for any
+    // failure so the response is identical whether the email exists or the
+    // password is wrong — prevents email enumeration attacks.
     const users = getUsers();
     const user = users.find(u => u.email === email);
     if (!user || !verifyPassword(password, user.password_hash)) {
-      recordAudit({ actor_id: null, actor_email: email, action: 'login_failure', target_id: user?.id ?? null, target_email: email, details: 'invalid credentials' });
+      // Deliberately no audit record for failed logins (avoids filling audit with enumeration probes)
       res.status(401).json({ error: { message: 'Invalid credentials.' } }); return;
     }
     if (!isPasswordHash(user.password_hash)) {
@@ -402,16 +421,21 @@ export function registerAdminRoutes(app: import('express').Application) {
     }
     const cfg: ServerConfig = { models };
     saveServerConfig(cfg);
-    recordAudit({ actor_id: val.userId, actor_email: val.user.email, action: 'user_updated', target_id: null, target_email: null, details: `models config updated (${models.length} models)` });
+    recordAudit({ actor_id: val.userId, actor_email: val.user.email, action: 'config_updated', target_id: null, target_email: null, details: `models config updated (${models.length} models)` });
     res.json({ models });
   });
 
   app.use('/api/admin', admin);
 
   // --- Public endpoints (no auth required) ---
-  // GET /api/models → list of enabled models (for user model selector)
+  // GET /api/models → expose only the top/default model to end users.
+  // Admins can still manage the full catalog at /api/admin/config/models.
   app.get('/api/models', (_req, res) => {
-    const enabled = getServerConfig().models.filter(m => m.enabled);
-    res.json({ models: enabled, default: getDefaultModel() });
+    const cfg = getServerConfig();
+    const topModelId = getDefaultModel();
+    const topModel = cfg.models.find(m => m.enabled && m.id === topModelId)
+      || cfg.models.find(m => m.enabled)
+      || DEFAULT_MODELS[0];
+    res.json({ models: [topModel], default: topModel.id });
   });
 }
